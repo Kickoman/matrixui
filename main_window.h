@@ -8,8 +8,10 @@ class AdvancedTerminalStream;
 class TimeChart;
 class DigitChart;
 class TestResult;
-class DigitsRunner;
+class DigitsRecognizerController;
 class QThread;
+class QPushButton;
+class QLabel;
 
 class MainWindow : public QMainWindow
 {
@@ -18,18 +20,33 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
 
+    AdvancedTerminal* getTerminalWidget() const;
+
+    void setLogger(std::ostream* stream);
+    void setController(DigitsRecognizerController* controller);
+
+    void closeEvent(QCloseEvent* event) override;
+
 public slots:
     void handleTimer();
     void handleStatistics(const TestResult& result);
 
+private slots:
+    void updateInfo();
+
 private:
-    void doDemo();
+
     std::ostream& logger();
+    std::ostream* stream = nullptr;
 
     AdvancedTerminal* terminal = nullptr;
-    std::ostream* stream = nullptr;
     TimeChart* chart = nullptr;
     DigitChart* digitChart = nullptr;
-    DigitsRunner* runner = nullptr;
-    QThread* thread = nullptr;
+    QPushButton* toggleLearningButton = nullptr;
+    QPushButton* openNetworkButton = nullptr;
+    QPushButton* openDatasetButton = nullptr;
+    QLabel* currentNetworkLabel = nullptr;
+    QLabel* currentDatasetLabel = nullptr;
+
+    DigitsRecognizerController* controller = nullptr;
 };

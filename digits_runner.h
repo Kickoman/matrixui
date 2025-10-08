@@ -1,27 +1,43 @@
 #pragma once
 
 #include <QObject>
+#include <memory>
 #include "digits_recognizer.h"
 
 
 Q_DECLARE_METATYPE(TestResult);
 
 
-class DigitsRunner : public QObject
+class DigitsRecognizerController : public QObject
 {
     Q_OBJECT
 public:
-    DigitsRunner(DigitsRecognizer recognizer);
+    struct Info {
+        bool initialized;
+        bool running;
+        std::string pathToDataset;
+        std::string networkName;
+        std::vector<std::size_t> layersConfiguration;
+    };
+
+    DigitsRecognizerController(DigitsRecognizer* recognizer);
+    ~DigitsRecognizerController();
 
 public slots:
     void run();
     void requestStop();
+    void loadNetwork(const QString& networkName);
+    void setDataset(const QString& pathToDataset);
+    void setSamplesLimit(const unsigned limit);
+
+    Info getInfo() const;
 
 signals:
+    void infoUpdated();
     void updatedStatistics(const TestResult& result) const;
 
 private:
     void updateStatistic(const TestResult& result) const;
 
-    DigitsRecognizer recognizer;
+    DigitsRecognizer* recognizer;
 };

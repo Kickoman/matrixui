@@ -20,6 +20,10 @@ bool NeuralNetwork::isInitialized() const {
     return initialized;
 }
 
+const std::vector<std::size_t>& NeuralNetwork::getLayerSizes() const {
+    return layerSizes;
+}
+
 void NeuralNetwork::initializeNetwork(const std::vector<size_t>& layerSizes) {
     this->layerSizes = layerSizes;
     this->initialized = true;

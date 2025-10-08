@@ -1,24 +1,66 @@
 #include "digits_runner.h"
 #include "digits_recognizer.h"
+#include <stdexcept>
+#include <QThreadPool>
 
 
-DigitsRunner::DigitsRunner(DigitsRecognizer recognizer)
+DigitsRecognizerController::DigitsRecognizerController(DigitsRecognizer* recognizer)
     : recognizer(recognizer)
 {
-    this->recognizer.setResultCallback([this](const TestResult& result){
-        this->updatedStatistics(result);
+    this->recognizer->setResultCallback([this](const TestResult& result){
+        QMetaObject::invokeMethod(this, &DigitsRecognizerController::updatedStatistics, result);
     });
 }
 
-
-void DigitsRunner::run() {
-    recognizer.doLearning();
+DigitsRecognizerController::~DigitsRecognizerController() {
+    QThreadPool::globalInstance()->waitForDone();
 }
 
-void DigitsRunner::requestStop() {
-    recognizer.requestStop();
+void DigitsRecognizerController::run() {
+    if (recognizer->isRunning()) {
+        throw std::runtime_error("Can't start learning while learning in progress");
+    }
+    QThreadPool::globalInstance()->start([this]{
+        QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
+        recognizer->doLearning();
+        QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
+    });
 }
 
-void DigitsRunner::updateStatistic(const TestResult& result) const {
+void DigitsRecognizerController::requestStop() {
+    recognizer->requestStop();
+}
+
+void DigitsRecognizerController::loadNetwork(const QString& network) {
+    if (recognizer->isRunning()) {
+        throw std::runtime_error("Can't load network, while learning is running");
+    }
+    recognizer->loadNetwork(network.toStdString());
+    emit infoUpdated();
+}
+
+void DigitsRecognizerController::setDataset(const QString& pathToDataset) {
+    if (recognizer->isRunning()) {
+        throw std::runtime_error("Can't change datasets while learning is running");
+    }
+    recognizer->setDataset(pathToDataset.toStdString());
+    emit infoUpdated();
+}
+
+void DigitsRecognizerController::setSamplesLimit(const unsigned limit) {
+    recognizer->setDatasetFileLimit(limit);
+}
+
+DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
+    return {
+        .initialized = recognizer->isInitialized(),
+        .running = recognizer->isRunning(),
+        .pathToDataset = recognizer->getPathToDataset(),
+        .networkName = recognizer->getNetworkName(),
+        .layersConfiguration = recognizer->getLayersConfiguration(),
+    };
+}
+
+void DigitsRecognizerController::updateStatistic(const TestResult& result) const {
     emit updatedStatistics(result);
 }

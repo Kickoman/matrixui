@@ -7,6 +7,7 @@
 #include <optional>
 #include <algorithm>
 
+#include "advanced_terminal.h"
 #include "neural_network.h"
 
 
@@ -60,7 +61,6 @@ public:
     using TLayers = TVector<TSize>;
     static constexpr TSize IMAGE_W = 64;
     static constexpr TSize IMAGE_H = 64;
-    static constexpr TSize DATASET_FILE_LIMIT = 10;
     static constexpr double LEARNING_RATE = 0.2;
     static constexpr unsigned EPOCHS = 1000;
     static const TLayers DEFAULT_LAYERS;
@@ -68,12 +68,20 @@ public:
     void setLogger(std::ostream* stream);
     void loadNetwork(const TString& networkName);
     void setDataset(const TString& pathToDataset);
+    void setDatasetFileLimit(const TSize limit);
     void setResultCallback(std::function<void(const TestResult&)> callback);
 
     TestResult testNetwork() const;
     void doTest() const;
     void doLearning();
     void requestStop();
+
+    bool isRunning() const;
+    bool isInitialized() const;
+
+    const TString& getPathToDataset() const;
+    const TString& getNetworkName() const;
+    const TLayers& getLayersConfiguration() const;
 private:
     static TDigit getPredictionFast(const Matrix& prediction);
     static Matrix generateExpectedResult(const TDigit digit);
@@ -98,7 +106,9 @@ private:
     TString networkName;
     TString pathToDataset;
     std::ostream* stream = &std::cout;
+    TSize datasetFileLimit = 10;
     bool saveOnEachDigit = true;
+    bool running = false;
     bool stopRequested = false;
     std::optional<std::function<void(const TestResult& result)>> resultCallback;
 };

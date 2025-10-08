@@ -32,6 +32,10 @@ void DigitsRecognizer::setDataset(const TString& pathToDataset) {
     this->pathToDataset = pathToDataset;
 }
 
+void DigitsRecognizer::setDatasetFileLimit(const TSize limit) {
+    datasetFileLimit = limit;
+}
+
 TestResult DigitsRecognizer::testNetwork() const {
     TestResult testResult;
     for (TDigit digitToCheck = 0; digitToCheck < 10 && !stopRequested; ++digitToCheck) {
@@ -41,6 +45,9 @@ TestResult DigitsRecognizer::testNetwork() const {
         RecognitionStatistics statistics;
 
         for (const auto& file : files) {
+            if (stopRequested) {
+                break;
+            }
             log() << "\r[test] Testing digit " << digitToCheck << "; " << std::flush;
             const auto image = PngUtils::fromPNG(file).transform(1, 64*64);
             const auto prediction = network.predict(image);
@@ -87,6 +94,7 @@ void DigitsRecognizer::printTestResult(const TestResult& result) const {
 }
 
 void DigitsRecognizer::doLearning() {
+    running = true;
     stopRequested = false;
     TDigit digitToTrain = 0;
     while (digitToTrain < 10 && !stopRequested) {
@@ -99,6 +107,27 @@ void DigitsRecognizer::doLearning() {
         }
         doTest();
     }
+    running = false;
+}
+
+bool DigitsRecognizer::isRunning() const {
+    return running;
+}
+
+bool DigitsRecognizer::isInitialized() const {
+    return network.isInitialized();
+}
+
+const DigitsRecognizer::TString& DigitsRecognizer::getPathToDataset() const {
+    return pathToDataset;
+}
+
+const DigitsRecognizer::TString& DigitsRecognizer::getNetworkName() const {
+    return networkName;
+}
+
+const DigitsRecognizer::TLayers& DigitsRecognizer::getLayersConfiguration() const {
+    return network.getLayerSizes();
 }
 
 void DigitsRecognizer::requestStop() {
@@ -135,7 +164,7 @@ DigitsRecognizer::TSamplesList DigitsRecognizer::getBadSamples(
 ) const {
     TSamplesList badSamples;
     const auto files = DirectoryLister::listFilesWithExtensions(datasetDir, {".png", ".PNG"});
-    for (TSize i = 0; i < std::min(DATASET_FILE_LIMIT, files.size()); ++i) {
+    for (TSize i = 0; i < std::min(datasetFileLimit, files.size()); ++i) {
         log() << "\r[validation] Checking digit " << expected << " for file #" << i + 1 << "                     " << std::flush;
         const auto image = PngUtils::fromPNG(files[i]).transform(1, IMAGE_H * IMAGE_W);
         const auto prediction = network.predict(image);

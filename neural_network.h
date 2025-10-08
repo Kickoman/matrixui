@@ -28,6 +28,7 @@ public:
 
     void initializeNetwork(const std::vector<size_t>& layerSizes);
     bool isInitialized() const;
+    const std::vector<std::size_t>& getLayerSizes() const;
 
     void initializeWeights(std::mt19937& gen);
     void train(const Matrix& inputs, const Matrix& targets, const int epochs, const double learningRate, std::ostream& logger = std::cout);
