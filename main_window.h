@@ -7,6 +7,9 @@ class AdvancedTerminal;
 class AdvancedTerminalStream;
 class TimeChart;
 class DigitChart;
+class TestResult;
+class DigitsRunner;
+class QThread;
 
 class MainWindow : public QMainWindow
 {
@@ -17,13 +20,16 @@ public:
 
 public slots:
     void handleTimer();
+    void handleStatistics(const TestResult& result);
 
 private:
     void doDemo();
-    AdvancedTerminalStream& logger();
+    std::ostream& logger();
 
     AdvancedTerminal* terminal = nullptr;
-    AdvancedTerminalStream* stream = nullptr;
+    std::ostream* stream = nullptr;
     TimeChart* chart = nullptr;
     DigitChart* digitChart = nullptr;
+    DigitsRunner* runner = nullptr;
+    QThread* thread = nullptr;
 };

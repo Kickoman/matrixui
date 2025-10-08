@@ -1,15 +1,19 @@
 #pragma once
 
 #include <QPlainTextEdit>
+#include <ios>
+#include <qtmetamacros.h>
 #include <sstream>
+#include <mutex>
+
 
 class AdvancedTerminal : public QPlainTextEdit {
     Q_OBJECT
 public:
     AdvancedTerminal(QWidget* parent = nullptr);
 
-    void write(const QString& text);
-    void writeLine(const QString& text);
+    Q_INVOKABLE void write(const QString& text);
+    Q_INVOKABLE void writeLine(const QString& text);
     void clearLine();
 
 private:
@@ -24,11 +28,13 @@ public:
 
     template<class T>
     AdvancedTerminalStream& operator<<(const T& t) {
+        std::lock_guard<std::mutex> lock(bufferMutex);
         buffer << t;
         return *this;
     }
 
     AdvancedTerminalStream& operator<<(std::ostream& (*manipulator)(std::ostream&)) {
+        std::lock_guard<std::mutex> lock(bufferMutex);
         if (manipulator == static_cast<std::ostream& (*)(std::ostream&)>(std::endl)) {
             flushBuffer(true);
         } else if (manipulator == static_cast<std::ostream& (*)(std::ostream&)>(std::flush)) {
@@ -41,6 +47,7 @@ public:
     }
 
     void flush() {
+        std::lock_guard<std::mutex> lock(bufferMutex);
         flushBuffer(false);
     }
 private:
@@ -49,12 +56,12 @@ private:
             return;
         }
 
-        const auto& text = buffer.str();
-        if (!text.empty() || addNewline) {
+        const auto& text = QString::fromStdString(buffer.str());
+        if (!text.isEmpty() || addNewline) {
             if (addNewline) {
-                terminal->writeLine(QString::fromStdString(text));
+                QMetaObject::invokeMethod(terminal, &AdvancedTerminal::writeLine, text);
             } else {
-                terminal->write(QString::fromStdString(text));
+                QMetaObject::invokeMethod(terminal, &AdvancedTerminal::write, text);
             }
             buffer.str("");
             buffer.clear();
@@ -67,7 +74,7 @@ private:
 
         if (newLinePosition != std::string::npos) {
             const auto& toFlush = content.substr(0, newLinePosition + 1);
-            terminal->write(QString::fromStdString(toFlush));
+            QMetaObject::invokeMethod(terminal, &AdvancedTerminal::write, QString::fromStdString(toFlush));
 
             const auto& remaining = content.substr(newLinePosition + 1);
             buffer.str(remaining);
@@ -76,5 +83,73 @@ private:
     }
 
     AdvancedTerminal* terminal;
+    std::mutex bufferMutex;
     std::ostringstream buffer;
 };
+
+
+class ThreadSafeTerminalBuffer : public std::streambuf
+{
+public:
+    ThreadSafeTerminalBuffer(AdvancedTerminalStream* stream) : stream(stream) {}
+
+protected:
+    std::streamsize xsputn(const char_type* s, std::streamsize count) override {
+        if (stream) {
+            std::string string(s, count);
+            *stream << string;
+        }
+        return count;
+    }
+
+    int_type overflow(int_type ch) override {
+        if (ch != traits_type::eof() && stream) {
+            *stream << static_cast<char>(ch);
+        }
+        return ch;
+    }
+
+    int sync() override {
+        if (stream) {
+            stream->flush();
+        }
+        return 0;
+    }
+
+private:
+    AdvancedTerminalStream* stream;
+};
+
+
+class ThreadSafeTerminalOStream : public std::ostream
+{
+public:
+    ThreadSafeTerminalOStream(AdvancedTerminalStream* stream)
+        : std::ostream(&buffer)
+        , buffer(stream)
+    {}
+
+    ThreadSafeTerminalOStream(const ThreadSafeTerminalOStream&) = delete;
+    ThreadSafeTerminalOStream& operator=(const ThreadSafeTerminalOStream&) = delete;
+
+    ThreadSafeTerminalOStream(ThreadSafeTerminalOStream&& other) noexcept
+        : std::ostream(std::move(other))
+        , buffer(std::move(other.buffer)) {
+        rdbuf(&buffer);
+    }
+
+    ThreadSafeTerminalOStream& operator=(ThreadSafeTerminalOStream&& other) noexcept {
+        if (this != &other) {
+            std::ostream::operator=(std::move(other));
+            buffer = std::move(other.buffer);
+            rdbuf(&buffer);
+        }
+        return *this;
+    }
+
+private:
+    ThreadSafeTerminalBuffer buffer;
+};
+
+
+std::unique_ptr<ThreadSafeTerminalOStream> createTerminalOStream(AdvancedTerminal* terminal);

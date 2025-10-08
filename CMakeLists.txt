@@ -31,6 +31,11 @@ set(SOURCES
     matrix.cpp
     time_chart.cpp
     digit_chart.cpp
+
+    digits_recognizer.cpp
+    neural_network.cpp
+    pngreader.cpp
+    digits_runner.cpp
 )
 
 include_directories(eigen)

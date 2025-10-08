@@ -76,3 +76,8 @@ QString AdvancedTerminal::processBackspaces(const QString& text)
     }
     return result;
 }
+
+std::unique_ptr<ThreadSafeTerminalOStream> createTerminalOStream(AdvancedTerminal* terminal) {
+    auto terminalStream = std::make_unique<AdvancedTerminalStream>(terminal);
+    return std::make_unique<ThreadSafeTerminalOStream>(terminalStream.release());
+}

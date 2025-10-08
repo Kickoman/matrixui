@@ -56,15 +56,14 @@ void TimeChart::addPoint(const double value)
 {
     const double timeOffset = startTime.msecsTo(QDateTime::currentDateTime()) / 1000.0;
     series->append(timeOffset, value);
-    // if (series->count() > 20) {
-    //     series->remove(0);
-    // }
+
+    const auto length = series->count();
+    const auto first = series->at(std::max(0, length - 1 - 20));
     if (timeOffset > 20) {
-        axisX->setRange(timeOffset - 20, timeOffset);
+        axisX->setRange(first.x(), timeOffset);
     } else {
         axisX->setRange(0, 20);
-    }
-    // updateYAxisRange();
+    };
 }
 
 void TimeChart::updateYAxisRange()

@@ -31,7 +31,7 @@ DigitChart::DigitChart(QWidget* parent)
     series->attachAxis(axisY);
 
     axisX = new QValueAxis();
-    axisX->setRange(0, 5);
+    axisX->setRange(0, 100);
     axisX->setTitleText("Value");
     chart->addAxis(axisX, Qt::AlignBottom);
     series->attachAxis(axisX);

@@ -1,5 +1,7 @@
 #include "main_window.h"
 #include "advanced_terminal.h"
+#include "digits_recognizer.h"
+#include "digits_runner.h"
 #include "matrix.h"
 #include "time_chart.h"
 #include "digit_chart.h"
@@ -10,6 +12,7 @@
 #include <QtCharts/QtCharts>
 #include <QTimer>
 #include <QRandomGenerator>
+#include <qobject.h>
 #include <qrandom.h>
 
 
@@ -17,7 +20,7 @@ MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
     terminal = new AdvancedTerminal(this);
-    stream = new AdvancedTerminalStream(terminal);
+    stream = createTerminalOStream(terminal).release();
 
     chart = new TimeChart(this);
     digitChart = new DigitChart(this);
@@ -36,15 +39,30 @@ MainWindow::MainWindow(QWidget* parent)
 
     terminal->write("Hello world");
 
-    auto* timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, &MainWindow::handleTimer);
-    timer->start(2000);
+    // auto* timer = new QTimer(this);
+    // connect(timer, &QTimer::timeout, this, &MainWindow::handleTimer);
+    // timer->start(2000);
     doDemo();
     showMaximized();
+
+    thread = new QThread(this);
+    DigitsRecognizer recognizer;
+    recognizer.loadNetwork("interm-6.wgt");
+    recognizer.setDataset("/home/kanstancin/Documents/projects/digits-generator/digit_images/");
+    recognizer.setLogger(stream);
+    runner = new DigitsRunner(recognizer);
+    runner->moveToThread(thread);
+    connect(thread, &QThread::finished, runner, &QObject::deleteLater);
+    connect(thread, &QThread::started, runner, &DigitsRunner::run);
+    connect(runner, &DigitsRunner::updatedStatistics, this, &MainWindow::handleStatistics);
+    thread->start();
 }
 
 MainWindow::~MainWindow()
 {
+    runner->requestStop();
+    thread->quit();
+    thread->wait();
     delete stream;
 }
 
@@ -61,7 +79,19 @@ void MainWindow::handleTimer()
     }
 }
 
-AdvancedTerminalStream& MainWindow::logger() {
+void MainWindow::handleStatistics(const TestResult& result) {
+    const auto& total = result.getTotal();
+    const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
+    chart->addPoint(rate);
+
+    for (unsigned i = 0; i < 10; ++i) {
+        const auto& res = result.digits[i];
+        const double rate = res->totalTests > 0 ? 100.0 * res->passedTests / res->totalTests : 0;
+        digitChart->setValue(i, rate);
+    }
+}
+
+std::ostream& MainWindow::logger() {
     return *stream;
 }
 
