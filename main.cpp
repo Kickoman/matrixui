@@ -6,7 +6,6 @@
 
 
 int main(int argc, char** argv) {
-    QApplication::setStyle("windows");
     QApplication a(argc, argv);
 
     MainWindow window;
@@ -15,7 +14,7 @@ int main(int argc, char** argv) {
     DigitsRecognizer recognizer;
     DigitsRecognizerController controller(&recognizer);
     controller.loadNetwork("interm-6.wgt");
-    controller.setSamplesLimit(20);
+    controller.setSamplesLimit(30);
     controller.setDataset("/home/kanstancin/Documents/projects/digits-generator/digit_images/");
 
     recognizer.setLogger(stream.get());

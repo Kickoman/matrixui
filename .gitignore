@@ -329,3 +329,5 @@ CMakeLists.txt.user*
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/cmake,visualstudiocode,c++,c,qt,python
+
+buildrel

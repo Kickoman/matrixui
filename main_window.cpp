@@ -14,11 +14,15 @@
 #include <QRandomGenerator>
 #include <QPushButton>
 #include <QLabel>
+#include <QFileDialog>
+#include <QMessageBox>
 #include <qboxlayout.h>
 #include <qevent.h>
 #include <qobject.h>
 #include <qpushbutton.h>
 #include <qrandom.h>
+#include <stdexcept>
+#include "network_create_dialog.h"
 
 
 MainWindow::MainWindow(QWidget* parent)
@@ -28,6 +32,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     chart = new TimeChart(this);
     digitChart = new DigitChart(this);
+    chart->setTitle("Test passing rate");
+    digitChart->setTitle("Tests passing per digit");
 
     toggleLearningButton = new QPushButton("Start learning", this);
     openNetworkButton = new QPushButton("Open network", this);
@@ -57,6 +63,9 @@ MainWindow::MainWindow(QWidget* parent)
 
     setCentralWidget(mainWidget);
     showMaximized();
+
+    connect(openNetworkButton, &QPushButton::clicked, this, &MainWindow::handleOpenNetworkClicked);
+    connect(openDatasetButton, &QPushButton::clicked, this, &MainWindow::handleOpenDatasetClicked);
 }
 
 MainWindow::~MainWindow()
@@ -127,6 +136,34 @@ void MainWindow::updateInfo() {
     toggleLearningButton->setText(
         info.running ? "Stop learning" : "Start learning"
     );
+}
+
+void MainWindow::handleOpenNetworkClicked() {
+    NetworkCreateDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        const QString name = dialog.getNetworkName();
+        const auto sizes = dialog.getLayerSizes();
+        controller->loadNetwork(name);
+    }
+}
+
+void MainWindow::handleOpenDatasetClicked() {
+    QFileDialog dialog(this);
+    dialog.setModal(true);
+    dialog.setFileMode(QFileDialog::Directory);
+    if (dialog.exec()) {
+        const auto selected = dialog.selectedFiles();
+        if (selected.size() != 1) {
+            throw std::runtime_error("A single directory should be selected");
+        }
+        if (!controller->setDataset(selected.front())) {
+            QMessageBox::critical(
+                this,
+                "Incorrect dataset format!",
+                "The dataset directory should contain 10 directories per each digit named with the digit"
+            );
+        }
+    }
 }
 
 std::ostream& MainWindow::logger() {

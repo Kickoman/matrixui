@@ -58,7 +58,7 @@ void TimeChart::addPoint(const double value)
     series->append(timeOffset, value);
 
     const auto length = series->count();
-    const auto first = series->at(std::max(0, length - 1 - 20));
+    const auto first = series->at(std::max(0, length - 1 - 200));
     if (timeOffset > 20) {
         axisX->setRange(first.x(), timeOffset);
     } else {

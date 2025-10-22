@@ -5,7 +5,7 @@
 
 namespace PngUtils {
 
-Matrix fromPNG(const std::string& filename);
+Matrix fromImage(const std::string& filename, const unsigned targetHeight, const unsigned targetWidth);
 
 }
 

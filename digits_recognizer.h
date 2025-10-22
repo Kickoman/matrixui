@@ -6,8 +6,8 @@
 #include <string>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
 
-#include "advanced_terminal.h"
 #include "neural_network.h"
 
 
@@ -52,7 +52,7 @@ struct TestResult {
 class DigitsRecognizer
 {
 public:
-    using TDigit = std::uint8_t;
+    using TDigit = unsigned;
     using TString = std::string;
     template<class T>
     using TVector = std::vector<T>;
@@ -67,19 +67,21 @@ public:
 
     void setLogger(std::ostream* stream);
     void loadNetwork(const TString& networkName);
-    void setDataset(const TString& pathToDataset);
+    void setDataset(const std::filesystem::path& pathToDataset);
     void setDatasetFileLimit(const TSize limit);
+    void setTestingFileLimit(const TSize limit);
     void setResultCallback(std::function<void(const TestResult&)> callback);
 
     TestResult testNetwork() const;
     void doTest() const;
     void doLearning();
     void requestStop();
+    void saveNetwork() const;
 
     bool isRunning() const;
     bool isInitialized() const;
 
-    const TString& getPathToDataset() const;
+    const std::filesystem::path& getPathToDataset() const;
     const TString& getNetworkName() const;
     const TLayers& getLayersConfiguration() const;
 private:
@@ -90,6 +92,7 @@ private:
         const TString& datasetDir,
         const bool fastCircuit = false
     ) const;
+    void filterBadSamples(TSamplesList& samples, const TDigit expected, const TString& datasetDir, const bool fastCircuit = false) const;
     bool trainSample(const TString& sample, const auto& expectedResult, const TDigit digit);
     bool trainDigit(const TDigit digit);
 
@@ -104,9 +107,10 @@ private:
 
     NeuralNetwork network;
     TString networkName;
-    TString pathToDataset;
+    std::filesystem::path pathToDataset;
     std::ostream* stream = &std::cout;
     TSize datasetFileLimit = 10;
+    TSize testingFileLimit = 150;
     bool saveOnEachDigit = true;
     bool running = false;
     bool stopRequested = false;

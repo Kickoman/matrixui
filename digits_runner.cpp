@@ -2,6 +2,7 @@
 #include "digits_recognizer.h"
 #include <stdexcept>
 #include <QThreadPool>
+#include <QDir>
 
 
 DigitsRecognizerController::DigitsRecognizerController(DigitsRecognizer* recognizer)
@@ -39,12 +40,20 @@ void DigitsRecognizerController::loadNetwork(const QString& network) {
     emit infoUpdated();
 }
 
-void DigitsRecognizerController::setDataset(const QString& pathToDataset) {
+bool DigitsRecognizerController::setDataset(const QString& pathToDataset) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't change datasets while learning is running");
     }
+    const QDir path(pathToDataset);
+    for (int i = 0; i < 10; ++i) {
+        const QDir subdirectory(path.filePath(QString::number(i)));
+        if (!subdirectory.exists() || !subdirectory.isReadable()) {
+            return false;
+        }
+    }
     recognizer->setDataset(pathToDataset.toStdString());
     emit infoUpdated();
+    return true;
 }
 
 void DigitsRecognizerController::setSamplesLimit(const unsigned limit) {

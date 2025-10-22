@@ -41,8 +41,11 @@ public:
         return files;
     }
 
-    static std::vector<std::string> listFilesWithExtensions(const std::string& directoryPath,
-                                                          const std::vector<std::string>& extensions) {
+    static std::vector<std::string> listFilesWithExtensions(
+        const std::string& directoryPath,
+        const std::vector<std::string>& extensions,
+        const int fileLimit = 0
+    ) {
         auto allFiles = listFiles(directoryPath);
         std::vector<std::string> filteredFiles;
 
@@ -53,6 +56,9 @@ public:
                     filteredFiles.push_back(file);
                     break;
                 }
+            }
+            if (fileLimit > 0 && filteredFiles.size() >= fileLimit) {
+                break;
             }
         }
 

@@ -51,7 +51,6 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
         size_t inputSize = layerSizes[i];
         size_t outputSize = layerSizes[i + 1];
 
-        // Initialize weights with random values
         Matrix weightMatrix(inputSize, outputSize);
         for (size_t row = 0; row < inputSize; ++row) {
             for (size_t col = 0; col < outputSize; ++col) {
@@ -60,7 +59,6 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
         }
         weights.push_back(weightMatrix);
 
-        // Initialize biases with zeros
         Matrix biasMatrix(1, outputSize, 0.0);
         biases.push_back(biasMatrix);
     }
@@ -68,22 +66,19 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
 
 std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
     std::vector<Matrix> activations;
-    activations.push_back(input); // Input layer activation
+    activations.push_back(input);
 
     Matrix currentActivation = input;
 
     for (size_t i = 0; i < weights.size(); ++i) {
-        // Calculate weighted sum
         Matrix weightedSum = currentActivation * weights[i];
 
-        // Add bias
         for (size_t row = 0; row < weightedSum.getRows(); ++row) {
             for (size_t col = 0; col < weightedSum.getCols(); ++col) {
                 weightedSum(row, col) += biases[i](0, col);
             }
         }
 
-        // Apply activation function
         Matrix activation = weightedSum;
         for (size_t row = 0; row < activation.getRows(); ++row) {
             for (size_t col = 0; col < activation.getCols(); ++col) {
@@ -108,24 +103,18 @@ void NeuralNetwork::backwardPass(
         throw std::invalid_argument("Invalid number of activations");
     }
 
-    // Calculate output error
     Matrix outputError = target - activations.back();
 
-    // Backpropagate through layers
     std::vector<Matrix> deltas(weights.size());
 
-    // Output layer delta
     Matrix outputDelta = outputError;
     for (size_t row = 0; row < outputDelta.getRows(); ++row) {
         for (size_t col = 0; col < outputDelta.getCols(); ++col) {
             outputDelta(row, col) *= sigmoidDerivative(activations.back()(row, col));
         }
     }
-    // std::cout << "Output delta" << std::endl;
-    // outputDelta.print();
     deltas.back() = outputDelta;
 
-    // Hidden layers deltas
     for (int i = weights.size() - 2; i >= 0; --i) {
         Matrix hiddenError = deltas[i + 1] * weights[i + 1].transpose();
         Matrix hiddenDelta = hiddenError;
@@ -138,12 +127,10 @@ void NeuralNetwork::backwardPass(
         deltas[i] = hiddenDelta;
     }
 
-    // Update weights and biases
     for (size_t i = 0; i < weights.size(); ++i) {
         Matrix weightGradient = activations[i].transpose() * deltas[i] * learningRate;
         weights[i] = weights[i] + weightGradient;
 
-        // Update biases (sum deltas across rows and multiply by learning rate)
         Matrix biasGradient(1, deltas[i].getCols());
         for (size_t col = 0; col < deltas[i].getCols(); ++col) {
             double sum = 0.0;
@@ -180,10 +167,6 @@ void NeuralNetwork::train(
             }
             meanError /= error.getCols();
             logger << "\rEpoch " << epoch << ", Error: " << meanError << "                             " << std::flush;
-            // logger << "Epoch " << epoch << ", Error: " << meanError << ", Predictions:" << std::endl;
-            // predictions.print();
-            // logger << "Errors:" << std::endl;
-            // error.print();
         }
     }
     logger << std::endl;
@@ -207,14 +190,12 @@ void NeuralNetwork::saveWeights(const std::string& filename) const {
         throw std::runtime_error("Cannot open file for writing: " + filename);
     }
 
-    // Save layer sizes
     file << layerSizes.size() << std::endl;
     for (size_t size : layerSizes) {
         file << size << " ";
     }
     file << std::endl;
 
-    // Save weights and biases
     for (size_t i = 0; i < weights.size(); ++i) {
         file << weights[i].getRows() << " " << weights[i].getCols() << std::endl;
         for (size_t row = 0; row < weights[i].getRows(); ++row) {
@@ -242,8 +223,6 @@ void NeuralNetwork::loadWeights(const std::string& filename) {
         throw std::runtime_error("Cannot open file for reading: " + filename);
     }
 
-    // Read layer sizes
-    std::cout << "Reading layer sizes" << std::endl;
     size_t numLayers;
     file >> numLayers;
     std::vector<size_t> loadedLayerSizes(numLayers);
@@ -253,8 +232,6 @@ void NeuralNetwork::loadWeights(const std::string& filename) {
 
     layerSizes = loadedLayerSizes;
 
-    // Read weights and biases
-    std::cout << "Reading weights & biases" << std::endl;
     weights.clear();
     biases.clear();
     for (size_t i = 0; i < numLayers - 1; ++i) {

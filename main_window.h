@@ -33,6 +33,8 @@ public slots:
 
 private slots:
     void updateInfo();
+    void handleOpenNetworkClicked();
+    void handleOpenDatasetClicked();
 
 private:
 

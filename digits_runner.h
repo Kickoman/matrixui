@@ -23,14 +23,15 @@ public:
     DigitsRecognizerController(DigitsRecognizer* recognizer);
     ~DigitsRecognizerController();
 
+    Info getInfo() const;
+
 public slots:
     void run();
     void requestStop();
     void loadNetwork(const QString& networkName);
-    void setDataset(const QString& pathToDataset);
+    bool setDataset(const QString& pathToDataset);
     void setSamplesLimit(const unsigned limit);
 
-    Info getInfo() const;
 
 signals:
     void infoUpdated();
