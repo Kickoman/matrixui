@@ -32,33 +32,41 @@ IF(USE_EIGEN)
     )
 ENDIF(USE_EIGEN)
 
-
-set(SOURCES
-    main.cpp
+set(
+    QT_DEPENDANT_SOURCES
     main_window.cpp
     advanced_terminal.cpp
-    matrix.cpp
     time_chart.cpp
     digit_chart.cpp
+    digits_runner.cpp
+    network_create_dialog.cpp
+)
 
+set(SOURCES
+    matrix.cpp
     digits_recognizer.cpp
     neural_network.cpp
     pngreader.cpp
-    digits_runner.cpp
-    network_create_dialog.cpp
 )
 
 include_directories(eigen)
 
 add_executable(
     ${PROJECT_NAME}
+    ${QT_DEPENDANT_SOURCES}
     ${SOURCES}
+    main.cpp
 )
-
 
 target_link_libraries(${PROJECT_NAME}
     Qt${QT_VERSION_MAJOR}::Gui
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Concurrent
     Qt${QT_VERSION_MAJOR}::Charts
+)
+
+add_executable(
+    ${PROJECT_NAME}_headless
+    ${SOURCES}
+    main_headless.cpp
 )
