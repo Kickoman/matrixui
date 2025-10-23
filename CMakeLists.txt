@@ -50,6 +50,13 @@ set(SOURCES
     pngreader.cpp
 )
 
+# Conditionally add matrix backend implementation
+IF(USE_EIGEN)
+    set(SOURCES ${SOURCES} matrix_eigen.cpp)
+ELSE()
+    set(SOURCES ${SOURCES} matrix_naive.cpp)
+ENDIF()
+
 include_directories(eigen)
 
 add_executable(

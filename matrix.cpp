@@ -1,305 +1,190 @@
 #include "matrix.h"
-
-#ifdef USE_EIGEN
-#include "Eigen/Dense"
-#include <iostream>
+#include "matrix_impl.h"
 #include <stdexcept>
 
-Matrix::Matrix() : data(0, 0) {}
+// Private implementation that directly uses the backend
+class Matrix::MatrixImpl {
+private:
+    std::unique_ptr<::MatrixImpl> backendImpl;
 
-Matrix::Matrix(size_t rows, size_t cols) : data(rows, cols) {
-    data.setZero();
-}
+public:
+    MatrixImpl() : backendImpl(createMatrixImpl()) {}
 
-Matrix::Matrix(size_t rows, size_t cols, double initialValue) : data(rows, cols) {
-    data.setConstant(initialValue);
-}
+    MatrixImpl(size_t rows, size_t cols) : backendImpl(createMatrixImpl()->create(rows, cols)) {}
 
-Matrix::Matrix(const std::vector<std::vector<double>>& inputData) {
-    if (inputData.empty()) {
-        data.resize(0, 0);
-        return;
-    }
+    MatrixImpl(size_t rows, size_t cols, double initialValue) : backendImpl(createMatrixImpl()->create(rows, cols, initialValue)) {}
 
-    size_t rows = inputData.size();
-    size_t cols = inputData[0].size();
+    MatrixImpl(const std::vector<std::vector<double>>& data) : backendImpl(createMatrixImpl()->create(data)) {}
 
-    for (size_t i = 1; i < rows; ++i) {
-        if (inputData[i].size() != cols) {
-            throw std::invalid_argument("All rows must have the same number of columns");
+    MatrixImpl(std::unique_ptr<::MatrixImpl> impl) : backendImpl(std::move(impl)) {}
+
+    MatrixImpl(const MatrixImpl& other) : backendImpl(other.backendImpl->clone()) {}
+
+    MatrixImpl(MatrixImpl&& other) noexcept = default;
+
+    MatrixImpl& operator=(const MatrixImpl& other) {
+        if (this != &other) {
+            backendImpl = other.backendImpl->clone();
         }
+        return *this;
     }
 
-    data.resize(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            data(i, j) = inputData[i][j];
-        }
+    MatrixImpl& operator=(MatrixImpl&& other) noexcept = default;
+
+    size_t getRows() const { return backendImpl->getRows(); }
+    size_t getCols() const { return backendImpl->getCols(); }
+
+    double& operator()(size_t row, size_t col) { return (*backendImpl)(row, col); }
+    const double& operator()(size_t row, size_t col) const { return (*backendImpl)(row, col); }
+
+    MatrixImpl add(const MatrixImpl& other) const {
+        return MatrixImpl(backendImpl->add(*other.backendImpl));
     }
+
+    MatrixImpl subtract(const MatrixImpl& other) const {
+        return MatrixImpl(backendImpl->subtract(*other.backendImpl));
+    }
+
+    MatrixImpl multiply(const MatrixImpl& other) const {
+        return MatrixImpl(backendImpl->multiply(*other.backendImpl));
+    }
+
+    MatrixImpl multiply(double scalar) const {
+        return MatrixImpl(backendImpl->multiply(scalar));
+    }
+
+    MatrixImpl divide(double scalar) const {
+        return MatrixImpl(backendImpl->divide(scalar));
+    }
+
+    MatrixImpl multiplyOptimized(const MatrixImpl& other) const {
+        return MatrixImpl(backendImpl->multiplyOptimized(*other.backendImpl));
+    }
+
+    void print() const { backendImpl->print(); }
+    bool isSquare() const { return backendImpl->isSquare(); }
+
+    MatrixImpl identity(size_t size) const {
+        return MatrixImpl(backendImpl->identity(size));
+    }
+
+    MatrixImpl zeros(size_t rows, size_t cols) const {
+        return MatrixImpl(backendImpl->zeros(rows, cols));
+    }
+
+    MatrixImpl ones(size_t rows, size_t cols) const {
+        return MatrixImpl(backendImpl->ones(rows, cols));
+    }
+
+    MatrixImpl transpose() const {
+        return MatrixImpl(backendImpl->transpose());
+    }
+
+    MatrixImpl transform(size_t rows, size_t cols) const {
+        return MatrixImpl(backendImpl->transform(rows, cols));
+    }
+};
+
+// Matrix class implementation
+Matrix::Matrix() : pImpl(std::make_unique<MatrixImpl>()) {}
+
+Matrix::Matrix(size_t rows, size_t cols) : pImpl(std::make_unique<MatrixImpl>(rows, cols)) {}
+
+Matrix::Matrix(size_t rows, size_t cols, double initialValue) : pImpl(std::make_unique<MatrixImpl>(rows, cols, initialValue)) {}
+
+Matrix::Matrix(const std::vector<std::vector<double>>& data) : pImpl(std::make_unique<MatrixImpl>(data)) {}
+
+Matrix::Matrix(const Matrix& other) : pImpl(std::make_unique<MatrixImpl>(*other.pImpl)) {}
+
+Matrix::Matrix(Matrix&& other) noexcept : pImpl(std::move(other.pImpl)) {}
+
+Matrix& Matrix::operator=(const Matrix& other) {
+    if (this != &other) {
+        pImpl = std::make_unique<MatrixImpl>(*other.pImpl);
+    }
+    return *this;
 }
 
-double& Matrix::operator()(size_t row, size_t col) {
-    return data(row, col);
+Matrix& Matrix::operator=(Matrix&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
 }
 
-const double& Matrix::operator()(size_t row, size_t col) const {
-    return data(row, col);
-}
+Matrix::~Matrix() = default;
+
+size_t Matrix::getRows() const { return pImpl->getRows(); }
+size_t Matrix::getCols() const { return pImpl->getCols(); }
+
+double& Matrix::operator()(size_t row, size_t col) { return (*pImpl)(row, col); }
+const double& Matrix::operator()(size_t row, size_t col) const { return (*pImpl)(row, col); }
 
 Matrix Matrix::operator+(const Matrix& other) const {
-    return Matrix(data + other.data);
-}
-
-Matrix Matrix::operator-(const Matrix& other) const {
-    return Matrix(data - other.data);
-}
-
-Matrix Matrix::operator*(const Matrix& other) const {
-    return Matrix(data * other.data);
-}
-
-Matrix Matrix::operator*(double scalar) const {
-    return Matrix(data * scalar);
-}
-
-Matrix Matrix::operator/(double scalar) const {
-    if (scalar == 0.0) {
-        throw std::invalid_argument("Division by zero");
-    }
-    return Matrix(data / scalar);
-}
-
-Matrix Matrix::multiplyOptimized(const Matrix& other) const {
-    return *this * other; // Eigen already uses optimized multiplication
-}
-
-void Matrix::print() const {
-    std::cout << data << std::endl;
-}
-
-Matrix Matrix::identity(size_t size) {
-    return Matrix(Eigen::MatrixXd::Identity(size, size));
-}
-
-Matrix Matrix::zeros(size_t rows, size_t cols) {
-    return Matrix(Eigen::MatrixXd::Zero(rows, cols));
-}
-
-Matrix Matrix::ones(size_t rows, size_t cols) {
-    return Matrix(Eigen::MatrixXd::Ones(rows, cols));
-}
-
-Matrix Matrix::transpose() const {
-    return Matrix(data.transpose());
-}
-
-Matrix Matrix::transform(const size_t rows, const size_t cols) const {
-    if (getRows() * getCols() != rows * cols) {
-        throw std::invalid_argument("New size should have the same number of cells");
-    }
-
-    // Manually reshape in row-major order to match naive implementation
-    Matrix result(rows, cols);
-    size_t new_row = 0;
-    size_t new_col = 0;
-    for (size_t i = 0; i < getRows(); ++i) {
-        for (size_t j = 0; j < getCols(); ++j) {
-            result(new_row, new_col++) = data(i, j);
-            if (new_col == cols) {
-                new_col = 0;
-                ++new_row;
-            }
-        }
-    }
-    return result;
-}
-#else // USE EIGEN
-#include <iostream>
-#include <stdexcept>
-#include <cassert>
-
-Matrix::Matrix() : rows(0), cols(0) {}
-
-Matrix::Matrix(size_t rows, size_t cols) : rows(rows), cols(cols) {
-    data.resize(rows, std::vector<double>(cols, 0.0));
-}
-
-Matrix::Matrix(size_t rows, size_t cols, double initialValue) : rows(rows), cols(cols) {
-    data.resize(rows, std::vector<double>(cols, initialValue));
-}
-
-Matrix::Matrix(const std::vector<std::vector<double>>& inputData) {
-    if (inputData.empty()) {
-        rows = 0;
-        cols = 0;
-        return;
-    }
-
-    rows = inputData.size();
-    cols = inputData[0].size();
-
-    for (size_t i = 1; i < rows; ++i) {
-        if (inputData[i].size() != cols) {
-            throw std::invalid_argument("All rows must have the same number of columns");
-        }
-    }
-
-    data = inputData;
-}
-
-double& Matrix::operator()(size_t row, size_t col) {
-    if (row >= rows || col >= cols) {
-        throw std::out_of_range("Matrix indices out of range");
-    }
-    return data[row][col];
-}
-
-const double& Matrix::operator()(size_t row, size_t col) const {
-    if (row >= rows || col >= cols) {
-        throw std::out_of_range("Matrix indices out of range");
-    }
-    return data[row][col];
-}
-
-Matrix Matrix::operator+(const Matrix& other) const {
-    if (rows != other.rows || cols != other.cols) {
-        throw std::invalid_argument("Matrix dimensions must match for addition");
-    }
-
-    Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] + other(i, j);
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->add(*other.pImpl));
     return result;
 }
 
 Matrix Matrix::operator-(const Matrix& other) const {
-    if (rows != other.rows || cols != other.cols) {
-        throw std::invalid_argument("Matrix dimensions must match for subtraction");
-    }
-
-    Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] - other(i, j);
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->subtract(*other.pImpl));
     return result;
 }
 
 Matrix Matrix::operator*(const Matrix& other) const {
-    if (cols != other.rows) {
-        throw std::invalid_argument("Matrix dimensions incompatible for multiplication");
-    }
-
-    Matrix result(rows, other.cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < other.cols; ++j) {
-            for (size_t k = 0; k < cols; ++k) {
-                result(i, j) += data[i][k] * other(k, j);
-            }
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->multiply(*other.pImpl));
     return result;
 }
 
 Matrix Matrix::operator*(double scalar) const {
-    Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] * scalar;
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->multiply(scalar));
     return result;
 }
 
 Matrix Matrix::operator/(double scalar) const {
-    if (scalar == 0.0) {
-        throw std::invalid_argument("Division by zero");
-    }
-
-    Matrix result(rows, cols);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(i, j) = data[i][j] / scalar;
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->divide(scalar));
     return result;
 }
 
 Matrix Matrix::multiplyOptimized(const Matrix& other) const {
-    if (cols != other.rows) {
-        throw std::invalid_argument("Matrix dimensions incompatible for multiplication");
-    }
-
-    Matrix result(rows, other.cols);
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t k = 0; k < cols; ++k) {
-            double temp = data[i][k];
-            for (size_t j = 0; j < other.cols; ++j) {
-                result(i, j) += temp * other(k, j);
-            }
-        }
-    }
-
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->multiplyOptimized(*other.pImpl));
     return result;
 }
 
-void Matrix::print() const {
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            std::cout << data[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-}
+void Matrix::print() const { pImpl->print(); }
+bool Matrix::isSquare() const { return pImpl->isSquare(); }
 
 Matrix Matrix::identity(size_t size) {
-    Matrix result(size, size, 0.0);
-    for (size_t i = 0; i < size; ++i) {
-        result(i, i) = 1.0;
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(MatrixImpl().identity(size));
     return result;
 }
 
 Matrix Matrix::zeros(size_t rows, size_t cols) {
-    return Matrix(rows, cols, 0.0);
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(MatrixImpl().zeros(rows, cols));
+    return result;
 }
 
 Matrix Matrix::ones(size_t rows, size_t cols) {
-    return Matrix(rows, cols, 1.0);
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(MatrixImpl().ones(rows, cols));
+    return result;
 }
 
 Matrix Matrix::transpose() const {
-    Matrix result(cols, rows);
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            result(j, i) = data[i][j];
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->transpose());
     return result;
 }
 
 Matrix Matrix::transform(const size_t rows, const size_t cols) const {
-    if (this->cols * this->rows != rows * cols) {
-        throw std::invalid_argument("New size should have the same number of cells");
-    }
-    Matrix result(rows, cols);
-    size_t new_row = 0;
-    size_t new_col = 0;
-    for (size_t i = 0; i < this->rows; ++i) {
-        for (size_t j = 0; j < this->cols; ++j) {
-            result(new_row, new_col++) = data[i][j];
-            if (new_col == cols) {
-                new_col = 0;
-                ++new_row;
-            }
-        }
-    }
+    Matrix result;
+    result.pImpl = std::make_unique<MatrixImpl>(pImpl->transform(rows, cols));
     return result;
 }
-
-#endif // USE EIGEN
