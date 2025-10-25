@@ -57,7 +57,7 @@ TestResult DigitsRecognizer::testNetwork() const {
                 break;
             }
             log() << "\r[test] Testing digit " << digitToCheck << "; " << std::flush;
-            const auto image = PngUtils::fromImage(file, IMAGE_H, IMAGE_W).transform(1, 64*64);
+            const auto image = PngUtils::fromImage(file, IMAGE_H, IMAGE_W).transform(1, IMAGE_W*IMAGE_H);
             const auto prediction = network.predict(image);
             const auto result = getPredictionFast(prediction);
             ++statistics.totalTests;
@@ -219,7 +219,7 @@ bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedRe
     log() << "Training for sample " << sample << std::endl;
 
     const auto image = PngUtils::fromImage(sample, IMAGE_W, IMAGE_H).transform(1, IMAGE_H * IMAGE_W);
-    unsigned int epochs = 25;
+    unsigned int epochs = 1;
     double learningRate = LEARNING_RATE;
 
     do {

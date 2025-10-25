@@ -24,6 +24,7 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concu
 
 OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
 IF(USE_EIGEN)
+    message("Using Eigen't matrix implementation")
     ADD_DEFINITIONS(-DUSE_EIGEN)
     # Hide warnings for eigen
     set_directory_properties(PATH eigen PROPERTIES
