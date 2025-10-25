@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 
+#include "pngreader.h"
 #include "neural_network.h"
 
 
@@ -115,4 +116,7 @@ private:
     bool running = false;
     bool stopRequested = false;
     std::optional<std::function<void(const TestResult& result)>> resultCallback;
+    mutable PngUtils::Cache pngCache = PngUtils::Cache({
+        .max_size = 10000
+    });
 };

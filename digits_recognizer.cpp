@@ -57,7 +57,12 @@ TestResult DigitsRecognizer::testNetwork() const {
                 break;
             }
             log() << "\r[test] Testing digit " << digitToCheck << "; " << std::flush;
-            const auto image = PngUtils::fromImage(file, IMAGE_H, IMAGE_W).transform(1, IMAGE_W*IMAGE_H);
+            const auto image = PngUtils::fromImage(
+                file,
+                IMAGE_H,
+                IMAGE_W,
+                pngCache
+            ).transform(1, IMAGE_W*IMAGE_H);
             const auto prediction = network.predict(image);
             const auto result = getPredictionFast(prediction);
             ++statistics.totalTests;
@@ -178,7 +183,12 @@ DigitsRecognizer::TSamplesList DigitsRecognizer::getBadSamples(
     const auto files = DirectoryLister::listFilesWithExtensions(datasetDir, {".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG"});
     for (TSize i = 0; i < std::min(datasetFileLimit, files.size()); ++i) {
         log() << "\r[validation] Checking digit " << expected << " for file #" << i + 1 << "                     " << std::flush;
-        const auto image = PngUtils::fromImage(files[i], IMAGE_H, IMAGE_W).transform(1, IMAGE_H * IMAGE_W);
+        const auto image = PngUtils::fromImage(
+            files[i],
+            IMAGE_H,
+            IMAGE_W,
+            pngCache
+        ).transform(1, IMAGE_H * IMAGE_W);
         const auto prediction = network.predict(image);
         const unsigned result = getPredictionFast(prediction);
         if (result != expected) {
@@ -203,7 +213,12 @@ void DigitsRecognizer::filterBadSamples(
     const bool fastCircuit
 ) const {
     for (TSize i = 0; i < samples.size();) {
-        const auto image = PngUtils::fromImage(samples[i], IMAGE_W, IMAGE_H).transform(1, IMAGE_H * IMAGE_W);
+        const auto image = PngUtils::fromImage(
+            samples[i],
+            IMAGE_W,
+            IMAGE_H,
+            pngCache
+        ).transform(1, IMAGE_H * IMAGE_W);
         const auto prediction = network.predict(image);
         const unsigned result = getPredictionFast(prediction);
         if (result == digit) {
@@ -218,7 +233,12 @@ void DigitsRecognizer::filterBadSamples(
 bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedResult, const TDigit digit) {
     log() << "Training for sample " << sample << std::endl;
 
-    const auto image = PngUtils::fromImage(sample, IMAGE_W, IMAGE_H).transform(1, IMAGE_H * IMAGE_W);
+    const auto image = PngUtils::fromImage(
+        sample,
+        IMAGE_W,
+        IMAGE_H,
+        pngCache
+    ).transform(1, IMAGE_H * IMAGE_W);
     unsigned int epochs = 1;
     double learningRate = LEARNING_RATE;
 

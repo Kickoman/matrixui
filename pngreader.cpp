@@ -37,3 +37,14 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
     }
     return result;
 }
+
+
+Matrix PngUtils::fromImage(const std::string &filename, const unsigned int targetHeight, const unsigned int targetWidth, Cache &cache) {
+    const auto cacheHit = cache.get(filename);
+    if (cacheHit.has_value()) {
+        return *cacheHit;
+    }
+    const auto result = fromImage(filename, targetHeight, targetWidth);
+    cache.put(filename, result);
+    return result;
+}
