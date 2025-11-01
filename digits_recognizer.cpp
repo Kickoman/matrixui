@@ -252,7 +252,7 @@ bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedRe
         }
 
         epochs = std::min(epochs * 2, EPOCHS);
-        learningRate = std::min(learningRate + 0.05, 0.8);
+        learningRate = std::min(learningRate + 0.05, 1.0);
         log() << "Bad training, continue with rate " << learningRate << std::endl;
     } while (!stopRequested);
 
