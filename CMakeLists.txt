@@ -54,25 +54,32 @@ include_directories(eigen)
 
 OPTION(BUILD_GUI "Build GUI version" ON)
 OPTION(BUILD_CLI "Build CLI version" ON)
-add_executable(
-    ${PROJECT_NAME}
-    ${QT_DEPENDANT_SOURCES}
-    ${SOURCES}
-    main.cpp
-)
 
-target_link_libraries(${PROJECT_NAME}
-    Qt${QT_VERSION_MAJOR}::Gui
-    Qt${QT_VERSION_MAJOR}::Widgets
-    Qt${QT_VERSION_MAJOR}::Concurrent
-    Qt${QT_VERSION_MAJOR}::Charts
-)
+IF(BUILD_GUI)
+    add_executable(
+        ${PROJECT_NAME}
+        ${QT_DEPENDANT_SOURCES}
+        ${MATRIX_SOURCES}
+        ${SOURCES}
+        main.cpp
+    )
 
-add_executable(
-    ${PROJECT_NAME}_headless
-    ${SOURCES}
-    main_headless.cpp
-)
+   target_link_libraries(${PROJECT_NAME}
+        Qt${QT_VERSION_MAJOR}::Gui
+        Qt${QT_VERSION_MAJOR}::Widgets
+        Qt${QT_VERSION_MAJOR}::Concurrent
+        Qt${QT_VERSION_MAJOR}::Charts
+    )
+ENDIF()
+
+IF(BUILD_CLI)
+    add_executable(
+        ${PROJECT_NAME}_headless
+        ${MATRIX_SOURCES}
+        ${SOURCES}
+        main_headless.cpp
+    )
+ENDIF()
 
 # PerfTest integration for matrix benchmarks
 OPTION(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)

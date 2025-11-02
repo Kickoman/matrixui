@@ -27,7 +27,7 @@ cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHM
 cmake --build . --parallel
 
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 1000
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000
 cd ..
 
 echo "Build second revision"
@@ -39,7 +39,7 @@ cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHM
 cmake --build . --parallel
 
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 1000
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000
 
 
 echo "Compare..."
