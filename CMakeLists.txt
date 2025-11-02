@@ -53,12 +53,7 @@ set(SOURCES
     pngreader.cpp
 )
 
-# Conditionally add matrix backend implementation
-IF(USE_EIGEN)
-    set(MATRIX_SOURCES ${MATRIX_SOURCES} matrix_eigen.cpp)
-ELSE()
-    set(MATRIX_SOURCES ${MATRIX_SOURCES} matrix_naive.cpp)
-ENDIF()
+# Matrix implementation is now unified in matrix.cpp with conditional compilation
 
 include_directories(eigen)
 

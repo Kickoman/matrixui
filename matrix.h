@@ -4,13 +4,25 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
-#include <memory>
+#include <cassert>
+
+#ifdef USE_EIGEN
+#include "Eigen/Dense"
+#endif
 
 class Matrix {
 private:
-    // PIMPL (Pointer to Implementation) idiom to hide backend details
-    class MatrixImpl;
-    std::unique_ptr<MatrixImpl> pImpl;
+#ifdef USE_EIGEN
+    Eigen::MatrixXd data;
+
+    // Private constructors for Eigen backend
+    Matrix(Eigen::MatrixXd&& eigenData) : data(std::move(eigenData)) {}
+    Matrix(const Eigen::MatrixXd& eigenData) : data(eigenData) {}
+#else
+    std::vector<std::vector<double>> data;
+    size_t rows;
+    size_t cols;
+#endif
 
 public:
     // Constructors
@@ -19,12 +31,12 @@ public:
     Matrix(size_t rows, size_t cols, double initialValue);
     Matrix(const std::vector<std::vector<double>>& data);
 
-    // Rule of Five: Copy and Move operations
-    Matrix(const Matrix& other);
-    Matrix(Matrix&& other) noexcept;
-    Matrix& operator=(const Matrix& other);
-    Matrix& operator=(Matrix&& other) noexcept;
-    ~Matrix();
+    // Copy and Move operations
+    Matrix(const Matrix& other) = default;
+    Matrix(Matrix&& other) noexcept = default;
+    Matrix& operator=(const Matrix& other) = default;
+    Matrix& operator=(Matrix&& other) noexcept = default;
+    ~Matrix() = default;
 
     // Accessors
     size_t getRows() const;
