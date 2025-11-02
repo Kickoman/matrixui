@@ -31,6 +31,7 @@ public slots:
     void loadNetwork(const QString& networkName);
     bool setDataset(const QString& pathToDataset);
     void setSamplesLimit(const unsigned limit);
+    void setTestingLimit(const unsigned limit);
 
 
 signals:

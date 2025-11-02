@@ -331,3 +331,6 @@ CMakeLists.txt.user*
 # End of https://www.toptal.com/developers/gitignore/api/cmake,visualstudiocode,c++,c,qt,python
 
 buildrel
+build_debug/
+build_eigen/
+build_naive/

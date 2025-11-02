@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <filesystem>
 
+#include "pngreader.h"
 #include "neural_network.h"
 
 
@@ -59,9 +60,9 @@ public:
     using TSamplesList = TVector<TString>;
     using TSize = std::size_t;
     using TLayers = TVector<TSize>;
-    static constexpr TSize IMAGE_W = 64;
-    static constexpr TSize IMAGE_H = 64;
-    static constexpr double LEARNING_RATE = 0.2;
+    static constexpr TSize IMAGE_W = 28;
+    static constexpr TSize IMAGE_H = 28;
+    static constexpr double LEARNING_RATE = 0.05;
     static constexpr unsigned EPOCHS = 1000;
     static const TLayers DEFAULT_LAYERS;
 
@@ -115,4 +116,7 @@ private:
     bool running = false;
     bool stopRequested = false;
     std::optional<std::function<void(const TestResult& result)>> resultCallback;
+    mutable PngUtils::Cache pngCache = PngUtils::Cache({
+        .max_size = 10000
+    });
 };

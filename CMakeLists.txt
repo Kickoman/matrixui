@@ -24,6 +24,7 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concu
 
 OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
 IF(USE_EIGEN)
+    message("Using Eigen't matrix implementation")
     ADD_DEFINITIONS(-DUSE_EIGEN)
     # Hide warnings for eigen
     set_directory_properties(PATH eigen PROPERTIES
@@ -70,3 +71,37 @@ add_executable(
     ${SOURCES}
     main_headless.cpp
 )
+
+# PerfTest integration for matrix benchmarks
+OPTION(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
+
+if(BUILD_MATRIX_BENCHMARK)
+    message("Building MatrixBenchmark with perftest library")
+
+    # Set perftest options before adding subdirectory
+    set(PERFBENCH_BUILD_EXAMPLES OFF CACHE BOOL "Build example benchmarks" FORCE)
+    set(PERFBENCH_BUILD_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
+
+    # Add perftest subdirectory
+    add_subdirectory(perftest)
+
+    # Create matrix benchmarks as an object library
+    add_library(matrix_benchmarks OBJECT
+        matrix_benchmarks.cpp
+        matrix.cpp
+    )
+
+    # Link matrix benchmarks with perfbench library
+    target_link_libraries(matrix_benchmarks perfbench)
+    target_include_directories(matrix_benchmarks PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/eigen
+    )
+
+    # Link matrix benchmarks object library to perfbench_main
+    target_sources(perfbench_main PRIVATE
+        $<TARGET_OBJECTS:matrix_benchmarks>
+    )
+
+    # Set compiler flags for benchmarks
+    target_compile_options(matrix_benchmarks PRIVATE -O3 -DNDEBUG)
+endif()

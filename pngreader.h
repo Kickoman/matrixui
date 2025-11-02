@@ -2,10 +2,25 @@
 #define PNGREADER_H
 
 #include "matrix.h"
+#include "cache.h"
 
 namespace PngUtils {
 
-Matrix fromImage(const std::string& filename, const unsigned targetHeight, const unsigned targetWidth);
+using Cache = ::cache::LRUCache<std::string, Matrix>;
+
+Matrix fromImage(
+    const std::string& filename,
+    const unsigned targetHeight,
+    const unsigned targetWidth
+);
+
+
+Matrix fromImage(
+    const std::string& filename,
+    const unsigned targetHeight,
+    const unsigned targetWidth,
+    Cache& cache
+);
 
 }
 

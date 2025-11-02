@@ -60,6 +60,10 @@ void DigitsRecognizerController::setSamplesLimit(const unsigned limit) {
     recognizer->setDatasetFileLimit(limit);
 }
 
+void DigitsRecognizerController::setTestingLimit(const unsigned limit) {
+    recognizer->setTestingFileLimit(limit);
+}
+
 DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
     return {
         .initialized = recognizer->isInitialized(),
