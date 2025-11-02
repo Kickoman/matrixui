@@ -43,8 +43,11 @@ set(
     network_create_dialog.cpp
 )
 
-set(SOURCES
+set(MATRIX_SOURCES
     matrix.cpp
+)
+
+set(SOURCES
     digits_recognizer.cpp
     neural_network.cpp
     pngreader.cpp
@@ -52,9 +55,9 @@ set(SOURCES
 
 # Conditionally add matrix backend implementation
 IF(USE_EIGEN)
-    set(SOURCES ${SOURCES} matrix_eigen.cpp)
+    set(MATRIX_SOURCES ${MATRIX_SOURCES} matrix_eigen.cpp)
 ELSE()
-    set(SOURCES ${SOURCES} matrix_naive.cpp)
+    set(MATRIX_SOURCES ${MATRIX_SOURCES} matrix_naive.cpp)
 ENDIF()
 
 include_directories(eigen)
@@ -62,6 +65,7 @@ include_directories(eigen)
 add_executable(
     ${PROJECT_NAME}
     ${QT_DEPENDANT_SOURCES}
+    ${MATRIX_SOURCES}
     ${SOURCES}
     main.cpp
 )
@@ -75,6 +79,7 @@ target_link_libraries(${PROJECT_NAME}
 
 add_executable(
     ${PROJECT_NAME}_headless
+    ${MATRIX_SOURCES}
     ${SOURCES}
     main_headless.cpp
 )
@@ -95,7 +100,7 @@ if(BUILD_MATRIX_BENCHMARK)
     # Create matrix benchmarks as an object library
     add_library(matrix_benchmarks OBJECT
         matrix_benchmarks.cpp
-        matrix.cpp
+        ${MATRIX_SOURCES}
     )
 
     # Link matrix benchmarks with perfbench library
