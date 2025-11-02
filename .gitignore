@@ -334,3 +334,6 @@ buildrel
 build_debug/
 build_eigen/
 build_naive/
+build_compare/
+compare/
+.compare_cache/

@@ -6,38 +6,40 @@ REV_A=$1
 REV_B=$2
 
 ORIGINAL=$PWD
-WORKDIR=$PWD/compare
-BUILDIR=$PWD/build_compare
+CACHE_DIR=$PWD/.compare_cache
+WORKDIR=$CACHE_DIR/compare_${REV_A}_${REV_B}
+BUILDIR_PREFIX=$CACHE_DIR/build_
+BUILDIR_A=${BUILDIR_PREFIX}_$REV_A
+BUILDIR_B=${BUILDIR_PREFIX}_$REV_B
 PREFIX=/usr/local/Qt-6.9.3
 PERFTEST_EXECUTABLE="./perftest/perfbench_main"
 
 mkdir -p $WORKDIR
-mkdir -p $BUILDIR
+mkdir -p $BUILDIR_A
+mkdir -p $BUILDIR_B
 
 echo "Build first revision"
 git checkout $REV_A
 git submodule update --init --recursive
 
-cd $BUILDIR
-rm -rf *
-cmake ../ -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON
+cd $BUILDIR_A
+cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF
 cmake --build . --parallel
 
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 1000
 cd ..
 
 echo "Build second revision"
 git checkout $REV_B
 git submodule update --init --recursive
 
-cd $BUILDIR
-rm -rf *
-cmake ../ -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON
+cd $BUILDIR_B
+cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF
 cmake --build . --parallel
 
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 1000
 
 
 echo "Compare..."

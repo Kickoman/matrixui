@@ -52,6 +52,8 @@ set(SOURCES
 
 include_directories(eigen)
 
+OPTION(BUILD_GUI "Build GUI version" ON)
+OPTION(BUILD_CLI "Build CLI version" ON)
 add_executable(
     ${PROJECT_NAME}
     ${QT_DEPENDANT_SOURCES}
