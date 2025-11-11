@@ -14,13 +14,18 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# Qt options
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
+OPTION(BUILD_GUI "Build GUI version" ON)
+OPTION(BUILD_CLI "Build CLI version" ON)
 
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
+# Qt options
+if (BUILD_GUI)
+    set(CMAKE_AUTOUIC ON)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+
+    find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
+    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
+endif()
 
 OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
 IF(USE_EIGEN)
@@ -52,8 +57,6 @@ set(SOURCES
 
 include_directories(eigen)
 
-OPTION(BUILD_GUI "Build GUI version" ON)
-OPTION(BUILD_CLI "Build CLI version" ON)
 
 IF(BUILD_GUI)
     add_executable(

@@ -67,7 +67,7 @@ public:
     static const TLayers DEFAULT_LAYERS;
 
     void setLogger(std::ostream* stream);
-    void loadNetwork(const TString& networkName);
+    void loadNetwork(const TString& networkName, const TLayers& layers = DEFAULT_LAYERS);
     void setDataset(const std::filesystem::path& pathToDataset);
     void setDatasetFileLimit(const TSize limit);
     void setTestingFileLimit(const TSize limit);

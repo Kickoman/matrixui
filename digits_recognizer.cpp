@@ -15,15 +15,18 @@ void DigitsRecognizer::setLogger(std::ostream* stream) {
     this->stream = stream;
 }
 
-void DigitsRecognizer::loadNetwork(const TString& networkName) {
+void DigitsRecognizer::loadNetwork(const TString& networkName, const TLayers& layers) {
     this->networkName = networkName;
     try {
+        if (layers != DEFAULT_LAYERS) {
+            log() << "Specified layers were ignored, using the loaded ones";
+        }
         network.loadWeights(networkName);
     } catch (const std::runtime_error& e) {
         log() << "Cannot load weights: " << e.what() << std::endl;
         log() << "Initialized with default values." << std::endl;
         std::mt19937 generator;
-        network = NeuralNetwork(DEFAULT_LAYERS);
+        network = NeuralNetwork(layers);
         network.initializeWeights(generator);
     }
 }
