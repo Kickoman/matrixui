@@ -45,6 +45,32 @@ bool validateDataset(const std::filesystem::path& datasetPath) {
 }
 
 
+DigitsRecognizer::TLayers parseLayers(const std::string& layersParameter) {
+    std::cerr << "'" << layersParameter << "'" << std::endl;
+    try {
+        DigitsRecognizer::TLayers layers;
+
+        if (layersParameter.empty()) {
+            return layers;
+        }
+
+        std::istringstream stream(layersParameter);
+        std::string token;
+
+        while (std::getline(stream, token, ',')) {
+            // Simple conversion - assumes valid input
+            layers.push_back(std::stoul(token));
+        }
+        return layers;
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse layers: " << e.what() << std::endl;
+        throw std::runtime_error("Failed to parse layers");
+    }
+}
+
+template<typename A> std::ostream& operator<<(std::ostream& os, const std::vector<A>& x) { for (const auto e : x) { os  << e << " "; } return os; }
+
+
 int main(int argc, char** argv) {
     InputParser cmd(argc, argv);
 
@@ -69,14 +95,19 @@ int main(int argc, char** argv) {
         cmd.getCmdOption("--test-file-limit", "150")
     );
     const size_t datasetFileLimit = std::stoi(
-        cmd.getCmdOption("dataset-file-limit", "10")
+        cmd.getCmdOption("--dataset-file-limit", "10")
     );
+    auto layers = DigitsRecognizer::DEFAULT_LAYERS;
+    if (cmd.cmdOptionExists("--layers")) {
+        layers = parseLayers(cmd.getCmdOption("--layers"));
+    }
 
     std::cout << "Starting with parameters:\n"
         << "\tNetwork name: " << networkName << "\n"
         << "\tDataset path: " << datasetPath << "\n"
         << "\tTesting file limit: " << testingFileLimit << "\n"
-        << "\tDataset file limit: " << datasetFileLimit
+        << "\tDataset file limit: " << datasetFileLimit << "\n"
+        << "\tLayers" << layers
         << std::endl;
 
     DigitsRecognizer recognizer;
