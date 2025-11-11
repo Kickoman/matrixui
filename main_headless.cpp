@@ -58,7 +58,6 @@ DigitsRecognizer::TLayers parseLayers(const std::string& layersParameter) {
         std::string token;
 
         while (std::getline(stream, token, ',')) {
-            // Simple conversion - assumes valid input
             layers.push_back(std::stoul(token));
         }
         return layers;
