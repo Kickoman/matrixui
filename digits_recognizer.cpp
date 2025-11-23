@@ -1,5 +1,6 @@
 #include "digits_recognizer.h"
 #include "directory_lister.h"
+#include "neural_network.h"
 #include "pngreader.h"
 
 #include <cassert>
@@ -29,6 +30,11 @@ void DigitsRecognizer::loadNetwork(const TString& networkName, const TLayers& la
         network = NeuralNetwork(layers);
         network.initializeWeights(generator);
     }
+}
+
+void DigitsRecognizer::loadNetwork(const NeuralNetwork& network, const TString& name) {
+    this->networkName = name;
+    this->network = network;
 }
 
 void DigitsRecognizer::setDataset(const std::filesystem::path& pathToDataset) {
@@ -89,6 +95,10 @@ void DigitsRecognizer::doTest() const {
 
 void DigitsRecognizer::setResultCallback(std::function<void(const TestResult&)> callback) {
     resultCallback = callback;
+}
+
+void DigitsRecognizer::setSaveOnEachDigit(const bool save) {
+    saveOnEachDigit = save;
 }
 
 void DigitsRecognizer::printTestResult(const TestResult& result) const {

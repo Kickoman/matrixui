@@ -4,9 +4,6 @@
 #define MATRIX_H
 
 #include "Eigen/Dense"
-#include <vector>
-#include <iostream>
-#include <stdexcept>
 
 class Matrix {
 private:
@@ -18,6 +15,7 @@ public:
     Matrix();
     Matrix(size_t rows, size_t cols);
     Matrix(size_t rows, size_t cols, double initialValue);
+    Matrix(size_t rows, size_t cols, std::function<double(size_t, size_t)> initialValueGenerator);
     Matrix(const std::vector<std::vector<double>>& data);
 
     size_t getRows() const { return data.rows(); }

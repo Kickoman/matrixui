@@ -100,6 +100,9 @@ if(BUILD_MATRIX_BENCHMARK)
     # Create matrix benchmarks as an object library
     add_library(matrix_benchmarks OBJECT
         matrix_benchmarks.cpp
+        recognition_benchmarks.cpp
+        digits_recognizer.cpp
+        neural_network.cpp
         matrix.cpp
     )
 

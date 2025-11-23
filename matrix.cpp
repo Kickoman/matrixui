@@ -15,6 +15,15 @@ Matrix::Matrix(size_t rows, size_t cols, double initialValue) : data(rows, cols)
     data.setConstant(initialValue);
 }
 
+Matrix::Matrix(size_t rows, size_t cols, std::function<double(size_t, size_t)> initialValueGenerator)
+    : data(rows, cols) {
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < cols; ++j) {
+            data(i, j) = initialValueGenerator(i, j);
+        }
+    }
+}
+
 Matrix::Matrix(const std::vector<std::vector<double>>& inputData) {
     if (inputData.empty()) {
         data.resize(0, 0);

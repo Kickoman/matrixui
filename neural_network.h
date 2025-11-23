@@ -4,6 +4,8 @@
 #include "matrix.h"
 #include <vector>
 #include <random>
+#include <iostream>
+
 
 class NeuralNetwork {
 private:

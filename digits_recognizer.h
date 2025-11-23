@@ -68,10 +68,12 @@ public:
 
     void setLogger(std::ostream* stream);
     void loadNetwork(const TString& networkName, const TLayers& layers = DEFAULT_LAYERS);
+    void loadNetwork(const NeuralNetwork& network, const TString& name = "unnamed");
     void setDataset(const std::filesystem::path& pathToDataset);
     void setDatasetFileLimit(const TSize limit);
     void setTestingFileLimit(const TSize limit);
     void setResultCallback(std::function<void(const TestResult&)> callback);
+    void setSaveOnEachDigit(const bool save);
 
     TestResult testNetwork() const;
     void doTest() const;
