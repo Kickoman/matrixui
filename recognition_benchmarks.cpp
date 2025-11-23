@@ -6,17 +6,17 @@
 #include <random>
 
 static const long DEFAULT_SEED = 1337;
-static const size_t BENCHMARK_IMAGE_H = 100;
-static const size_t BENCHMARK_IMAGE_W = 100;
+static const size_t BENCHMARK_IMAGE_H = 10;
+static const size_t BENCHMARK_IMAGE_W = 10;
 static const std::vector<size_t> DEFAULT_SIZES = {
     BENCHMARK_IMAGE_H * BENCHMARK_IMAGE_W,
-    1000,
-    1000,
-    1000,
-    700,
-    700,
-    500,
     100,
+    100,
+    100,
+    70,
+    70,
+    50,
+    10,
     10,
 };
 static const Matrix DEFAULT_IMAGE{
