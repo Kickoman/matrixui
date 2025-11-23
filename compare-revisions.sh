@@ -21,26 +21,25 @@ mkdir -p $BUILDIR_B
 echo "Build first revision"
 git checkout $REV_A
 git submodule update --init --recursive
-
 cd $BUILDIR_A
-cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF
+cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel
-
-echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000
 cd ..
 
 echo "Build second revision"
 git checkout $REV_B
 git submodule update --init --recursive
-
 cd $BUILDIR_B
-cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF
+cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel
 
+cd $BUILDIR_A
+echo "Run benchmark..."
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000
+
+cd $BUILDIR_B
 echo "Run benchmark..."
 $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000
-
 
 echo "Compare..."
 $PERFTEST_EXECUTABLE --compare $WORKDIR/rev_a.json $WORKDIR/rev_b.json --output $WORKDIR/compare_result.json
