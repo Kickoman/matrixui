@@ -103,6 +103,7 @@ if(BUILD_MATRIX_BENCHMARK)
         recognition_benchmarks.cpp
         digits_recognizer.cpp
         neural_network.cpp
+        pngreader.cpp
         matrix.cpp
     )
 
