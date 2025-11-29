@@ -30,7 +30,7 @@ set(SOURCES
 )
 
 add_library(
-    Matrix
+    Matrix STATIC
     ${SOURCES}
 )
 

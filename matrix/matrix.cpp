@@ -137,6 +137,18 @@ Matrix::Matrix(size_t rows, size_t cols, double initialValue) : rows(rows), cols
     data.resize(rows, std::vector<double>(cols, initialValue));
 }
 
+Matrix::Matrix(size_t rows, size_t cols, std::function<double(size_t, size_t)> initialValueGenerator)
+    : rows(rows)
+    , cols(cols)
+{
+    data.resize(rows, std::vector<double>(cols));
+    for (size_t i = 0; i < rows; ++i) {
+        for (size_t j = 0; j < cols; ++j) {
+            data[i][j] = initialValueGenerator(i, j);
+        }
+    }
+}
+
 Matrix::Matrix(const std::vector<std::vector<double>>& inputData) {
     if (inputData.empty()) {
         rows = 0;

@@ -27,6 +27,7 @@ if (BUILD_GUI)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
 endif()
 
+set(USE_EIGEN ON)
 add_subdirectory(matrix)
 
 set(
@@ -103,6 +104,7 @@ if(BUILD_MATRIX_BENCHMARK)
 
     target_sources(perfbench_main PRIVATE
         $<TARGET_OBJECTS:matrix_benchmarks>
+        $<TARGET_OBJECTS:Matrix>
     )
 
     target_compile_options(matrix_benchmarks PRIVATE -O3 -DNDEBUG)
