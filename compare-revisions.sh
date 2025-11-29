@@ -35,7 +35,7 @@ cmake --build . --parallel
 
 echo "Retrieving benchmark list"
 cd $BUILDIR_A
-mapfile -t benchmarks_list < < ($PERFTEST_EXECUTABLE --list)
+mapfile -t benchmarks_list < <($PERFTEST_EXECUTABLE --list)
 
 for benchmark in "${benchmarks_list[@]}"; do
     echo "Run benchmark $benchmark for revision $REV_A"
