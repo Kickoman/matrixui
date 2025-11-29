@@ -28,6 +28,11 @@ if (BUILD_GUI)
 endif()
 
 set(USE_EIGEN ON)
+option(USE_EIGEN "Use Eigen's matrix implementation" ON)
+if (USE_EIGEN)
+    message("Matrix using Eigen's implementation")
+    add_definitions(-DUSE_EIGEN)
+endif (USE_EIGEN)
 add_subdirectory(matrix)
 
 set(
