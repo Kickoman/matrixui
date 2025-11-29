@@ -13,8 +13,8 @@ CACHE_DIR=/tmp/.compare_cache
 WORKDIR=$CACHE_DIR/compare_${REV_A}_${REV_B}
 SOURCE_A=$CACHE_DIR/source_${REV_A}
 SOURCE_B=$CACHE_DIR/source_${REV_B}
-BUILDDIR_A=$WORKDIR/build_${REV_A}
-BUILDDIR_B=$WORKDIR/build_${REV_B}
+BUILDDIR_A=$CACHE_DIR/build_${REV_A}
+BUILDDIR_B=$CACHE_DIR/build_${REV_B}
 PERFTEST_EXECUTABLE="./perftest/perfbench_main"
 
 mkdir -p $WORKDIR
