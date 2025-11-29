@@ -1,5 +1,5 @@
 [submodule "eigen"]
-	path = eigen
+	path = matrix/eigen
 	url = git@github.com:Kickoman/eigen.git
 [submodule "perftest"]
 	path = perftest

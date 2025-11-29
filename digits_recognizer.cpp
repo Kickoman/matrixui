@@ -221,9 +221,7 @@ DigitsRecognizer::TSamplesList DigitsRecognizer::getBadSamples(
 
 void DigitsRecognizer::filterBadSamples(
     TSamplesList& samples,
-    const TDigit digit,
-    const TString& datasetDir,
-    const bool fastCircuit
+    const TDigit digit
 ) const {
     for (TSize i = 0; i < samples.size();) {
         const auto image = PngUtils::fromImage(
@@ -289,7 +287,7 @@ bool DigitsRecognizer::trainDigit(const TDigit digit) {
         if (!trainSample(sample, expectedResult, digit) || stopRequested) {
             return false;
         }
-        filterBadSamples(badSamples, digit, directory);
+        filterBadSamples(badSamples, digit);
     }
 
     return true;

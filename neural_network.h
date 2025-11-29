@@ -19,7 +19,6 @@ private:
 
     std::vector<Matrix> forwardPass(const Matrix& input) const;
     void backwardPass(
-        const Matrix& input,
         const Matrix& target,
         const std::vector<Matrix>& activations,
         const double learningRate

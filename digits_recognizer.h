@@ -95,7 +95,7 @@ private:
         const TString& datasetDir,
         const bool fastCircuit = false
     ) const;
-    void filterBadSamples(TSamplesList& samples, const TDigit expected, const TString& datasetDir, const bool fastCircuit = false) const;
+    void filterBadSamples(TSamplesList& samples, const TDigit expected) const;
     bool trainSample(const TString& sample, const auto& expectedResult, const TDigit digit);
     bool trainDigit(const TDigit digit);
 

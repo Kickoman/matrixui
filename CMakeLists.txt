@@ -27,16 +27,7 @@ if (BUILD_GUI)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
 endif()
 
-OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
-IF(USE_EIGEN)
-    message("Using Eigen't matrix implementation")
-    ADD_DEFINITIONS(-DUSE_EIGEN)
-    # Hide warnings for eigen
-    set_directory_properties(PATH eigen PROPERTIES
-        COMPILE_OPTIONS "-w"  # For GCC/Clang
-        # COMPILE_OPTIONS "/w"  # For MSVC
-    )
-ENDIF(USE_EIGEN)
+add_subdirectory(matrix)
 
 set(
     QT_DEPENDANT_SOURCES
@@ -49,7 +40,6 @@ set(
 )
 
 set(SOURCES
-    matrix.cpp
     digits_recognizer.cpp
     neural_network.cpp
     pngreader.cpp
@@ -72,6 +62,7 @@ IF(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
+        Matrix
     )
 ENDIF()
 
@@ -81,6 +72,9 @@ IF(BUILD_CLI)
         ${MATRIX_SOURCES}
         ${SOURCES}
         main_headless.cpp
+    )
+    target_link_libraries(
+        ${PROJECT_NAME}_headless Matrix
     )
 ENDIF()
 
@@ -100,10 +94,9 @@ if(BUILD_MATRIX_BENCHMARK)
         digits_recognizer.cpp
         neural_network.cpp
         pngreader.cpp
-        matrix.cpp
     )
 
-    target_link_libraries(matrix_benchmarks perfbench)
+    target_link_libraries(matrix_benchmarks perfbench Matrix)
     target_include_directories(matrix_benchmarks PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/eigen
     )

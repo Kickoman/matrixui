@@ -94,7 +94,6 @@ std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
 }
 
 void NeuralNetwork::backwardPass(
-    const Matrix& input,
     const Matrix& target,
     const std::vector<Matrix>& activations,
     const double learningRate
@@ -156,7 +155,7 @@ void NeuralNetwork::train(
 
     for (int epoch = 0; epoch < epochs; ++epoch) {
         auto activations = forwardPass(inputs);
-        backwardPass(inputs, targets, activations, learningRate);
+        backwardPass(targets, activations, learningRate);
 
         if (epoch % 10 == 0) {
             Matrix predictions = activations.back();

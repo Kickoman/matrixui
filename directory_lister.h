@@ -44,7 +44,7 @@ public:
     static std::vector<std::string> listFilesWithExtensions(
         const std::string& directoryPath,
         const std::vector<std::string>& extensions,
-        const int fileLimit = 0
+        const size_t fileLimit = 0
     ) {
         auto allFiles = listFiles(directoryPath);
         std::vector<std::string> filteredFiles;
