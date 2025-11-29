@@ -35,11 +35,11 @@ cmake --build . --parallel
 
 cd $BUILDIR_A
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --randomize
 
 cd $BUILDIR_B
 echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000
+$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --randomize
 
 echo "Compare..."
 $PERFTEST_EXECUTABLE --compare $WORKDIR/rev_a.json $WORKDIR/rev_b.json --output $WORKDIR/compare_result.json
