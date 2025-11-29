@@ -37,15 +37,17 @@ echo "Retrieving benchmark list"
 cd $BUILDIR_A
 mapfile -t benchmarks_list < <($PERFTEST_EXECUTABLE --list)
 
-for benchmark in "${benchmarks_list[@]}"; do
-    echo "Run benchmark $benchmark for revision $REV_A"
-    cd $BUILDIR_A
-    $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --names $benchmark --append-json-report
-    echo ""
-    echo "Run benchmark $benchmark for revision $REV_B"
-    cd $BUILDIR_B
-    $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --names $benchmark --append-json-report
-    echo ""
+for _ in {1..100}; do
+    for benchmark in "${benchmarks_list[@]}"; do
+        echo "Run benchmark $benchmark for revision $REV_A"
+        cd $BUILDIR_A
+        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10 --names $benchmark --append-json-report
+        echo ""
+        echo "Run benchmark $benchmark for revision $REV_B"
+        cd $BUILDIR_B
+        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10 --names $benchmark --append-json-report
+        echo ""
+    done
 done
 
 # cd $BUILDIR_A
