@@ -5,57 +5,73 @@ set -e
 REV_A=$1
 REV_B=$2
 
-ORIGINAL=$PWD
-CACHE_DIR=$PWD/.compare_cache
-WORKDIR=$CACHE_DIR/compare_${REV_A}_${REV_B}
-BUILDIR_PREFIX=$CACHE_DIR/build_
-BUILDIR_A=${BUILDIR_PREFIX}_$REV_A
-BUILDIR_B=${BUILDIR_PREFIX}_$REV_B
+REPOSITORY="git@github.com:Kickoman/matrixui.git"
 PREFIX=/usr/local/Qt-6.9.3
+BUILD_PARAMS="-DCMAKE_PREFIX_PATH=${PREFIX} -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release"
+
+CACHE_DIR=/tmp/.compare_cache
+WORKDIR=$CACHE_DIR/compare_${REV_A}_${REV_B}
+SOURCE_A=$WORKDIR/source_${REV_A}
+SOURCE_B=$WORKDIR/source_${REV_B}
+BUILDDIR_A=$WORKDIR/build_${REV_A}
+BUILDDIR_B=$WORKDIR/build_${REV_B}
 PERFTEST_EXECUTABLE="./perftest/perfbench_main"
 
 mkdir -p $WORKDIR
-mkdir -p $BUILDIR_A
-mkdir -p $BUILDIR_B
+mkdir -p $BUILDDIR_A
+mkdir -p $BUILDDIR_B
 
-echo "Build first revision"
+echo "Retrieve source for ${REV_A}"
+
+if [ ! -d "$SOURCE_A" ]; then
+    git clone $REPOSITORY $SOURCE_A --recurse-submodules
+fi
+cd $SOURCE_A
 git checkout $REV_A
 git submodule update --init --recursive
-cd $BUILDIR_A
-cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
-cmake --build . --parallel
-cd ..
 
-echo "Build second revision"
+echo "Retrieve source for ${REV_B}"
+if [ ! -d "$SOURCE_B" ]; then
+    git clone $REPOSITORY $SOURCE_B --recurse-submodules
+fi
+cd $SOURCE_B
 git checkout $REV_B
 git submodule update --init --recursive
-cd $BUILDIR_B
-cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
+
+echo "Build first revision"
+cd $BUILDDIR_A
+cmake $SOURCE_A $BUILD_PARAMS
 cmake --build . --parallel
 
+echo "Build second revision"
+cd $BUILDDIR_B
+cmake $SOURCE_B $BUILD_PARAMS
+cmake --build . --parallel
+
+
 echo "Retrieving benchmark list"
-cd $BUILDIR_A
+cd $BUILDDIR_A
 mapfile -t benchmarks_list < <($PERFTEST_EXECUTABLE --list)
 
-for iteration in {1..100}; do
+for iteration in {1..10}; do
     echo "Running benchmark for iteration $iteration"
     for benchmark in "${benchmarks_list[@]}"; do
         echo "Run benchmark $benchmark for revision $REV_A"
-        cd $BUILDIR_A
-        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 100 --names $benchmark --append-json-report
+        cd $BUILDDIR_A
+        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10 --names $benchmark --append-json-report
         echo ""
         echo "Run benchmark $benchmark for revision $REV_B"
-        cd $BUILDIR_B
-        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 100 --names $benchmark --append-json-report
+        cd $BUILDDIR_B
+        $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10 --names $benchmark --append-json-report
         echo ""
     done
 done
 
-# cd $BUILDIR_A
+# cd $BUILDDIR_A
 # echo "Run benchmark..."
 # $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --randomize
 
-# cd $BUILDIR_B
+# cd $BUILDDIR_B
 # echo "Run benchmark..."
 # $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --randomize
 
