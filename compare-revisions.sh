@@ -33,13 +33,28 @@ cd $BUILDIR_B
 cmake $ORIGINAL -DCMAKE_PREFIX_PATH=$PREFIX -DUSE_EIGEN=ON -DBUILD_MATRIX_BENCHMARK=ON -DBUILD_GUI=OFF -DBUILD_CLI=OFF -DCMAKE_BUILD_TYPE=Release
 cmake --build . --parallel
 
+echo "Retrieving benchmark list"
 cd $BUILDIR_A
-echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --randomize
+mapfile -t benchmarks_list < < ($PERFTEST_EXECUTABLE --list)
 
-cd $BUILDIR_B
-echo "Run benchmark..."
-$PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --randomize
+for benchmark in "${benchmarks_list[@]}"; do
+    echo "Run benchmark $benchmark for revision $REV_A"
+    cd $BUILDIR_A
+    $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --names $benchmark --append-json-report
+    echo ""
+    echo "Run benchmark $benchmark for revision $REV_B"
+    cd $BUILDIR_B
+    $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --names $benchmark --append-json-report
+    echo ""
+done
+
+# cd $BUILDIR_A
+# echo "Run benchmark..."
+# $PERFTEST_EXECUTABLE --output $WORKDIR/rev_a.json --warmup 100 --iterations 10000 --randomize
+
+# cd $BUILDIR_B
+# echo "Run benchmark..."
+# $PERFTEST_EXECUTABLE --output $WORKDIR/rev_b.json --warmup 100 --iterations 10000 --randomize
 
 echo "Compare..."
 $PERFTEST_EXECUTABLE --compare $WORKDIR/rev_a.json $WORKDIR/rev_b.json --output $WORKDIR/compare_result.json
