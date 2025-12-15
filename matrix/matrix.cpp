@@ -71,6 +71,16 @@ Matrix Matrix::operator*(double scalar) const {
     return Matrix(data * scalar);
 }
 
+Matrix& Matrix::operator*=(const Matrix& other) {
+    data *= other.data;
+    return *this;
+}
+
+Matrix& Matrix::operator*=(double scalar) {
+    data *= scalar;
+    return *this;
+}
+
 Matrix Matrix::operator/(double scalar) const {
     if (scalar == 0.0) {
         throw std::invalid_argument("Division by zero");

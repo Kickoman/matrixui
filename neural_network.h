@@ -17,7 +17,7 @@ private:
     static double sigmoid(double x);
     static double sigmoidDerivative(double x);
 
-    std::vector<Matrix> forwardPass(const Matrix& input) const;
+    std::vector<Matrix> forwardPass(Matrix input) const;
     void backwardPass(
         const Matrix& target,
         const std::vector<Matrix>& activations,

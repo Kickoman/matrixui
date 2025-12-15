@@ -27,9 +27,11 @@ public:
     Matrix operator+(const Matrix& other) const;
     Matrix operator-(const Matrix& other) const;
     Matrix operator*(const Matrix& other) const;
+    Matrix& operator*=(const Matrix& other);
 
     Matrix operator*(double scalar) const;
     Matrix operator/(double scalar) const;
+    Matrix& operator*=(double scalar);
 
     Matrix multiplyOptimized(const Matrix& other) const; // Just calls operator*
 

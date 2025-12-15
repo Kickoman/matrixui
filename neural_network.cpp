@@ -59,35 +59,26 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
         }
         weights.push_back(weightMatrix);
 
-        Matrix biasMatrix(1, outputSize, 0.0);
-        biases.push_back(biasMatrix);
+        biases.emplace_back(1, outputSize, 0.);
     }
 }
 
-std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
+std::vector<Matrix> NeuralNetwork::forwardPass(Matrix input) const {
     std::vector<Matrix> activations;
     activations.push_back(input);
 
-    Matrix currentActivation = input;
+    Matrix& currentActivation = input;
 
     for (size_t i = 0; i < weights.size(); ++i) {
-        Matrix weightedSum = currentActivation * weights[i];
+        currentActivation *= weights[i];
 
-        for (size_t row = 0; row < weightedSum.getRows(); ++row) {
-            for (size_t col = 0; col < weightedSum.getCols(); ++col) {
-                weightedSum(row, col) += biases[i](0, col);
+        for (size_t row = 0; row < currentActivation.getRows(); ++row) {
+            for (size_t col = 0; col < currentActivation.getCols(); ++col) {
+                currentActivation(row, col) += biases[i](0, col);
+                currentActivation(row, col) = sigmoid(currentActivation(row, col));
             }
         }
-
-        Matrix activation = weightedSum;
-        for (size_t row = 0; row < activation.getRows(); ++row) {
-            for (size_t col = 0; col < activation.getCols(); ++col) {
-                activation(row, col) = sigmoid(weightedSum(row, col));
-            }
-        }
-
-        activations.push_back(activation);
-        currentActivation = activation;
+        activations.push_back(currentActivation);
     }
 
     return activations;
