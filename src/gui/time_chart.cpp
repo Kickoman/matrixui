@@ -1,4 +1,4 @@
-#include "time_chart.h"
+#include "gui/time_chart.h"
 
 #include <QChart>
 #include <QChartView>

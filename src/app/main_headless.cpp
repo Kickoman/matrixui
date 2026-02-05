@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "digits_recognizer.h"
+#include "core/digits_recognizer.h"
 
 
 class InputParser{

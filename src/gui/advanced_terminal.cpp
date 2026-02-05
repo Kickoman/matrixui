@@ -1,4 +1,4 @@
-#include "advanced_terminal.h"
+#include "gui/advanced_terminal.h"
 
 
 AdvancedTerminal::AdvancedTerminal(QWidget* parent)

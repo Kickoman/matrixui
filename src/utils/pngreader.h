@@ -2,7 +2,7 @@
 #define PNGREADER_H
 
 #include "matrix.h"
-#include "cache.h"
+#include "utils/cache.h"
 
 namespace PngUtils {
 

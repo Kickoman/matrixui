@@ -14,8 +14,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-OPTION(BUILD_GUI "Build GUI version" ON)
-OPTION(BUILD_CLI "Build CLI version" ON)
+option(BUILD_GUI "Build GUI version" ON)
+option(BUILD_CLI "Build CLI version" ON)
 
 # Qt options
 if (BUILD_GUI)
@@ -37,30 +37,30 @@ add_subdirectory(matrix)
 
 set(
     QT_DEPENDANT_SOURCES
-    main_window.cpp
-    advanced_terminal.cpp
-    time_chart.cpp
-    digit_chart.cpp
-    digits_runner.cpp
-    network_create_dialog.cpp
+    src/gui/main_window.cpp
+    src/gui/advanced_terminal.cpp
+    src/gui/time_chart.cpp
+    src/gui/digit_chart.cpp
+    src/gui/digits_runner.cpp
+    src/gui/network_create_dialog.cpp
 )
 
 set(SOURCES
-    digits_recognizer.cpp
-    neural_network.cpp
-    pngreader.cpp
+    src/core/digits_recognizer.cpp
+    src/core/neural_network.cpp
+    src/utils/pngreader.cpp
 )
 
-include_directories(eigen)
+include_directories(src thirdparty)
 
 
-IF(BUILD_GUI)
+if(BUILD_GUI)
     add_executable(
         ${PROJECT_NAME}
         ${QT_DEPENDANT_SOURCES}
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main.cpp
+        src/app/main.cpp
     )
 
    target_link_libraries(${PROJECT_NAME}
@@ -70,21 +70,21 @@ IF(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Charts
         Matrix
     )
-ENDIF()
+endif()
 
-IF(BUILD_CLI)
+if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main_headless.cpp
+        src/app/main_headless.cpp
     )
     target_link_libraries(
         ${PROJECT_NAME}_headless Matrix
     )
-ENDIF()
+endif()
 
-OPTION(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
+option(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
 
 if(BUILD_MATRIX_BENCHMARK)
     message("Building MatrixBenchmark with perftest library")
@@ -95,16 +95,18 @@ if(BUILD_MATRIX_BENCHMARK)
     add_subdirectory(perftest)
 
     add_library(matrix_benchmarks OBJECT
-        matrix_benchmarks.cpp
-        recognition_benchmarks.cpp
-        digits_recognizer.cpp
-        neural_network.cpp
-        pngreader.cpp
+        benchmarks/matrix_benchmarks.cpp
+        benchmarks/recognition_benchmarks.cpp
+        src/core/digits_recognizer.cpp
+        src/core/neural_network.cpp
+        src/utils/pngreader.cpp
     )
 
     target_link_libraries(matrix_benchmarks perfbench Matrix)
     target_include_directories(matrix_benchmarks PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/eigen
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty
     )
 
     target_sources(perfbench_main PRIVATE

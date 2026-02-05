@@ -2,7 +2,7 @@
 
 #include <QObject>
 #include <memory>
-#include "digits_recognizer.h"
+#include "core/digits_recognizer.h"
 
 
 Q_DECLARE_METATYPE(TestResult);

@@ -1,8 +1,8 @@
 #include <QApplication>
-#include "main_window.h"
-#include "digits_recognizer.h"
-#include "digits_runner.h"
-#include "advanced_terminal.h"
+#include "gui/main_window.h"
+#include "core/digits_recognizer.h"
+#include "gui/digits_runner.h"
+#include "gui/advanced_terminal.h"
 
 
 int main(int argc, char** argv) {

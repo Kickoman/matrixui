@@ -1,7 +1,7 @@
-#include "digits_recognizer.h"
-#include "directory_lister.h"
-#include "neural_network.h"
-#include "pngreader.h"
+#include "core/digits_recognizer.h"
+#include "utils/directory_lister.h"
+#include "core/neural_network.h"
+#include "utils/pngreader.h"
 
 #include <cassert>
 #include <ostream>

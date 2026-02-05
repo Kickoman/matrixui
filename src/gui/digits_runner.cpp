@@ -1,5 +1,5 @@
-#include "digits_runner.h"
-#include "digits_recognizer.h"
+#include "gui/digits_runner.h"
+#include "core/digits_recognizer.h"
 #include <stdexcept>
 #include <QThreadPool>
 #include <QDir>

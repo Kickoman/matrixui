@@ -1,7 +1,7 @@
 #include "perfbench/registry.h"
 #include "perftest/include/perfbench/benchmark.h"
 
-#include "neural_network.h"
+#include "core/neural_network.h"
 
 #include <random>
 

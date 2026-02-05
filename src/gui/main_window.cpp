@@ -1,10 +1,10 @@
-#include "main_window.h"
-#include "advanced_terminal.h"
-#include "digits_recognizer.h"
-#include "digits_runner.h"
+#include "gui/main_window.h"
+#include "gui/advanced_terminal.h"
+#include "core/digits_recognizer.h"
+#include "gui/digits_runner.h"
 #include "matrix.h"
-#include "time_chart.h"
-#include "digit_chart.h"
+#include "gui/time_chart.h"
+#include "gui/digit_chart.h"
 
 #include <QLabel>
 #include <QHBoxLayout>
@@ -22,7 +22,7 @@
 #include <qpushbutton.h>
 #include <qrandom.h>
 #include <stdexcept>
-#include "network_create_dialog.h"
+#include "gui/network_create_dialog.h"
 
 
 MainWindow::MainWindow(QWidget* parent)

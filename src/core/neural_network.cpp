@@ -1,4 +1,4 @@
-#include "neural_network.h"
+#include "core/neural_network.h"
 #include "matrix.h"
 #include <cmath>
 #include <cstdio>

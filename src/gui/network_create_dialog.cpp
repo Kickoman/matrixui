@@ -1,4 +1,4 @@
-#include "network_create_dialog.h"
+#include "gui/network_create_dialog.h"
 
 #include <QLabel>
 #include <QLineEdit>

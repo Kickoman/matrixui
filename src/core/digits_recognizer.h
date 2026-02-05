@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "pngreader.h"
-#include "neural_network.h"
+#include "utils/pngreader.h"
+#include "core/neural_network.h"
 
 
 struct RecognitionStatistics {

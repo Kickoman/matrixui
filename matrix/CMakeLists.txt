@@ -18,10 +18,6 @@ option(USE_EIGEN "Use Eigen's matrix implementation" ON)
 if (USE_EIGEN)
     message("Matrix using Eigen's implementation")
     add_definitions(-DUSE_EIGEN)
-    set_directory_properties(path eigen PROPERTIES
-        COMPILE_OPTIONS "-w"
-    )
-    include_directories(eigen)
 endif (USE_EIGEN)
 
 
@@ -39,4 +35,10 @@ target_include_directories(
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(
+    Matrix
+    SYSTEM PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/eigen>
 )
