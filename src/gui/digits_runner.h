@@ -1,11 +1,10 @@
 #pragma once
 
 #include <QObject>
-#include <memory>
 #include "core/digits_recognizer.h"
 
 
-Q_DECLARE_METATYPE(TestResult);
+Q_DECLARE_METATYPE(recognition::TestResult);
 
 
 class DigitsRecognizerController : public QObject
@@ -36,10 +35,10 @@ public slots:
 
 signals:
     void infoUpdated();
-    void updatedStatistics(const TestResult& result) const;
+    void updatedStatistics(const recognition::TestResult& result) const;
 
 private:
-    void updateStatistic(const TestResult& result) const;
+    void updateStatistic(const recognition::TestResult& result) const;
 
     DigitsRecognizer* recognizer;
 };

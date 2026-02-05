@@ -5,55 +5,28 @@
 
 #include <cassert>
 #include <ostream>
-#include <random>
-#include <stdexcept>
 #include <string>
 
 
-const DigitsRecognizer::TLayers DigitsRecognizer::DEFAULT_LAYERS = {DigitsRecognizer::IMAGE_H * DigitsRecognizer::IMAGE_W, 1000, 1000, 100, 100,  100, 100, 10};
+const DigitsRecognizer::TLayers DEFAULT_LAYERS = {
+    DigitsRecognizer::IMAGE_H * DigitsRecognizer::IMAGE_W,
+    1000, 1000, 100, 100,  100, 100,
+    10
+};
 
-void DigitsRecognizer::setLogger(std::ostream* stream) {
-    this->stream = stream;
-}
-
-void DigitsRecognizer::loadNetwork(const TString& networkName, const TLayers& layers) {
-    this->networkName = networkName;
-    try {
-        if (layers != DEFAULT_LAYERS) {
-            log() << "Specified layers were ignored, using the loaded ones";
-        }
-        network.loadWeights(networkName);
-    } catch (const std::runtime_error& e) {
-        log() << "Cannot load weights: " << e.what() << std::endl;
-        log() << "Initialized with default values." << std::endl;
-        std::mt19937 generator;
-        network = NeuralNetwork(layers);
-        network.initializeWeights(generator);
-    }
-}
-
-void DigitsRecognizer::loadNetwork(const NeuralNetwork& network, const TString& name) {
-    this->networkName = name;
-    this->network = network;
-}
-
-void DigitsRecognizer::setDataset(const std::filesystem::path& pathToDataset) {
-    this->pathToDataset = pathToDataset;
+void DigitsRecognizer::setTestingFileLimit(const TSize limit) {
+    testingFileLimit = limit;
 }
 
 void DigitsRecognizer::setDatasetFileLimit(const TSize limit) {
     datasetFileLimit = limit;
 }
 
-void DigitsRecognizer::setTestingFileLimit(const TSize limit) {
-    testingFileLimit = limit;
-}
-
-TestResult DigitsRecognizer::testNetwork() const {
-    TestResult testResult;
-    for (TDigit digitToCheck = 0; digitToCheck < 10 && !stopRequested; ++digitToCheck) {
+DigitsRecognizer::TestResult DigitsRecognizer::testNetwork() const {
+    TestResult testResult(10);
+    for (TDigit digitToCheck = 0; digitToCheck < 10 && !isStopRequested(); ++digitToCheck) {
         log() << "[test] Testing digit " << digitToCheck << std::flush;
-        const TString& directory = pathToDataset / std::to_string(digitToCheck);
+        const TString& directory = getPathToDataset() / std::to_string(digitToCheck);
         const auto files = DirectoryLister::listFilesWithExtensions(
             directory,
             {".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG"},
@@ -62,7 +35,7 @@ TestResult DigitsRecognizer::testNetwork() const {
         RecognitionStatistics statistics;
 
         for (const auto& file : files) {
-            if (stopRequested) {
+            if (isStopRequested()) {
                 break;
             }
             log() << "\r[test] Testing digit " << digitToCheck << "; " << std::flush;
@@ -70,41 +43,25 @@ TestResult DigitsRecognizer::testNetwork() const {
                 file,
                 IMAGE_H,
                 IMAGE_W,
-                pngCache
+                getPngCache()
             ).transform(1, IMAGE_W*IMAGE_H);
-            const auto prediction = network.predict(image);
-            const auto result = getPredictionFast(prediction);
+            const auto prediction = getNetwork().predict(image);
+            const auto result = GetPredictionFast(prediction);
             ++statistics.totalTests;
             statistics.passedTests += result == digitToCheck;
             log() << "Total rate: " << 100.0 * testResult.getTotal().passedTests / testResult.getTotal().totalTests << "%                    ";
         }
 
-        testResult.setDigit(digitToCheck, statistics);
+        testResult.setPosition(digitToCheck, statistics);
     }
     log() << std::endl;
     return testResult;
 }
 
-void DigitsRecognizer::doTest() const {
-    const auto result = testNetwork();
-    printTestResult(result);
-    if (resultCallback.has_value()) {
-        (*resultCallback)(result);
-    }
-}
-
-void DigitsRecognizer::setResultCallback(std::function<void(const TestResult&)> callback) {
-    resultCallback = callback;
-}
-
-void DigitsRecognizer::setSaveOnEachDigit(const bool save) {
-    saveOnEachDigit = save;
-}
-
 void DigitsRecognizer::printTestResult(const TestResult& result) const {
     log() << "Test result per digit:" << std::endl;
     for (unsigned digit = 0; digit < 10; ++digit) {
-        const auto& r = result.digits[digit];
+        const auto& r = result.positions[digit];
         if (!r.has_value()) {
             log() << "\t- " << digit << " is missing!" << std::endl;
             continue;
@@ -119,72 +76,17 @@ void DigitsRecognizer::printTestResult(const TestResult& result) const {
     log() << "(" << 100.0 * r.passedTests / r.totalTests << "%)" << std::endl;
 }
 
-void DigitsRecognizer::doLearning() {
-    running = true;
-    stopRequested = false;
-    TDigit digitToTrain = 0;
-    while (digitToTrain < 10 && !stopRequested) {
-        if (!trainDigit(digitToTrain)) {
-            continue;
-        }
-        digitToTrain = validateAndFindNextDigit(digitToTrain);
-        if (saveOnEachDigit && !stopRequested) {
-            network.saveWeights(networkName);
-        }
-        doTest();
+void DigitsRecognizer::learnNetwork() {
+    if (lastTrainedDigitIsOk) {
+        currentDigit = validateAndFindNextDigit(currentDigit);
     }
-    running = false;
-}
-
-bool DigitsRecognizer::isRunning() const {
-    return running;
-}
-
-bool DigitsRecognizer::isInitialized() const {
-    return network.isInitialized();
-}
-
-const std::filesystem::path& DigitsRecognizer::getPathToDataset() const {
-    return pathToDataset;
-}
-
-const DigitsRecognizer::TString& DigitsRecognizer::getNetworkName() const {
-    return networkName;
-}
-
-const DigitsRecognizer::TLayers& DigitsRecognizer::getLayersConfiguration() const {
-    return network.getLayerSizes();
-}
-
-void DigitsRecognizer::requestStop() {
-    stopRequested = true;
-}
-
-void DigitsRecognizer::saveNetwork() const {
-    network.saveWeights(networkName);
-}
-
-DigitsRecognizer::TDigit DigitsRecognizer::getPredictionFast(const Matrix& prediction) {
-    assert(prediction.getRows() == 1);
-    assert(prediction.getCols() == 10);
-    TDigit result = 10;
-    double maxProbability = -1;
-    for (size_t i = 0; i < 10; ++i) {
-        const auto currentProbability = prediction(0, i);
-        if (currentProbability > maxProbability) {
-            maxProbability = currentProbability;
-            result = i;
-        }
+    lastTrainedDigitIsOk = trainDigit(currentDigit);
+    if (isSaveOnEachIteration() && !isStopRequested()) {
+        getNetwork().saveWeights(getNetworkName());
     }
-    assert(result != 10);
-    return result;
-}
-
-Matrix DigitsRecognizer::generateExpectedResult(const TDigit digit) {
-    assert(digit < 10);
-    auto res = Matrix::zeros(1, 10);
-    res(0, digit) = 1;
-    return res;
+    if (currentDigit >= 10) {
+        requestStop();
+    }
 }
 
 DigitsRecognizer::TSamplesList DigitsRecognizer::getBadSamples(
@@ -200,10 +102,10 @@ DigitsRecognizer::TSamplesList DigitsRecognizer::getBadSamples(
             files[i],
             IMAGE_H,
             IMAGE_W,
-            pngCache
+            getPngCache()
         ).transform(1, IMAGE_H * IMAGE_W);
-        const auto prediction = network.predict(image);
-        const unsigned result = getPredictionFast(prediction);
+        const auto prediction = getNetwork().predict(image);
+        const unsigned result = GetPredictionFast(prediction);
         if (result != expected) {
             log() << "\n[validation] Found bad result. Expected " << expected << ", got " << result << std::endl;
             log() << "Bad filename: " << files[i] << std::endl;
@@ -228,10 +130,10 @@ void DigitsRecognizer::filterBadSamples(
             samples[i],
             IMAGE_W,
             IMAGE_H,
-            pngCache
+            getPngCache()
         ).transform(1, IMAGE_H * IMAGE_W);
-        const auto prediction = network.predict(image);
-        const unsigned result = getPredictionFast(prediction);
+        const auto prediction = getNetwork().predict(image);
+        const unsigned result = GetPredictionFast(prediction);
         if (result == digit) {
             std::swap(samples[i], samples.back());
             samples.pop_back();
@@ -248,14 +150,14 @@ bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedRe
         sample,
         IMAGE_W,
         IMAGE_H,
-        pngCache
+        getPngCache()
     ).transform(1, IMAGE_H * IMAGE_W);
     unsigned int epochs = 1;
     double learningRate = LEARNING_RATE;
 
     do {
-        network.train(image, expectedResult, epochs, learningRate, log());
-        const auto prediction = getPredictionFast(network.predict(image));
+        getNetwork().train(image, expectedResult, epochs, learningRate, log());
+        const auto prediction = GetPredictionFast(getNetwork().predict(image));
         const bool passed = (prediction == digit);
 
         if (passed) {
@@ -265,7 +167,7 @@ bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedRe
         epochs = std::min(epochs * 2, EPOCHS);
         learningRate = std::min(learningRate + 0.05, 1.0);
         log() << "Bad training, continue with rate " << learningRate << std::endl;
-    } while (!stopRequested);
+    } while (!isStopRequested());
 
     return false;
 }
@@ -273,8 +175,8 @@ bool DigitsRecognizer::trainSample(const TString& sample, const auto& expectedRe
 bool DigitsRecognizer::trainDigit(const TDigit digit) {
     log() << "=== Training for " << digit << std::endl;
 
-    const auto expectedResult = generateExpectedResult(digit);
-    const auto directory = pathToDataset / std::to_string(digit);
+    const auto expectedResult = GenerateExpectedResult(digit, 10);
+    const auto directory = getPathToDataset() / std::to_string(digit);
     auto badSamples = getBadSamples(digit, directory);
 
     if (badSamples.empty()) {
@@ -282,9 +184,9 @@ bool DigitsRecognizer::trainDigit(const TDigit digit) {
         return true;
     }
 
-    while (!badSamples.empty() && !stopRequested) {
+    while (!badSamples.empty() && !isStopRequested()) {
         const auto& sample = badSamples.front();
-        if (!trainSample(sample, expectedResult, digit) || stopRequested) {
+        if (!trainSample(sample, expectedResult, digit) || isStopRequested()) {
             return false;
         }
         filterBadSamples(badSamples, digit);
@@ -295,7 +197,7 @@ bool DigitsRecognizer::trainDigit(const TDigit digit) {
 
 DigitsRecognizer::TDigit DigitsRecognizer::validateAndFindNextDigit(const TDigit currentDigit) {
     for (TDigit digit = 0; digit < 10; ++digit) {
-        const auto directoryToCheck = pathToDataset / std::to_string(digit);
+        const auto directoryToCheck = getPathToDataset() / std::to_string(digit);
         const auto badSamples = getBadSamples(digit, directoryToCheck, true);
 
         if (!badSamples.empty()) {
@@ -309,6 +211,6 @@ DigitsRecognizer::TDigit DigitsRecognizer::validateAndFindNextDigit(const TDigit
     return currentDigit + 1;
 }
 
-std::ostream& DigitsRecognizer::log() const {
-    return *stream;
+const DigitsRecognizer::TLayers& DigitsRecognizer::getDefaultLayersConfiguration() const {
+    return DEFAULT_LAYERS;
 }

@@ -7,7 +7,9 @@ class AdvancedTerminal;
 class AdvancedTerminalStream;
 class TimeChart;
 class DigitChart;
+namespace recognition {
 class TestResult;
+}
 class DigitsRecognizerController;
 class QThread;
 class QPushButton;
@@ -29,7 +31,7 @@ public:
 
 public slots:
     void handleTimer();
-    void handleStatistics(const TestResult& result);
+    void handleStatistics(const recognition::TestResult& result);
 
 private slots:
     void updateInfo();

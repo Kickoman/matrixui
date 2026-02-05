@@ -8,7 +8,7 @@
 DigitsRecognizerController::DigitsRecognizerController(DigitsRecognizer* recognizer)
     : recognizer(recognizer)
 {
-    this->recognizer->setResultCallback([this](const TestResult& result){
+    this->recognizer->setResultCallback([this](const recognition::TestResult& result){
         QMetaObject::invokeMethod(this, &DigitsRecognizerController::updatedStatistics, result);
     });
 }
@@ -74,6 +74,6 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
     };
 }
 
-void DigitsRecognizerController::updateStatistic(const TestResult& result) const {
+void DigitsRecognizerController::updateStatistic(const recognition::TestResult& result) const {
     emit updatedStatistics(result);
 }

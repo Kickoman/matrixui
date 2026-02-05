@@ -46,7 +46,9 @@ set(
 )
 
 set(SOURCES
+    src/core/recognizer.cpp
     src/core/digits_recognizer.cpp
+    src/core/dots_recognizer.cpp
     src/core/neural_network.cpp
     src/utils/pngreader.cpp
 )

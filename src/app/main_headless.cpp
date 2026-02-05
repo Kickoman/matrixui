@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     const size_t datasetFileLimit = std::stoi(
         cmd.getCmdOption("--dataset-file-limit", "10")
     );
-    auto layers = DigitsRecognizer::DEFAULT_LAYERS;
+    std::optional<DigitsRecognizer::TLayers> layers;
     if (cmd.cmdOptionExists("--layers")) {
         layers = parseLayers(cmd.getCmdOption("--layers"));
     }
@@ -106,8 +106,13 @@ int main(int argc, char** argv) {
         << "\tDataset path: " << datasetPath << "\n"
         << "\tTesting file limit: " << testingFileLimit << "\n"
         << "\tDataset file limit: " << datasetFileLimit << "\n"
-        << "\tLayers" << layers
-        << std::endl;
+    ;
+    if (layers.has_value()) {
+        std::cout << "\tLayers: " << layers.value() << "\n";
+    } else {
+        std::cout << "\tLayers: default" << "\n";
+    }
+    std::cout << std::endl;
 
     DigitsRecognizer recognizer;
     recognizer.loadNetwork(networkName);

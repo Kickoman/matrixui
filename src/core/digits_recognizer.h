@@ -1,60 +1,15 @@
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <vector>
-#include <string>
-#include <optional>
-#include <algorithm>
-#include <filesystem>
+#include "core/recognizer.h"
 
-#include "utils/pngreader.h"
-#include "core/neural_network.h"
-
-
-struct RecognitionStatistics {
-    unsigned passedTests = 0;
-    unsigned totalTests = 0;
-};
-
-struct TestResult {
-    std::array<std::optional<RecognitionStatistics>, 11> digits;  // 10 == total
-
-    TestResult() {
-        reset();
-    }
-
-    void reset() {
-        std::fill(digits.begin(), digits.end(), std::nullopt);
-        digits[10] = RecognitionStatistics{};
-    }
-
-    RecognitionStatistics& getTotalRef() {
-        return digits[10].value();
-    }
-
-    const RecognitionStatistics& getTotal() const {
-        return digits[10].value();
-    }
-
-    void setDigit(const std::uint8_t digit, const RecognitionStatistics& results) {
-        auto& total = getTotalRef();
-        if (digits[digit].has_value()) {
-            auto& value = digits[digit].value();
-            total.totalTests -= value.totalTests;
-            total.passedTests -= total.passedTests;
-        }
-        digits[digit] = results;
-        total.totalTests += results.totalTests;
-        total.passedTests += results.passedTests;
-    }
-};
-
-class DigitsRecognizer
+class DigitsRecognizer : public recognition::Recognizer
 {
 public:
+    using Base = recognition::Recognizer;
+    using TestResult = recognition::TestResult;
+    using RecognitionStatistics = recognition::RecognitionStatistics;
+
     using TDigit = unsigned;
-    using TString = std::string;
     template<class T>
     using TVector = std::vector<T>;
     using TSamplesList = TVector<TString>;
@@ -64,32 +19,14 @@ public:
     static constexpr TSize IMAGE_H = 28;
     static constexpr double LEARNING_RATE = 0.05;
     static constexpr unsigned EPOCHS = 1000;
-    static const TLayers DEFAULT_LAYERS;
 
-    void setLogger(std::ostream* stream);
-    void loadNetwork(const TString& networkName, const TLayers& layers = DEFAULT_LAYERS);
-    void loadNetwork(const NeuralNetwork& network, const TString& name = "unnamed");
-    void setDataset(const std::filesystem::path& pathToDataset);
-    void setDatasetFileLimit(const TSize limit);
     void setTestingFileLimit(const TSize limit);
-    void setResultCallback(std::function<void(const TestResult&)> callback);
-    void setSaveOnEachDigit(const bool save);
+    void setDatasetFileLimit(const TSize limit);
 
-    TestResult testNetwork() const;
-    void doTest() const;
-    void doLearning();
-    void requestStop();
-    void saveNetwork() const;
-
-    bool isRunning() const;
-    bool isInitialized() const;
-
-    const std::filesystem::path& getPathToDataset() const;
-    const TString& getNetworkName() const;
-    const TLayers& getLayersConfiguration() const;
+    TestResult testNetwork() const override;
+    void learnNetwork() override;
+    const TLayers& getDefaultLayersConfiguration() const override;
 private:
-    static TDigit getPredictionFast(const Matrix& prediction);
-    static Matrix generateExpectedResult(const TDigit digit);
     TSamplesList getBadSamples(
         const TDigit expected,
         const TString& datasetDir,
@@ -106,19 +43,11 @@ private:
     void initializeNetworkWeights(NeuralNetwork& network, const TString);
     void printTestResult(const TestResult& result) const;
 
-    std::ostream& log() const;
 
-    NeuralNetwork network;
-    TString networkName;
-    std::filesystem::path pathToDataset;
-    std::ostream* stream = &std::cout;
     TSize datasetFileLimit = 10;
     TSize testingFileLimit = 150;
-    bool saveOnEachDigit = true;
-    bool running = false;
-    bool stopRequested = false;
-    std::optional<std::function<void(const TestResult& result)>> resultCallback;
-    mutable PngUtils::Cache pngCache = PngUtils::Cache({
-        .max_size = 10000
-    });
+
+    // state
+    TDigit currentDigit = 0;
+    bool lastTrainedDigitIsOk = true;
 };

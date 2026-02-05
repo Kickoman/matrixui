@@ -113,13 +113,13 @@ void MainWindow::handleTimer()
     }
 }
 
-void MainWindow::handleStatistics(const TestResult& result) {
+void MainWindow::handleStatistics(const recognition::TestResult& result) {
     const auto& total = result.getTotal();
     const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
     chart->addPoint(rate);
 
     for (unsigned i = 0; i < 10; ++i) {
-        const auto& res = result.digits[i];
+        const auto& res = result.positions[i];
         const double rate = res->totalTests > 0 ? 100.0 * res->passedTests / res->totalTests : 0;
         digitChart->setValue(i, rate);
     }
