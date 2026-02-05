@@ -5,6 +5,7 @@
 #include <filesystem>
 
 #include "core/digits_recognizer.h"
+#include "core/dots_recognizer.h"
 
 
 class InputParser{
@@ -85,10 +86,6 @@ int main(int argc, char** argv) {
 
     const std::string networkName = cmd.getCmdOption("--network");
     const std::string datasetPath = cmd.getCmdOption("--dataset");
-    if (!validateDataset(datasetPath)) {
-        std::cerr << "Invalid dataset" << std::endl;
-        return 3;
-    }
 
     const size_t testingFileLimit = std::stoi(
         cmd.getCmdOption("--test-file-limit", "150")
@@ -114,13 +111,28 @@ int main(int argc, char** argv) {
     }
     std::cout << std::endl;
 
-    DigitsRecognizer recognizer;
-    recognizer.loadNetwork(networkName);
-    recognizer.setDataset(datasetPath);
-    recognizer.setDatasetFileLimit(datasetFileLimit);
-    recognizer.setTestingFileLimit(testingFileLimit);
+    const std::string recognizerType = cmd.getCmdOption("--recognizer", "digits");
+    std::unique_ptr<recognition::Recognizer> recognizer;
+    if (recognizerType == "digits") {
+        recognizer = std::make_unique<DigitsRecognizer>();
+        static_cast<DigitsRecognizer*>(recognizer.get())->setDatasetFileLimit(datasetFileLimit);
+        static_cast<DigitsRecognizer*>(recognizer.get())->setTestingFileLimit(testingFileLimit);
+        if (!validateDataset(datasetPath)) {
+            std::cerr << "Invalid dataset" << std::endl;
+            return 3;
+        }
+    } else if (recognizerType == "dots") {
+        recognizer = std::make_unique<DotsRecognizer>();
+    } else {
+        std::cerr << "Invalid recognizer type: " << recognizerType << std::endl;
+        return 4;
+    }
 
-    recognizer.doLearning();
+    recognizer->loadNetwork(networkName);
+    recognizer->setDataset(datasetPath);
+    recognizer->setSaveOnEachIteration(true);
+
+    recognizer->doLearning();
 
     return 0;
 }

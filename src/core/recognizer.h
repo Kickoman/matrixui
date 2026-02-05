@@ -54,6 +54,13 @@ struct TestResult {
         total.totalTests += results.totalTests;
         total.passedTests += results.passedTests;
     }
+
+    RecognitionStatistics& getPositionRef(const unsigned position) {
+        if (!positions[position].has_value()) {
+            positions[position] = RecognitionStatistics{};
+        }
+        return positions[position].value();
+    }
 };
 
 class Recognizer {
