@@ -13,6 +13,11 @@
 
 namespace recognition {
 
+enum class BatchTrainingMode {
+    SampleBySample,  // Train on each sample individually (old behavior)
+    TrueBatch        // Train on all samples in batch simultaneously
+};
+
 struct RecognitionStatistics {
     unsigned passedTests = 0;
     unsigned totalTests = 0;
@@ -48,7 +53,7 @@ struct TestResult {
         if (positions[position].has_value()) {
             auto& value = positions[position].value();
             total.totalTests -= value.totalTests;
-            total.passedTests -= total.passedTests;
+            total.passedTests -= value.passedTests;
         }
         positions[position] = results;
         total.totalTests += results.totalTests;

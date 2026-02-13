@@ -14,6 +14,7 @@
 #include <QRandomGenerator>
 #include <QPushButton>
 #include <QLabel>
+#include <QCheckBox>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <qboxlayout.h>
@@ -40,6 +41,8 @@ MainWindow::MainWindow(QWidget* parent)
     openDatasetButton = new QPushButton("Open dataset", this);
     currentNetworkLabel = new QLabel("No network", this);
     currentDatasetLabel = new QLabel("No dataset", this);
+    batchModeCheckbox = new QCheckBox("True Batch Training", this);
+    batchModeCheckbox->setToolTip("Train on all samples in batch simultaneously instead of one-by-one");
 
     auto* vLayout = new QVBoxLayout();
     auto* hLayout = new QHBoxLayout();
@@ -48,6 +51,7 @@ MainWindow::MainWindow(QWidget* parent)
     buttonLayout->addWidget(toggleLearningButton);
     buttonLayout->addWidget(openNetworkButton);
     buttonLayout->addWidget(openDatasetButton);
+    buttonLayout->addWidget(batchModeCheckbox);
     infoLayout->addWidget(currentNetworkLabel);
     infoLayout->addWidget(currentDatasetLabel);
 
@@ -92,6 +96,7 @@ void MainWindow::setController(DigitsRecognizerController* controller) {
             controller->run();
         }
     });
+    connect(batchModeCheckbox, &QCheckBox::stateChanged, this, &MainWindow::handleBatchModeChanged);
     updateInfo();
 }
 
@@ -136,6 +141,17 @@ void MainWindow::updateInfo() {
     toggleLearningButton->setText(
         info.running ? "Stop learning" : "Start learning"
     );
+
+    // Update checkbox state without triggering signal
+    batchModeCheckbox->blockSignals(true);
+    batchModeCheckbox->setChecked(info.trueBatchMode);
+    batchModeCheckbox->blockSignals(false);
+}
+
+void MainWindow::handleBatchModeChanged(int state) {
+    if (controller) {
+        controller->setBatchTrainingMode(state == Qt::Checked);
+    }
 }
 
 void MainWindow::handleOpenNetworkClicked() {

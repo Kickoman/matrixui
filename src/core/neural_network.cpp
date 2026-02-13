@@ -45,11 +45,15 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
     weights.clear();
     biases.clear();
 
-    std::normal_distribution<double> dist(0.0, 1.0);
+    // std::normal_distribution<double> dist(0.0, 1.0);
 
     for (size_t i = 0; i < layerSizes.size() - 1; ++i) {
         size_t inputSize = layerSizes[i];
         size_t outputSize = layerSizes[i + 1];
+
+        // Xavier/Glorot initialization for sigmoid activation
+        double stddev = std::sqrt(2.0 / (inputSize + outputSize));
+        std::normal_distribution<double> dist(0.0, stddev);
 
         Matrix weightMatrix(inputSize, outputSize);
         for (size_t row = 0; row < inputSize; ++row) {

@@ -64,6 +64,13 @@ void DigitsRecognizerController::setTestingLimit(const unsigned limit) {
     recognizer->setTestingFileLimit(limit);
 }
 
+void DigitsRecognizerController::setBatchTrainingMode(bool trueBatch) {
+    recognizer->setBatchTrainingMode(
+        trueBatch ? BatchTrainingMode::TrueBatch : BatchTrainingMode::SampleBySample
+    );
+    emit infoUpdated();
+}
+
 DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
     return {
         .initialized = recognizer->isInitialized(),
@@ -71,6 +78,7 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
         .pathToDataset = recognizer->getPathToDataset(),
         .networkName = recognizer->getNetworkName(),
         .layersConfiguration = recognizer->getLayersConfiguration(),
+        .trueBatchMode = recognizer->getBatchTrainingMode() == BatchTrainingMode::TrueBatch,
     };
 }
 

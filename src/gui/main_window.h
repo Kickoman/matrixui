@@ -14,6 +14,7 @@ class DigitsRecognizerController;
 class QThread;
 class QPushButton;
 class QLabel;
+class QCheckBox;
 
 class MainWindow : public QMainWindow
 {
@@ -37,6 +38,7 @@ private slots:
     void updateInfo();
     void handleOpenNetworkClicked();
     void handleOpenDatasetClicked();
+    void handleBatchModeChanged(int state);
 
 private:
 
@@ -51,6 +53,7 @@ private:
     QPushButton* openDatasetButton = nullptr;
     QLabel* currentNetworkLabel = nullptr;
     QLabel* currentDatasetLabel = nullptr;
+    QCheckBox* batchModeCheckbox = nullptr;
 
     DigitsRecognizerController* controller = nullptr;
 };

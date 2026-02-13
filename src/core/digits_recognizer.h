@@ -1,6 +1,17 @@
 #pragma once
 
 #include "core/recognizer.h"
+#include <random>
+
+using recognition::BatchTrainingMode;
+
+
+// A sample with its expected digit label
+struct LabeledSample {
+    std::string path;
+    unsigned digit;
+};
+
 
 class DigitsRecognizer : public recognition::Recognizer
 {
@@ -13,6 +24,7 @@ public:
     template<class T>
     using TVector = std::vector<T>;
     using TSamplesList = TVector<TString>;
+    using TLabeledSamplesList = TVector<LabeledSample>;
     using TSize = std::size_t;
     using TLayers = TVector<TSize>;
     static constexpr TSize IMAGE_W = 28;
@@ -22,32 +34,35 @@ public:
 
     void setTestingFileLimit(const TSize limit);
     void setDatasetFileLimit(const TSize limit);
+    void setBatchTrainingMode(BatchTrainingMode mode);
+    BatchTrainingMode getBatchTrainingMode() const;
 
     TestResult testNetwork() const override;
     void learnNetwork() override;
     const TLayers& getDefaultLayersConfiguration() const override;
 private:
-    TSamplesList getBadSamples(
-        const TDigit expected,
-        const TString& datasetDir,
-        const bool fastCircuit = false
-    ) const;
-    void filterBadSamples(TSamplesList& samples, const TDigit expected) const;
-    bool trainSample(const TString& sample, const auto& expectedResult, const TDigit digit);
-    bool trainDigit(const TDigit digit);
+    // Collect bad samples from all digits
+    TLabeledSamplesList getAllBadSamples() const;
+    
+    // Filter out samples that are now correctly predicted
+    void filterBadSamples(TLabeledSamplesList& samples) const;
+    
+    // Shuffle samples randomly
+    void shuffleSamples(TLabeledSamplesList& samples);
+    
+    // Training methods for mixed-digit batches
+    bool trainMixedSamples(TLabeledSamplesList& badSamples);
+    bool trainMixedSampleBySample(TLabeledSamplesList& badSamples);
+    bool trainMixedTrueBatch(TLabeledSamplesList& badSamples);
+    
+    // Legacy single-digit methods (kept for reference but not used)
+    TSamplesList getBadSamplesForDigit(const TDigit expected, const TString& datasetDir) const;
 
-
-    TDigit validateAndFindNextDigit(const TDigit currentDigit);
-    void performTesting();
-
-    void initializeNetworkWeights(NeuralNetwork& network, const TString);
     void printTestResult(const TestResult& result) const;
 
 
     TSize datasetFileLimit = 10;
     TSize testingFileLimit = 150;
-
-    // state
-    TDigit currentDigit = 0;
-    bool lastTrainedDigitIsOk = true;
+    BatchTrainingMode trainingMode = BatchTrainingMode::SampleBySample;
+    std::mt19937 rng{std::random_device{}()};
 };

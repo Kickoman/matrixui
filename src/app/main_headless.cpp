@@ -98,11 +98,21 @@ int main(int argc, char** argv) {
         layers = parseLayers(cmd.getCmdOption("--layers"));
     }
 
+    const std::string batchModeStr = cmd.getCmdOption("--batch-mode", "sample");
+    BatchTrainingMode batchMode = BatchTrainingMode::SampleBySample;
+    if (batchModeStr == "batch" || batchModeStr == "true-batch") {
+        batchMode = BatchTrainingMode::TrueBatch;
+    } else if (batchModeStr != "sample" && batchModeStr != "sample-by-sample") {
+        std::cerr << "Invalid batch mode: " << batchModeStr << ". Use 'sample' or 'batch'" << std::endl;
+        return 5;
+    }
+
     std::cout << "Starting with parameters:\n"
         << "\tNetwork name: " << networkName << "\n"
         << "\tDataset path: " << datasetPath << "\n"
         << "\tTesting file limit: " << testingFileLimit << "\n"
         << "\tDataset file limit: " << datasetFileLimit << "\n"
+        << "\tBatch training mode: " << batchModeStr << "\n"
     ;
     if (layers.has_value()) {
         std::cout << "\tLayers: " << layers.value() << "\n";
@@ -114,15 +124,19 @@ int main(int argc, char** argv) {
     const std::string recognizerType = cmd.getCmdOption("--recognizer", "digits");
     std::unique_ptr<recognition::Recognizer> recognizer;
     if (recognizerType == "digits") {
-        recognizer = std::make_unique<DigitsRecognizer>();
-        static_cast<DigitsRecognizer*>(recognizer.get())->setDatasetFileLimit(datasetFileLimit);
-        static_cast<DigitsRecognizer*>(recognizer.get())->setTestingFileLimit(testingFileLimit);
+        auto digitsRecognizer = std::make_unique<DigitsRecognizer>();
+        digitsRecognizer->setDatasetFileLimit(datasetFileLimit);
+        digitsRecognizer->setTestingFileLimit(testingFileLimit);
+        digitsRecognizer->setBatchTrainingMode(batchMode);
         if (!validateDataset(datasetPath)) {
             std::cerr << "Invalid dataset" << std::endl;
             return 3;
         }
+        recognizer = std::move(digitsRecognizer);
     } else if (recognizerType == "dots") {
-        recognizer = std::make_unique<DotsRecognizer>();
+        auto dotsRecognizer = std::make_unique<DotsRecognizer>();
+        dotsRecognizer->setBatchTrainingMode(batchMode);
+        recognizer = std::move(dotsRecognizer);
     } else {
         std::cerr << "Invalid recognizer type: " << recognizerType << std::endl;
         return 4;

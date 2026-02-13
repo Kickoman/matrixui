@@ -17,6 +17,7 @@ public:
         std::string pathToDataset;
         std::string networkName;
         std::vector<std::size_t> layersConfiguration;
+        bool trueBatchMode;
     };
 
     DigitsRecognizerController(DigitsRecognizer* recognizer);
@@ -31,6 +32,7 @@ public slots:
     bool setDataset(const QString& pathToDataset);
     void setSamplesLimit(const unsigned limit);
     void setTestingLimit(const unsigned limit);
+    void setBatchTrainingMode(bool trueBatch);
 
 
 signals:

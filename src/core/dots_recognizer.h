@@ -12,7 +12,7 @@ struct DatasetEntry {
 
 
 struct Dataset {
-    static constexpr size_t BATCH_SIZE = 50;
+    static constexpr size_t BATCH_SIZE = 10;
 
     bool loaded = false;
     std::vector<DatasetEntry> entries;
@@ -21,6 +21,9 @@ struct Dataset {
     bool load(const std::filesystem::path& path);
     std::span<const DatasetEntry> getBatch(const size_t batchIndex) const;
 };
+
+
+using recognition::BatchTrainingMode;
 
 
 class DotsRecognizer : public recognition::Recognizer
@@ -36,8 +39,13 @@ public:
     void learnNetwork() override;
     const TLayers& getDefaultLayersConfiguration() const override;
 
+    void setBatchTrainingMode(BatchTrainingMode mode);
+    BatchTrainingMode getBatchTrainingMode() const;
+
 private:
     void trainBatch(const Batch& batch);
+    void trainBatchSampleBySample(const Batch& batch, unsigned int epochs, double learningRate);
+    void trainBatchTrueBatch(const Batch& batch, unsigned int epochs, double learningRate);
     bool testImage(const Matrix& image, const size_t expectedIndex) const;
     bool testBatch(const Batch& batch) const;
     Batch getBatch(const size_t batchIndex) const;
@@ -45,4 +53,5 @@ private:
 
     mutable Dataset dataset;
     size_t currentBatchIndex = 0;
+    BatchTrainingMode trainingMode = BatchTrainingMode::SampleBySample;
 };
