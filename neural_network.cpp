@@ -2,11 +2,10 @@
 #include "matrix.h"
 #include <cmath>
 #include <cstdio>
-#include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <random>
-#include <fstream>
+
 
 double NeuralNetwork::sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
@@ -96,37 +95,30 @@ std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
 }
 
 void NeuralNetwork::backwardPass(
-    const Matrix& input,
-    const Matrix& target,
     const std::vector<Matrix>& activations,
+    const Matrix& error,
     const double learningRate
 ) {
     if (activations.size() != weights.size() + 1) {
         throw std::invalid_argument("Invalid number of activations");
     }
 
-    Matrix outputError = target - activations.back();
-
     std::vector<Matrix> deltas(weights.size());
-
-    Matrix outputDelta = outputError;
-    for (size_t row = 0; row < outputDelta.getRows(); ++row) {
-        for (size_t col = 0; col < outputDelta.getCols(); ++col) {
-            outputDelta(row, col) *= sigmoidDerivative(activations.back()(row, col));
+    deltas.back() = error;
+    for (size_t row = 0; row < error.getRows(); ++row) {
+        for (size_t col = 0; col < error.getCols(); ++col) {
+            deltas.back()(row, col) *= sigmoidDerivative(activations.back()(row, col));
         }
     }
-    deltas.back() = outputDelta;
 
     for (int i = weights.size() - 2; i >= 0; --i) {
         Matrix hiddenError = deltas[i + 1] * weights[i + 1].transpose();
-        Matrix hiddenDelta = hiddenError;
-
-        for (size_t row = 0; row < hiddenDelta.getRows(); ++row) {
-            for (size_t col = 0; col < hiddenDelta.getCols(); ++col) {
-                hiddenDelta(row, col) *= sigmoidDerivative(activations[i + 1](row, col));
+        for (size_t row = 0; row < hiddenError.getRows(); ++row) {
+            for (size_t col = 0; col < hiddenError.getCols(); ++col) {
+                hiddenError(row, col) *= sigmoidDerivative(activations[i + 1](row, col));
             }
         }
-        deltas[i] = hiddenDelta;
+        deltas[i] = hiddenError;
     }
 
     for (size_t i = 0; i < weights.size(); ++i) {
@@ -135,7 +127,7 @@ void NeuralNetwork::backwardPass(
 
         Matrix biasGradient(1, deltas[i].getCols());
         for (size_t col = 0; col < deltas[i].getCols(); ++col) {
-            double sum = 0.0;
+            double sum = 0;
             for (size_t row = 0; row < deltas[i].getRows(); ++row) {
                 sum += deltas[i](row, col);
             }
@@ -145,33 +137,9 @@ void NeuralNetwork::backwardPass(
     }
 }
 
-void NeuralNetwork::train(
-    const Matrix& inputs,
-    const Matrix& targets,
-    const int epochs,
-    const double learningRate,
-    std::ostream& logger
-) {
-    if (!isInitialized()) {
-        throw std::runtime_error("Network must be initalized before training");
-    }
-
-    for (int epoch = 0; epoch < epochs; ++epoch) {
-        auto activations = forwardPass(inputs);
-        backwardPass(inputs, targets, activations, learningRate);
-
-        if (epoch % 10 == 0) {
-            Matrix predictions = activations.back();
-            Matrix error = targets - predictions;
-            double meanError = 0.0;
-            for (size_t i = 0; i < error.getCols(); ++i) {
-                meanError += std::abs(error(0, i));
-            }
-            meanError /= error.getCols();
-            logger << "\rEpoch " << epoch << ", Error: " << meanError << "                             " << std::flush;
-        }
-    }
-    logger << std::endl;
+void NeuralNetwork::train(const Matrix& input, const Matrix& target, const double learningRate) {
+    const auto activations = forwardPass(input);
+    backwardPass(activations, target - activations.back(), learningRate);
 }
 
 Matrix NeuralNetwork::predict(const Matrix& input) const {
@@ -182,82 +150,18 @@ Matrix NeuralNetwork::predict(const Matrix& input) const {
     return activations.back();
 }
 
-void NeuralNetwork::saveWeights(const std::string& filename) const {
-    if (!isInitialized()) {
-        throw std::runtime_error("Network must be initialized before saving weights");
-    }
-
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for writing: " + filename);
-    }
-
-    file << layerSizes.size() << std::endl;
-    for (size_t size : layerSizes) {
-        file << size << " ";
-    }
-    file << std::endl;
-
-    for (size_t i = 0; i < weights.size(); ++i) {
-        file << weights[i].getRows() << " " << weights[i].getCols() << std::endl;
-        for (size_t row = 0; row < weights[i].getRows(); ++row) {
-            for (size_t col = 0; col < weights[i].getCols(); ++col) {
-                file << weights[i](row, col) << " ";
-            }
-            file << std::endl;
-        }
-
-        file << biases[i].getRows() << " " << biases[i].getCols() << std::endl;
-        for (size_t row = 0; row < biases[i].getRows(); ++row) {
-            for (size_t col = 0; col < biases[i].getCols(); ++col) {
-                file << biases[i](row, col) << " ";
-            }
-            file << std::endl;
-        }
-    }
-
-    file.close();
+void NeuralNetwork::setWeights(const std::vector<Matrix>& newWeights) {
+    weights = newWeights;
 }
 
-void NeuralNetwork::loadWeights(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for reading: " + filename);
-    }
+void NeuralNetwork::setBiases(const std::vector<Matrix>& newBiases) {
+    biases = newBiases;
+}
 
-    size_t numLayers;
-    file >> numLayers;
-    std::vector<size_t> loadedLayerSizes(numLayers);
-    for (size_t i = 0; i < numLayers; ++i) {
-        file >> loadedLayerSizes[i];
-    }
+const std::vector<Matrix>& NeuralNetwork::getWeights() const {
+    return weights;
+}
 
-    layerSizes = loadedLayerSizes;
-
-    weights.clear();
-    biases.clear();
-    for (size_t i = 0; i < numLayers - 1; ++i) {
-        size_t rows, cols;
-        file >> rows >> cols;
-        Matrix weightMatrix(rows, cols);
-        for (size_t row = 0; row < rows; ++row) {
-            for (size_t col = 0; col < cols; ++col) {
-                file >> weightMatrix(row, col);
-            }
-        }
-        weights.push_back(weightMatrix);
-
-        file >> rows >> cols;
-        Matrix biasMatrix(rows, cols);
-        for (size_t row = 0; row < rows; ++row) {
-            for (size_t col = 0; col < cols; ++col) {
-                file >> biasMatrix(row, col);
-            }
-        }
-        biases.push_back(biasMatrix);
-    }
-
-    file.close();
-
-    initialized = true;
+const std::vector<Matrix>& NeuralNetwork::getBiases() const {
+    return biases;
 }

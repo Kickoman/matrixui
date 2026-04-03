@@ -10,6 +10,10 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include <iostream>
+
+#include "dataset.h"
+
 
 struct RecognitionStatistics {
     size_t passedTests = 0;
@@ -50,7 +54,10 @@ public:
     void setLogger(std::ostream* stream);
     void loadNetwork(const TString& networkName, const TLayers& layers = DEFAULT_LAYERS);
     void loadNetwork(const NeuralNetwork& network, const TString& name);
-    void setDataset(const std::filesystem::path& pathToDataset);
+    // void setDataset(const std::filesystem::path& pathToDataset);
+    void setTrainingDataset(std::unique_ptr<Neural::Dataset>&& dataset);
+    void setTestingDataset(std::unique_ptr<Neural::Dataset>&& dataset);
+
     void setDatasetFileLimit(TSize limit);
     void setTestingFileLimit(TSize limit);
 
@@ -63,7 +70,7 @@ public:
 
     bool isRunning() const;
     bool isInitialized() const;
-    const std::filesystem::path& getPathToDataset() const;
+    // const std::filesystem::path& getPathToDataset() const;
     const TString& getNetworkName() const;
     const TLayers& getLayersConfiguration() const;
 
@@ -74,10 +81,10 @@ public:
     static Matrix generateExpectedResult(TDigit digit);
 
 private:
-    struct Sample {
-        Matrix image;
-        TDigit label;
-    };
+    // struct Sample {
+    //     Matrix image;
+    //     TDigit label;
+    // };
 
     // Параметры обучения
     static constexpr double INITIAL_LEARNING_RATE = 0.5;
@@ -88,9 +95,12 @@ private:
     static constexpr size_t PATIENCE = 10;
     static constexpr double LEARNING_RATE = 0.1; // legacy
 
+    std::unique_ptr<Neural::Dataset> trainingDataset;
+    std::unique_ptr<Neural::Dataset> testingDataset;
+
     NeuralNetwork network;
     TString networkName;
-    std::filesystem::path pathToDataset;
+    // std::filesystem::path pathToDataset;
     TSize datasetFileLimit = std::numeric_limits<TSize>::max();
     TSize testingFileLimit = std::numeric_limits<TSize>::max();
     std::ostream* stream = &std::cerr;
@@ -102,18 +112,18 @@ private:
     void printTestResult(const TestResult& result) const;
 
     // Новые методы
-    std::vector<Sample> loadAllSamples() const;
-    std::vector<Sample> loadSamplesForDigit(TDigit digit, TSize limit) const;
-    void shuffleSamples(std::vector<Sample>& samples, std::mt19937& rng) const;
-    double trainEpoch(std::vector<Sample>& samples, double learningRate, std::mt19937& rng);
-    double evaluateAccuracy(const std::vector<Sample>& samples) const;
+    // std::vector<Sample> loadAllSamples() const;
+    // std::vector<Sample> loadSamplesForDigit(TDigit digit, TSize limit) const;
+    // void shuffleSamples(std::vector<Sample>& samples, std::mt19937& rng) const;
+    double trainEpoch(std::vector<Neural::Sample>& samples, double learningRate, std::mt19937& rng);
+    double evaluateAccuracy(const std::vector<Neural::Sample>& samples) const;
 
-    // Legacy методы для совместимости
-    TSamplesList getBadSamples(TDigit expected, const TString& datasetDir, bool fastCircuit = false) const;
-    void filterBadSamples(TSamplesList& samples, TDigit digit, const TString& datasetDir, bool fastCircuit = false) const;
-    bool trainSample(const TString& sample, const auto& expectedResult, TDigit digit);
-    bool trainDigit(TDigit digit);
-    TDigit validateAndFindNextDigit(TDigit currentDigit);
+    // // Legacy методы для совместимости
+    // TSamplesList getBadSamples(TDigit expected, const TString& datasetDir, bool fastCircuit = false) const;
+    // void filterBadSamples(TSamplesList& samples, TDigit digit, const TString& datasetDir, bool fastCircuit = false) const;
+    // bool trainSample(const TString& sample, const auto& expectedResult, TDigit digit);
+    // bool trainDigit(TDigit digit);
+    // TDigit validateAndFindNextDigit(TDigit currentDigit);
 
     std::ostream& log() const;
 };

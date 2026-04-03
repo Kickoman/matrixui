@@ -46,9 +46,11 @@ private:
     DigitChart* digitChart = nullptr;
     QPushButton* toggleLearningButton = nullptr;
     QPushButton* openNetworkButton = nullptr;
-    QPushButton* openDatasetButton = nullptr;
+    QPushButton* openTrainingDatasetButton = nullptr;
+    QPushButton* openTestingDatasetButton = nullptr;
     QLabel* currentNetworkLabel = nullptr;
-    QLabel* currentDatasetLabel = nullptr;
+    QLabel* currentTestingDatasetLabel = nullptr;
+    QLabel* currentTrainingDatasetLabel = nullptr;
 
     DigitsRecognizerController* controller = nullptr;
 };

@@ -5,6 +5,8 @@
 #include <filesystem>
 
 #include "digits_recognizer.h"
+#include "directory_dataset.h"
+#include "pngreader.h"
 
 
 class InputParser{
@@ -110,8 +112,17 @@ int main(int argc, char** argv) {
         << std::endl;
 
     DigitsRecognizer recognizer;
+    PngUtils::Cache pngCache;
+    const auto reader = [&pngCache](const std::filesystem::path& path) {
+        return PngUtils::fromImage(path, 28, 28, pngCache);
+    };
+    auto trainingDataset = std::make_unique<Neural::DirectoryDataset>(datasetPath);
+    auto testingDataset = std::make_unique<Neural::DirectoryDataset>(datasetPath);
+    trainingDataset->setFileReader(reader);
+    testingDataset->setFileReader(reader);
     recognizer.loadNetwork(networkName);
-    recognizer.setDataset(datasetPath);
+    recognizer.setTrainingDataset(std::move(trainingDataset));
+    recognizer.setTestingDataset(std::move(testingDataset));
     recognizer.setDatasetFileLimit(datasetFileLimit);
     recognizer.setTestingFileLimit(testingFileLimit);
 

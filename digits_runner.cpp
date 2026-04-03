@@ -1,8 +1,31 @@
 #include "digits_runner.h"
 #include "digits_recognizer.h"
+#include "directory_dataset.h"
 #include <stdexcept>
 #include <QThreadPool>
 #include <QDir>
+
+
+namespace {
+
+std::unique_ptr<Neural::DirectoryDataset> LoadDataset(const QString& pathToDataset) {
+    static PngUtils::Cache pngCache;
+    static const auto reader = [](const std::filesystem::path& path) {
+        return PngUtils::fromImage(path, 28, 28, pngCache).transform(1, 28 * 28);
+    };
+    const QDir path(pathToDataset);
+    for (int i = 0; i < 10; ++i) {
+        const QDir subdirectory(path.filePath(QString::number(i)));
+        if (!subdirectory.exists() || !subdirectory.isReadable()) {
+            return {};
+        }
+    }
+    auto dataset = std::make_unique<Neural::DirectoryDataset>(pathToDataset.toStdString());
+    dataset->setFileReader(reader);
+    return dataset;
+}
+
+}
 
 
 DigitsRecognizerController::DigitsRecognizerController(DigitsRecognizer* recognizer)
@@ -50,18 +73,30 @@ void DigitsRecognizerController::loadNetwork(const QString& network, const QVect
     emit infoUpdated();
 }
 
-bool DigitsRecognizerController::setDataset(const QString& pathToDataset) {
+bool DigitsRecognizerController::setTestingDataset(const QString& pathToDataset) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't change datasets while learning is running");
     }
-    const QDir path(pathToDataset);
-    for (int i = 0; i < 10; ++i) {
-        const QDir subdirectory(path.filePath(QString::number(i)));
-        if (!subdirectory.exists() || !subdirectory.isReadable()) {
-            return false;
-        }
+    auto dataset = LoadDataset(pathToDataset);
+    if (!dataset) {
+        return false;
     }
-    recognizer->setDataset(pathToDataset.toStdString());
+    pathToTestingDataset = pathToDataset;
+    recognizer->setTestingDataset(std::move(dataset));
+    emit infoUpdated();
+    return true;
+}
+
+bool DigitsRecognizerController::setTrainingDataset(const QString& pathToDataset) {
+    if (recognizer->isRunning()) {
+        throw std::runtime_error("Can't change datasets while learning is running");
+    }
+    auto dataset = LoadDataset(pathToDataset);
+    if (!dataset) {
+        return false;
+    }
+    pathToTrainingDataset = pathToDataset;
+    recognizer->setTrainingDataset(std::move(dataset));
     emit infoUpdated();
     return true;
 }
@@ -78,7 +113,8 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
     return {
         .initialized = recognizer->isInitialized(),
         .running = recognizer->isRunning(),
-        .pathToDataset = recognizer->getPathToDataset(),
+        .pathToTrainingDataset = pathToTrainingDataset.toStdString(),
+        .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = recognizer->getNetworkName(),
         .layersConfiguration = recognizer->getLayersConfiguration(),
     };

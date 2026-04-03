@@ -52,7 +52,10 @@ set(SOURCES
     matrix.cpp
     digits_recognizer.cpp
     neural_network.cpp
+    neural_network_loader.cpp
     pngreader.cpp
+    dataset.cpp
+    directory_dataset.cpp
 )
 
 include_directories(eigen)

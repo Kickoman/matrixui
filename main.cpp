@@ -21,8 +21,12 @@ int main(int argc, char** argv) {
     controller.loadNetwork(settings.value("last_network_name", QString("network.wgt")).toString());
     controller.setSamplesLimit(50);
     controller.setTestingLimit(150);
-    controller.setDataset(settings.value(
-        "last_dataset_path",
+    controller.setTrainingDataset(settings.value(
+        "last_training_dataset_path",
+        QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
+    ).toString());
+    controller.setTestingDataset(settings.value(
+        "last_testing_dataset_path",
         QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
     ).toString());
 

@@ -37,9 +37,11 @@ MainWindow::MainWindow(QWidget* parent)
 
     toggleLearningButton = new QPushButton("Start learning", this);
     openNetworkButton = new QPushButton("Open network", this);
-    openDatasetButton = new QPushButton("Open dataset", this);
+    openTrainingDatasetButton = new QPushButton("Open training dataset", this);
+    openTestingDatasetButton = new QPushButton("Open testing dataset", this);
     currentNetworkLabel = new QLabel("No network", this);
-    currentDatasetLabel = new QLabel("No dataset", this);
+    currentTestingDatasetLabel = new QLabel("No testing dataset", this);
+    currentTrainingDatasetLabel = new QLabel("No training dataset", this);
 
     auto* vLayout = new QVBoxLayout();
     auto* hLayout = new QHBoxLayout();
@@ -47,9 +49,11 @@ MainWindow::MainWindow(QWidget* parent)
     auto* infoLayout = new QVBoxLayout();
     buttonLayout->addWidget(toggleLearningButton);
     buttonLayout->addWidget(openNetworkButton);
-    buttonLayout->addWidget(openDatasetButton);
+    buttonLayout->addWidget(openTrainingDatasetButton);
+    buttonLayout->addWidget(openTestingDatasetButton);
     infoLayout->addWidget(currentNetworkLabel);
-    infoLayout->addWidget(currentDatasetLabel);
+    infoLayout->addWidget(currentTestingDatasetLabel);
+    infoLayout->addWidget(currentTrainingDatasetLabel);
 
     vLayout->addLayout(buttonLayout);
     vLayout->addLayout(infoLayout);
@@ -65,7 +69,8 @@ MainWindow::MainWindow(QWidget* parent)
     showMaximized();
 
     connect(openNetworkButton, &QPushButton::clicked, this, &MainWindow::handleOpenNetworkClicked);
-    connect(openDatasetButton, &QPushButton::clicked, this, &MainWindow::handleOpenDatasetClicked);
+    connect(openTrainingDatasetButton, &QPushButton::clicked, this, &MainWindow::handleOpenDatasetClicked);
+    connect(openTestingDatasetButton, &QPushButton::clicked, this, &MainWindow::handleOpenDatasetClicked);
 }
 
 MainWindow::~MainWindow()
@@ -98,7 +103,8 @@ void MainWindow::setController(DigitsRecognizerController* controller) {
 void MainWindow::closeEvent(QCloseEvent* event) {
     controller->requestStop();
     QSettings settings;
-    settings.setValue("last_dataset_path", QString::fromStdString(controller->getInfo().pathToDataset));
+    settings.setValue("last_training_dataset_path", QString::fromStdString(controller->getInfo().pathToTrainingDataset));
+    settings.setValue("last_testing_dataset_path", QString::fromStdString(controller->getInfo().pathToTestingDataset));
     settings.setValue("last_network_name", QString::fromStdString(controller->getInfo().networkName));
     QMainWindow::closeEvent(event);
 }
@@ -134,7 +140,8 @@ void MainWindow::updateInfo() {
     }
     const auto& info = controller->getInfo();
     currentNetworkLabel->setText(info.networkName.size() ? ("Network: " + QString::fromStdString(info.networkName)) : QString("No network"));
-    currentDatasetLabel->setText(info.pathToDataset.size() ? ("Dataset: " + QString::fromStdString(info.pathToDataset)) : QString("No dataset"));
+    currentTestingDatasetLabel->setText(info.pathToTestingDataset.size() ? ("Testing dataset: " + QString::fromStdString(info.pathToTestingDataset)) : QString("No dataset"));
+    currentTrainingDatasetLabel->setText(info.pathToTrainingDataset.size() ? ("Training dataset: " + QString::fromStdString(info.pathToTrainingDataset)) : QString("No dataset"));
     toggleLearningButton->setEnabled(info.initialized);
     toggleLearningButton->setText(
         info.running ? "Stop learning" : "Start learning"
@@ -159,7 +166,13 @@ void MainWindow::handleOpenDatasetClicked() {
         if (selected.size() != 1) {
             throw std::runtime_error("A single directory should be selected");
         }
-        if (!controller->setDataset(selected.front())) {
+        bool set = false;
+        if (QObject::sender() == openTestingDatasetButton) {
+            set = controller->setTestingDataset(selected.front());
+        } else if (QObject::sender() == openTrainingDatasetButton) {
+            set = controller->setTrainingDataset(selected.front());
+        }
+        if (!set) {
             QMessageBox::critical(
                 this,
                 "Incorrect dataset format!",

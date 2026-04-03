@@ -15,7 +15,8 @@ public:
     struct Info {
         bool initialized;
         bool running;
-        std::string pathToDataset;
+        std::string pathToTrainingDataset;
+        std::string pathToTestingDataset;
         std::string networkName;
         std::vector<std::size_t> layersConfiguration;
     };
@@ -29,7 +30,8 @@ public slots:
     void run();
     void requestStop();
     void loadNetwork(const QString& networkName, const QVector<unsigned>& layers = {});
-    bool setDataset(const QString& pathToDataset);
+    bool setTrainingDataset(const QString& pathToDataset);
+    bool setTestingDataset(const QString& pathToDataset);
     void setSamplesLimit(const unsigned limit);
     void setTestingLimit(const unsigned limit);
 
@@ -41,5 +43,7 @@ signals:
 private:
     void updateStatistic(const TestResult& result) const;
 
+    QString pathToTrainingDataset;
+    QString pathToTestingDataset;
     DigitsRecognizer* recognizer;
 };

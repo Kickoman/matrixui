@@ -8,7 +8,20 @@
 
 class DirectoryLister {
 public:
-    static std::vector<std::string> listFiles(const std::string& directoryPath) {
+    static std::vector<std::filesystem::path> listDirectories(const std::string& directoryPath) {
+        std::vector<std::filesystem::path> directories;
+        if (!std::filesystem::exists(directoryPath)) {
+            throw std::runtime_error("Directory does not exist: " + directoryPath);
+        }
+        for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
+            if (entry.is_directory()) {
+                directories.push_back(entry.path());
+            }
+        }
+        return directories;
+    }
+
+    static std::vector<std::string> listFiles(const std::string& directoryPath, const std::size_t limit = 0) {
         std::vector<std::string> files;
 
         // Check if directory exists
@@ -26,6 +39,9 @@ public:
                 if (entry.is_regular_file()) {
                     std::string filename = entry.path().string();
                     files.push_back(filename);
+                    if (limit > 0 && files.size() >= limit) {
+                        break;
+                    }
                 }
             }
         } catch (const std::filesystem::filesystem_error& e) {
