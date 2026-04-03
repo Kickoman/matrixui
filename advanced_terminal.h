@@ -58,11 +58,11 @@ private:
 
         const auto& text = QString::fromStdString(buffer.str());
         if (!text.isEmpty() || addNewline) {
-            if (addNewline) {
-                QMetaObject::invokeMethod(terminal, &AdvancedTerminal::writeLine, text);
-            } else {
-                QMetaObject::invokeMethod(terminal, &AdvancedTerminal::write, text);
-            }
+            const auto method = addNewline ? &AdvancedTerminal::writeLine : &AdvancedTerminal::write;
+            auto term = this->terminal;
+            QMetaObject::invokeMethod(term, [term, method, text]() {
+                (term->*method)(text);
+            });
             buffer.str("");
             buffer.clear();
         }
@@ -73,9 +73,11 @@ private:
         const auto newLinePosition = content.find('\n');
 
         if (newLinePosition != std::string::npos) {
-            const auto& toFlush = content.substr(0, newLinePosition + 1);
-            QMetaObject::invokeMethod(terminal, &AdvancedTerminal::write, QString::fromStdString(toFlush));
-
+            const auto& toFlush = QString::fromStdString(content.substr(0, newLinePosition + 1));
+            auto term = this->terminal;
+            QMetaObject::invokeMethod(term, [term, toFlush]() {
+                term->write(toFlush);
+            });
             const auto& remaining = content.substr(newLinePosition + 1);
             buffer.str(remaining);
             buffer.clear();

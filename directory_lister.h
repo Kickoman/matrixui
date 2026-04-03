@@ -8,7 +8,7 @@
 
 class DirectoryLister {
 public:
-    static std::vector<std::string> listFiles(const std::string& directoryPath, bool includeHidden = false) {
+    static std::vector<std::string> listFiles(const std::string& directoryPath) {
         std::vector<std::string> files;
 
         // Check if directory exists
@@ -25,12 +25,6 @@ public:
             for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
                 if (entry.is_regular_file()) {
                     std::string filename = entry.path().string();
-
-                    // Skip hidden files if requested
-                    if (!includeHidden && !filename.empty() && filename[0] == '.') {
-                        continue;
-                    }
-
                     files.push_back(filename);
                 }
             }

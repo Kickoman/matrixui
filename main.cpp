@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     DigitsRecognizer recognizer;
     DigitsRecognizerController controller(&recognizer);
     controller.loadNetwork("interm-6.wgt");
-    controller.setSamplesLimit(10);
+    controller.setSamplesLimit(50);
     controller.setTestingLimit(150);
     controller.setDataset("/home/kanstancin/Documents/projects/digits-generator/digit_images/");
 

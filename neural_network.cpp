@@ -66,6 +66,7 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
 
 std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
     std::vector<Matrix> activations;
+    activations.reserve(layerSizes.size());
     activations.push_back(input);
 
     Matrix currentActivation = input;
@@ -88,6 +89,7 @@ std::vector<Matrix> NeuralNetwork::forwardPass(const Matrix& input) const {
 
         activations.push_back(activation);
         currentActivation = activation;
+
     }
 
     return activations;

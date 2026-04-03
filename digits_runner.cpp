@@ -9,7 +9,9 @@ DigitsRecognizerController::DigitsRecognizerController(DigitsRecognizer* recogni
     : recognizer(recognizer)
 {
     this->recognizer->setResultCallback([this](const TestResult& result){
-        QMetaObject::invokeMethod(this, &DigitsRecognizerController::updatedStatistics, result);
+        QMetaObject::invokeMethod(this, [this, result]() {
+            emit updatedStatistics(result);
+        });
     });
 }
 
