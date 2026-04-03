@@ -40,27 +40,26 @@ endif(USE_EIGEN)
 
 set(
     QT_DEPENDANT_SOURCES
-    main_window.cpp
-    advanced_terminal.cpp
-    time_chart.cpp
-    digit_chart.cpp
-    digits_runner.cpp
-    network_create_dialog.cpp
+    gui/main_window.cpp
+    gui/advanced_terminal.cpp
+    gui/time_chart.cpp
+    gui/digit_chart.cpp
+    gui/digits_runner.cpp
+    gui/network_create_dialog.cpp
 )
 
 set(SOURCES
-    matrix.cpp
+    matrix/matrix.cpp
     # digits_recognizer.cpp
-    neural_network.cpp
-    neural_network_loader.cpp
-    pngreader.cpp
-    dataset.cpp
-    directory_dataset.cpp
-    trainer.cpp
+    core/neural_network.cpp
+    core/neural_network_loader.cpp
+    png/pngreader.cpp
+    core/dataset.cpp
+    core/directory_dataset.cpp
+    core/trainer.cpp
 )
 
 include_directories(eigen)
-
 
 if(BUILD_GUI)
     add_executable(
@@ -68,14 +67,21 @@ if(BUILD_GUI)
         ${QT_DEPENDANT_SOURCES}
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main.cpp
+        gui/main.cpp
     )
 
-   target_link_libraries(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME}
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
+    )
+
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        core/
+        gui/
+        matrix/
+        png/
     )
 endif()
 
@@ -84,7 +90,14 @@ if(BUILD_CLI)
         ${PROJECT_NAME}_headless
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main_headless.cpp
+        core/main_headless.cpp
+    )
+
+    target_include_directories(${PROJECT_NAME}_headless PRIVATE
+        core/
+        gui/
+        matrix/
+        png/
     )
 endif()
 
@@ -99,12 +112,12 @@ if(BUILD_MATRIX_BENCHMARK)
     add_subdirectory(perftest)
 
     add_library(matrix_benchmarks OBJECT
-        matrix_benchmarks.cpp
-        recognition_benchmarks.cpp
+        benchmarks/matrix_benchmarks.cpp
+        benchmarks/recognition_benchmarks.cpp
         # digits_recognizer.cpp
-        neural_network.cpp
-        pngreader.cpp
-        matrix.cpp
+        core/neural_network.cpp
+        png/pngreader.cpp
+        matrix/matrix.cpp
     )
 
     target_link_libraries(matrix_benchmarks perfbench)
