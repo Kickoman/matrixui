@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "digits_recognizer.h"
+#include "trainer.h"
+#include "neural_network_loader.h"
 #include "directory_dataset.h"
 #include "pngreader.h"
 
@@ -47,10 +48,10 @@ bool validateDataset(const std::filesystem::path& datasetPath) {
 }
 
 
-DigitsRecognizer::TLayers parseLayers(const std::string& layersParameter) {
+std::vector<std::size_t> parseLayers(const std::string& layersParameter) {
     std::cerr << "'" << layersParameter << "'" << std::endl;
     try {
-        DigitsRecognizer::TLayers layers;
+        std::vector<std::size_t> layers;
 
         if (layersParameter.empty()) {
             return layers;
@@ -98,7 +99,7 @@ int main(int argc, char** argv) {
     const size_t datasetFileLimit = std::stoi(
         cmd.getCmdOption("--dataset-file-limit", "10")
     );
-    auto layers = DigitsRecognizer::DEFAULT_LAYERS;
+    std::vector<std::size_t> layers = {28 * 28, 50, 20, 10};
     if (cmd.cmdOptionExists("--layers")) {
         layers = parseLayers(cmd.getCmdOption("--layers"));
     }
@@ -111,7 +112,7 @@ int main(int argc, char** argv) {
         << "\tLayers" << layers
         << std::endl;
 
-    DigitsRecognizer recognizer;
+    Neural::Trainer recognizer;
     PngUtils::Cache pngCache;
     const auto reader = [&pngCache](const std::filesystem::path& path) {
         return PngUtils::fromImage(path, 28, 28, pngCache);
@@ -120,13 +121,14 @@ int main(int argc, char** argv) {
     auto testingDataset = std::make_unique<Neural::DirectoryDataset>(datasetPath);
     trainingDataset->setFileReader(reader);
     testingDataset->setFileReader(reader);
-    recognizer.loadNetwork(networkName);
+    recognizer.setNetwork(Neural::LoadNetwork(networkName, layers));
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
-    recognizer.setDatasetFileLimit(datasetFileLimit);
-    recognizer.setTestingFileLimit(testingFileLimit);
+    recognizer.setEpochCallback([&recognizer, &networkName]{
+        Neural::SaveNetwork(recognizer.getNetwork(), networkName);
+    });
 
-    recognizer.doLearning();
+    recognizer.train();
 
     return 0;
 }

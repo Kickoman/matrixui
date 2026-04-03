@@ -1,6 +1,5 @@
 #include "main_window.h"
 #include "advanced_terminal.h"
-#include "digits_recognizer.h"
 #include "digits_runner.h"
 #include "matrix.h"
 #include "time_chart.h"
@@ -122,14 +121,14 @@ void MainWindow::handleTimer()
     }
 }
 
-void MainWindow::handleStatistics(const TestResult& result) {
+void MainWindow::handleStatistics(const Neural::TestResult& result) {
     const auto& total = result.getTotal();
     const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
     chart->addPoint(rate);
 
     for (unsigned i = 0; i < 10; ++i) {
-        const auto& res = result.digits[i];
-        const double rate = res->totalTests > 0 ? 100.0 * res->passedTests / res->totalTests : 0;
+        const auto& res = result.stats[i];
+        const double rate = res.totalTests > 0 ? 100.0 * res.passedTests / res.totalTests : 0;
         digitChart->setValue(i, rate);
     }
 }
@@ -150,6 +149,7 @@ void MainWindow::updateInfo() {
 
 void MainWindow::handleOpenNetworkClicked() {
     NetworkCreateDialog dialog(this);
+    dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().networkName));
     if (dialog.exec() == QDialog::Accepted) {
         const QString name = dialog.getNetworkName();
         const auto sizes = dialog.getLayerSizes();

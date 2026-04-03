@@ -7,11 +7,11 @@ class AdvancedTerminal;
 class AdvancedTerminalStream;
 class TimeChart;
 class DigitChart;
-class TestResult;
 class DigitsRecognizerController;
 class QThread;
 class QPushButton;
 class QLabel;
+namespace Neural { class TestResult; }
 
 class MainWindow : public QMainWindow
 {
@@ -29,7 +29,7 @@ public:
 
 public slots:
     void handleTimer();
-    void handleStatistics(const TestResult& result);
+    void handleStatistics(const Neural::TestResult& result);
 
 private slots:
     void updateInfo();

@@ -14,8 +14,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-OPTION(BUILD_GUI "Build GUI version" ON)
-OPTION(BUILD_CLI "Build CLI version" ON)
+option(BUILD_GUI "Build GUI version" ON)
+option(BUILD_CLI "Build CLI version" ON)
 
 # Qt options
 if (BUILD_GUI)
@@ -27,16 +27,16 @@ if (BUILD_GUI)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
 endif()
 
-OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
-IF(USE_EIGEN)
+option(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
+if(USE_EIGEN)
     message("Using Eigen't matrix implementation")
-    ADD_DEFINITIONS(-DUSE_EIGEN)
+    add_definitions(-DUSE_EIGEN)
     # Hide warnings for eigen
     set_directory_properties(PATH eigen PROPERTIES
         COMPILE_OPTIONS "-w"  # For GCC/Clang
         # COMPILE_OPTIONS "/w"  # For MSVC
     )
-ENDIF(USE_EIGEN)
+endif(USE_EIGEN)
 
 set(
     QT_DEPENDANT_SOURCES
@@ -50,18 +50,19 @@ set(
 
 set(SOURCES
     matrix.cpp
-    digits_recognizer.cpp
+    # digits_recognizer.cpp
     neural_network.cpp
     neural_network_loader.cpp
     pngreader.cpp
     dataset.cpp
     directory_dataset.cpp
+    trainer.cpp
 )
 
 include_directories(eigen)
 
 
-IF(BUILD_GUI)
+if(BUILD_GUI)
     add_executable(
         ${PROJECT_NAME}
         ${QT_DEPENDANT_SOURCES}
@@ -76,18 +77,18 @@ IF(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
     )
-ENDIF()
+endif()
 
-IF(BUILD_CLI)
+if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
         ${MATRIX_SOURCES}
         ${SOURCES}
         main_headless.cpp
     )
-ENDIF()
+endif()
 
-OPTION(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
+option(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
 
 if(BUILD_MATRIX_BENCHMARK)
     message("Building MatrixBenchmark with perftest library")
@@ -100,7 +101,7 @@ if(BUILD_MATRIX_BENCHMARK)
     add_library(matrix_benchmarks OBJECT
         matrix_benchmarks.cpp
         recognition_benchmarks.cpp
-        digits_recognizer.cpp
+        # digits_recognizer.cpp
         neural_network.cpp
         pngreader.cpp
         matrix.cpp

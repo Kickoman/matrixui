@@ -1,7 +1,7 @@
 #include <QApplication>
 #include <QSettings>
 #include "main_window.h"
-#include "digits_recognizer.h"
+#include "trainer.h"
 #include "digits_runner.h"
 #include "advanced_terminal.h"
 
@@ -16,11 +16,9 @@ int main(int argc, char** argv) {
     auto stream = createTerminalOStream(window.getTerminalWidget());
 
     QSettings settings;
-    DigitsRecognizer recognizer;
+    Neural::Trainer recognizer;
     DigitsRecognizerController controller(&recognizer);
     controller.loadNetwork(settings.value("last_network_name", QString("network.wgt")).toString());
-    controller.setSamplesLimit(50);
-    controller.setTestingLimit(150);
     controller.setTrainingDataset(settings.value(
         "last_training_dataset_path",
         QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
@@ -30,8 +28,7 @@ int main(int argc, char** argv) {
         QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
     ).toString());
 
-    recognizer.setLogger(stream.get());
-    recognizer.setSaveOnEachDigit(true);
+    recognizer.setOutputStream(stream.get());
     window.setLogger(stream.get());
     window.setController(&controller);
 

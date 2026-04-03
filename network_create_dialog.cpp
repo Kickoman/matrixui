@@ -60,8 +60,15 @@ QVector<unsigned> NetworkCreateDialog::getLayerSizes() const {
     return result;
 }
 
+void NetworkCreateDialog::setCurrentNetworkPath(const QString& path) {
+    networkPathInput->setText(path);
+}
+
 void NetworkCreateDialog::handleNetworkPathButtonClicked() {
     QFileDialog dialog(this);
+    if (const auto path = networkPathInput->text(); QFile::exists(path)) {
+        dialog.setDirectory(QFileInfo(path).dir());
+    }
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setOption(QFileDialog::DontConfirmOverwrite, true);
