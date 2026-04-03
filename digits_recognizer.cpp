@@ -23,18 +23,22 @@ void DigitsRecognizer::setLogger(std::ostream* stream) {
 
 void DigitsRecognizer::loadNetwork(const TString& networkName, const TLayers& layers) {
     this->networkName = networkName;
+    if (std::filesystem::exists(networkName)){
     try {
-        if (layers != DEFAULT_LAYERS) {
+            network.loadWeights(networkName);
+            log() << "Loaded weights from " << networkName << std::endl;
+            if (network.getLayerSizes() != layers) {
             log() << "Specified layers were ignored, using the loaded ones" << std::endl;
         }
-        network.loadWeights(networkName);
+            return;
     } catch (const std::runtime_error& e) {
         log() << "Cannot load weights: " << e.what() << std::endl;
-        log() << "Initialized with default values." << std::endl;
+        }
+    }
         std::mt19937 generator;
         network = NeuralNetwork(layers);
         network.initializeWeights(generator);
-    }
+    log() << "Initialized with default values." << std::endl;
 }
 
 void DigitsRecognizer::loadNetwork(const NeuralNetwork& network, const TString& name) {

@@ -34,11 +34,19 @@ void DigitsRecognizerController::requestStop() {
     recognizer->requestStop();
 }
 
-void DigitsRecognizerController::loadNetwork(const QString& network) {
+void DigitsRecognizerController::loadNetwork(const QString& network, const QVector<unsigned>& layers) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't load network, while learning is running");
     }
-    recognizer->loadNetwork(network.toStdString());
+    std::vector<unsigned long> layersSizes;
+    std::transform(layers.begin(), layers.end(), std::back_inserter(layersSizes), [](unsigned size) {
+        return static_cast<unsigned long>(size);
+    });
+    if (layersSizes.size()) {
+        recognizer->loadNetwork(network.toStdString(), layersSizes);
+    } else {
+        recognizer->loadNetwork(network.toStdString());
+    }
     emit infoUpdated();
 }
 

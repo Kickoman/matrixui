@@ -28,7 +28,7 @@ public:
 public slots:
     void run();
     void requestStop();
-    void loadNetwork(const QString& networkName);
+    void loadNetwork(const QString& networkName, const QVector<unsigned>& layers = {});
     bool setDataset(const QString& pathToDataset);
     void setSamplesLimit(const unsigned limit);
     void setTestingLimit(const unsigned limit);

@@ -8,6 +8,12 @@
 #include <QDialogButtonBox>
 #include <QFileDialog>
 
+#include <fstream>
+#include <qfiledialog.h>
+#include <qnamespace.h>
+
+#include "qinputvalidators.h"
+
 
 NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
     : QDialog(parent)
@@ -19,6 +25,8 @@ NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
     networkPathButton = new QPushButton("Select network...", this);
     networkLayersInput = new QLineEdit(this);
     buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+
+    networkLayersInput->setValidator(new CommaSeparatedIntsValidator(networkLayersInput));
 
     networkPathLayout->addWidget(networkPathInput);
     networkPathLayout->addWidget(networkPathButton);
@@ -43,12 +51,20 @@ QString NetworkCreateDialog::getNetworkName() const {
 }
 
 QVector<unsigned> NetworkCreateDialog::getLayerSizes() const {
-    return {};
+    const auto sizes = networkLayersInput->text().split(',', Qt::SkipEmptyParts);
+    QVector<unsigned> result;
+    result.reserve(sizes.size());
+    std::transform(sizes.begin(), sizes.end(), std::back_inserter(result), [](const QString& size) {
+        return size.toUInt();
+    });
+    return result;
 }
 
 void NetworkCreateDialog::handleNetworkPathButtonClicked() {
     QFileDialog dialog(this);
     dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setOption(QFileDialog::DontConfirmOverwrite, true);
     dialog.setNameFilter("*.wgt");
     if (dialog.exec() == QDialog::Accepted) {
         const auto fileNames = dialog.selectedFiles();
@@ -56,16 +72,32 @@ void NetworkCreateDialog::handleNetworkPathButtonClicked() {
             throw std::runtime_error("Can't open multiple files");
         }
         const auto fileName = fileNames.first();
-        networkPathInput->setText(fileName);
+        networkPathInput->setText(fileName + (fileName.endsWith(".wgt") ? "" : ".wgt"));
     }
 }
 
 void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     qDebug() << "Selection: " << text;
     if (QFile::exists(text)) {
-        // try loading ???
+        try {
+            std::size_t numLayers;
+            std::ifstream in(text.toStdString());
+            in >> numLayers;
+            std::vector<std::size_t> layerSizes(numLayers);
+            for (std::size_t i = 0; i < numLayers; ++i) {
+                in >> layerSizes[i];
+            }
+            QStringList layers;
+            std::transform(layerSizes.begin(), layerSizes.end(), std::back_inserter(layers), [](std::size_t size) {
+                return QString::number(size);
+            });
+            networkLayersInput->setText(layers.join(", "));
+        } catch (const std::exception& e) {
+            qDebug() << "Error: " << e.what();
+        }
         networkLayersInput->setEnabled(false);
     } else {
         networkLayersInput->setEnabled(true);
+        networkLayersInput->setText("");
     }
 }

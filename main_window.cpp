@@ -99,6 +99,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     controller->requestStop();
     QSettings settings;
     settings.setValue("last_dataset_path", QString::fromStdString(controller->getInfo().pathToDataset));
+    settings.setValue("last_network_name", QString::fromStdString(controller->getInfo().networkName));
     QMainWindow::closeEvent(event);
 }
 
@@ -132,8 +133,8 @@ void MainWindow::updateInfo() {
         return;
     }
     const auto& info = controller->getInfo();
-    currentNetworkLabel->setText(QString::fromStdString(info.networkName));
-    currentDatasetLabel->setText(QString::fromStdString(info.pathToDataset));
+    currentNetworkLabel->setText(info.networkName.size() ? ("Network: " + QString::fromStdString(info.networkName)) : QString("No network"));
+    currentDatasetLabel->setText(info.pathToDataset.size() ? ("Dataset: " + QString::fromStdString(info.pathToDataset)) : QString("No dataset"));
     toggleLearningButton->setEnabled(info.initialized);
     toggleLearningButton->setText(
         info.running ? "Stop learning" : "Start learning"
@@ -145,7 +146,7 @@ void MainWindow::handleOpenNetworkClicked() {
     if (dialog.exec() == QDialog::Accepted) {
         const QString name = dialog.getNetworkName();
         const auto sizes = dialog.getLayerSizes();
-        controller->loadNetwork(name);
+        controller->loadNetwork(name, sizes);
     }
 }
 

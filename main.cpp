@@ -15,18 +15,19 @@ int main(int argc, char** argv) {
     MainWindow window;
     auto stream = createTerminalOStream(window.getTerminalWidget());
 
+    QSettings settings;
     DigitsRecognizer recognizer;
     DigitsRecognizerController controller(&recognizer);
-    controller.loadNetwork("interm-6.wgt");
+    controller.loadNetwork(settings.value("last_network_name", QString("network.wgt")).toString());
     controller.setSamplesLimit(50);
     controller.setTestingLimit(150);
-    QSettings settings;
     controller.setDataset(settings.value(
         "last_dataset_path",
         QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
     ).toString());
 
     recognizer.setLogger(stream.get());
+    recognizer.setSaveOnEachDigit(true);
     window.setLogger(stream.get());
     window.setController(&controller);
 
