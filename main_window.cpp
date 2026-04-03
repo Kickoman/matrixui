@@ -97,6 +97,8 @@ void MainWindow::setController(DigitsRecognizerController* controller) {
 
 void MainWindow::closeEvent(QCloseEvent* event) {
     controller->requestStop();
+    QSettings settings;
+    settings.setValue("last_dataset_path", QString::fromStdString(controller->getInfo().pathToDataset));
     QMainWindow::closeEvent(event);
 }
 
