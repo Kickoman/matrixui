@@ -18,6 +18,8 @@ public:
     QString getNetworkName() const;
     QVector<unsigned> getLayerSizes() const;
 
+    void setCurrentNetworkPath(const QString& path);
+
 private slots:
     void handleNetworkPathButtonClicked();
     void handleSelectedPathChanged(const QString& text);

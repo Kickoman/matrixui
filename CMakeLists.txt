@@ -14,8 +14,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-OPTION(BUILD_GUI "Build GUI version" ON)
-OPTION(BUILD_CLI "Build CLI version" ON)
+option(BUILD_GUI "Build GUI version" ON)
+option(BUILD_CLI "Build CLI version" ON)
 
 # Qt options
 if (BUILD_GUI)
@@ -27,64 +27,81 @@ if (BUILD_GUI)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
 endif()
 
-OPTION(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
-IF(USE_EIGEN)
+option(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
+if(USE_EIGEN)
     message("Using Eigen't matrix implementation")
-    ADD_DEFINITIONS(-DUSE_EIGEN)
+    add_definitions(-DUSE_EIGEN)
     # Hide warnings for eigen
     set_directory_properties(PATH eigen PROPERTIES
         COMPILE_OPTIONS "-w"  # For GCC/Clang
         # COMPILE_OPTIONS "/w"  # For MSVC
     )
-ENDIF(USE_EIGEN)
+endif(USE_EIGEN)
 
 set(
     QT_DEPENDANT_SOURCES
-    main_window.cpp
-    advanced_terminal.cpp
-    time_chart.cpp
-    digit_chart.cpp
-    digits_runner.cpp
-    network_create_dialog.cpp
+    gui/main_window.cpp
+    gui/advanced_terminal.cpp
+    gui/time_chart.cpp
+    gui/digit_chart.cpp
+    gui/digits_runner.cpp
+    gui/network_create_dialog.cpp
 )
 
 set(SOURCES
-    matrix.cpp
-    digits_recognizer.cpp
-    neural_network.cpp
-    pngreader.cpp
+    matrix/matrix.cpp
+    # digits_recognizer.cpp
+    core/neural_network.cpp
+    core/neural_network_loader.cpp
+    png/pngreader.cpp
+    core/dataset.cpp
+    core/directory_dataset.cpp
+    core/trainer.cpp
 )
 
 include_directories(eigen)
 
-
-IF(BUILD_GUI)
+if(BUILD_GUI)
     add_executable(
         ${PROJECT_NAME}
         ${QT_DEPENDANT_SOURCES}
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main.cpp
+        gui/main.cpp
     )
 
-   target_link_libraries(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME}
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
     )
-ENDIF()
 
-IF(BUILD_CLI)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        core/
+        gui/
+        matrix/
+        png/
+    )
+endif()
+
+if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
         ${MATRIX_SOURCES}
         ${SOURCES}
-        main_headless.cpp
+        core/main_headless.cpp
     )
-ENDIF()
 
-OPTION(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
+    target_include_directories(${PROJECT_NAME}_headless PRIVATE
+        core/
+        gui/
+        matrix/
+        png/
+    )
+endif()
+
+option(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
 
 if(BUILD_MATRIX_BENCHMARK)
     message("Building MatrixBenchmark with perftest library")
@@ -95,12 +112,12 @@ if(BUILD_MATRIX_BENCHMARK)
     add_subdirectory(perftest)
 
     add_library(matrix_benchmarks OBJECT
-        matrix_benchmarks.cpp
-        recognition_benchmarks.cpp
-        digits_recognizer.cpp
-        neural_network.cpp
-        pngreader.cpp
-        matrix.cpp
+        benchmarks/matrix_benchmarks.cpp
+        benchmarks/recognition_benchmarks.cpp
+        # digits_recognizer.cpp
+        core/neural_network.cpp
+        png/pngreader.cpp
+        matrix/matrix.cpp
     )
 
     target_link_libraries(matrix_benchmarks perfbench)
