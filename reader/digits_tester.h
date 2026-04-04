@@ -1,0 +1,31 @@
+#pragma once
+
+#include <QObject>
+#include <qtmetamacros.h>
+#include "neural_network.h"
+
+
+class DigitsTester : public QObject
+{
+    Q_OBJECT
+public:
+    struct Info {
+        QString networkName;
+        unsigned predictedNumber;
+        QVector<double> probabilities;
+    };
+
+    explicit DigitsTester(QObject* parent = nullptr);
+    ~DigitsTester();
+
+public slots:
+    void processUpdates(const QImage& image);
+    void loadNetwork(const QString &networkName);
+
+signals:
+    void infoUpdated(const Info& prediction);
+
+private:
+    NeuralNetwork network;
+    QString networkName;
+};

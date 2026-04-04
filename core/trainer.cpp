@@ -15,11 +15,13 @@ const std::size_t GetPrediction(const Matrix& embedding) {
     double maxProbability = embedding(0, 0);
     for (std::size_t i = 1; i < embedding.getCols(); ++i) {
         const auto probability = embedding(0, i);
+        //std::cerr << probability << " ";
         if (probability > maxProbability) {
             maxProbability = probability;
             result = i;
         }
     }
+    //std::cerr << std::endl;
     return result;
 }
 
@@ -167,11 +169,11 @@ double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRa
         const auto& sample = samples[i];
         const auto expected = GenerateExpected(sample.label, network.getLayerSizes().back());
 
+        const auto prediction = GetPrediction(network.predict(sample.input));
         for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
             network.train(sample.input, expected, learningRate);
         }
 
-        const auto prediction = GetPrediction(network.predict(sample.input));
         if (prediction == sample.label) {
             ++correctCount;
         }

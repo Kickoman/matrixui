@@ -9,6 +9,51 @@
 namespace Neural {
 
 
+std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
+    if (!std::filesystem::exists(filename)) {
+        return std::nullopt;
+    }
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file for reading: " + filename);
+    }
+
+    std::size_t numLayers;
+    file >> numLayers;
+    std::vector<std::size_t> layerSizes(numLayers);
+    for (std::size_t i = 0; i < numLayers; ++i) {
+        file >> layerSizes[i];
+    }
+
+    std::vector<Matrix> weights;
+    std::vector<Matrix> biases;
+
+    for (std::size_t i = 0; i < numLayers - 1; ++i) {
+        std::size_t rows, cols;
+        file >> rows >> cols;
+        weights.push_back(Matrix(rows, cols));
+        for (std::size_t row = 0; row < rows; ++row) {
+            for (std::size_t col = 0; col < cols; ++col) {
+                file >> weights.back()(row, col);
+            }
+        }
+
+        file >> rows >> cols;
+        biases.push_back(Matrix(rows, cols));
+        for (std::size_t row = 0; row < rows; ++row) {
+            for (std::size_t col = 0; col < cols; ++col) {
+                file >> biases.back()(row, col);
+            }
+        }
+    }
+    NeuralNetwork network;
+    network.initializeNetwork(layerSizes);
+    network.setWeights(weights);
+    network.setBiases(biases);
+    return network;
+}
+
+
 NeuralNetwork LoadNetwork(const std::string& filename, const std::vector<std::size_t>& layers) {
     NeuralNetwork network;
     if (std::filesystem::exists(filename)) {

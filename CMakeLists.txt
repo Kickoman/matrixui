@@ -16,6 +16,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(BUILD_GUI "Build GUI version" ON)
 option(BUILD_CLI "Build CLI version" ON)
+option(BUILD_READER "Build Reader version" ON)
 
 # Qt options
 if (BUILD_GUI)
@@ -38,14 +39,17 @@ if(USE_EIGEN)
     )
 endif(USE_EIGEN)
 
-set(
-    QT_DEPENDANT_SOURCES
-    gui/main_window.cpp
-    gui/advanced_terminal.cpp
-    gui/time_chart.cpp
-    gui/digit_chart.cpp
+set(GUI_SOURCES
     gui/digits_runner.cpp
+    gui/main_window.cpp
     gui/network_create_dialog.cpp
+)
+
+set(
+    GUI_COMMON_SOURCES
+    gui_common/advanced_terminal.cpp
+    gui_common/time_chart.cpp
+    gui_common/digit_chart.cpp
 )
 
 set(SOURCES
@@ -59,12 +63,20 @@ set(SOURCES
     core/trainer.cpp
 )
 
+set(READER_SOURCES
+    reader/main_reader.cpp
+    reader/main_window.cpp
+    reader/paint_scene.cpp
+    reader/digits_tester.cpp
+)
+
 include_directories(eigen)
 
 if(BUILD_GUI)
     add_executable(
         ${PROJECT_NAME}
-        ${QT_DEPENDANT_SOURCES}
+        ${GUI_SOURCES}
+        ${GUI_COMMON_SOURCES}
         ${MATRIX_SOURCES}
         ${SOURCES}
         gui/main.cpp
@@ -80,6 +92,7 @@ if(BUILD_GUI)
     target_include_directories(${PROJECT_NAME} PRIVATE
         core/
         gui/
+        gui_common/
         matrix/
         png/
     )
@@ -95,9 +108,33 @@ if(BUILD_CLI)
 
     target_include_directories(${PROJECT_NAME}_headless PRIVATE
         core/
-        gui/
         matrix/
         png/
+    )
+endif()
+
+if(BUILD_READER)
+    add_executable(
+        ${PROJECT_NAME}_reader
+        ${MATRIX_SOURCES}
+        ${SOURCES}
+        ${GUI_COMMON_SOURCES}
+        ${READER_SOURCES}
+    )
+
+    target_link_libraries(${PROJECT_NAME}_reader
+        Qt${QT_VERSION_MAJOR}::Gui
+        Qt${QT_VERSION_MAJOR}::Widgets
+        # Qt${QT_VERSION_MAJOR}::Concurrent
+        Qt${QT_VERSION_MAJOR}::Charts
+    )
+
+    target_include_directories(
+        ${PROJECT_NAME}_reader PRIVATE
+        core/
+        matrix/
+        png/
+        gui_common/
     )
 endif()
 

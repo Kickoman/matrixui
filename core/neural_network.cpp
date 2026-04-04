@@ -44,11 +44,12 @@ void NeuralNetwork::initializeWeights(std::mt19937& gen) {
     weights.clear();
     biases.clear();
 
-    std::normal_distribution<double> dist(0.0, 1.0);
-
     for (size_t i = 0; i < layerSizes.size() - 1; ++i) {
         size_t inputSize = layerSizes[i];
         size_t outputSize = layerSizes[i + 1];
+
+        double stddev = std::sqrt(1.0 / inputSize);
+        std::normal_distribution<double> dist(0.0, stddev);
 
         Matrix weightMatrix(inputSize, outputSize);
         for (size_t row = 0; row < inputSize; ++row) {
@@ -123,7 +124,7 @@ void NeuralNetwork::backwardPass(
 
     for (size_t i = 0; i < weights.size(); ++i) {
         Matrix weightGradient = activations[i].transpose() * deltas[i] * learningRate;
-        weights[i] = weights[i] + weightGradient;
+        weights[i] = weights[i] - weightGradient;
 
         Matrix biasGradient(1, deltas[i].getCols());
         for (size_t col = 0; col < deltas[i].getCols(); ++col) {
@@ -133,13 +134,13 @@ void NeuralNetwork::backwardPass(
             }
             biasGradient(0, col) = sum * learningRate;
         }
-        biases[i] = biases[i] + biasGradient;
+        biases[i] = biases[i] - biasGradient;
     }
 }
 
 void NeuralNetwork::train(const Matrix& input, const Matrix& target, const double learningRate) {
     const auto activations = forwardPass(input);
-    backwardPass(activations, target - activations.back(), learningRate);
+    backwardPass(activations, activations.back() - target, learningRate);
 }
 
 Matrix NeuralNetwork::predict(const Matrix& input) const {

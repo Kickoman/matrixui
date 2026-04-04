@@ -14,10 +14,10 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
         throw std::runtime_error("Failed to load image: " + filename);
     }
 
-    const bool recizeNecessary = targetHeight != height || targetWidth != width;
+    const bool resizeNecessary = targetHeight != height || targetWidth != width;
 
     unsigned char* resized = img;  // by default, the image does not need recize
-    if (recizeNecessary) {
+    if (resizeNecessary) {
         resized = new unsigned char[targetHeight * targetWidth];
         stbir_resize_uint8_linear(img, width, height, 0, resized, targetWidth, targetHeight, 0, STBIR_1CHANNEL);
     }
@@ -26,13 +26,13 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
 
     for (int y = 0; y < targetHeight; y++) {
         for (int x = 0; x < targetWidth; x++) {
-            unsigned char pixel = resized[y * width + x];
+            unsigned char pixel = resized[y * targetWidth + x];
             result(y, x) = (255.0 - pixel) / 255.0; // 0=white, 1=black
         }
     }
 
     stbi_image_free(img);
-    if (recizeNecessary) {
+    if (resizeNecessary) {
         delete resized;
     }
     return result;
