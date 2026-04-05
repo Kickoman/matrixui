@@ -46,6 +46,10 @@ LearningConfigWidget::LearningConfigWidget(QWidget* parent)
     dropoutRate->setMaximum(1);
     dropoutRate->setSingleStep(0.1);
 
+    datasetLimit = new QSpinBox(this);
+    datasetLimit->setMinimum(1);
+    datasetLimit->setMaximum(1000000);
+
     auto* mainLayout = new QHBoxLayout(this);
     auto* leftFormLayout = new QFormLayout(this);
     leftFormLayout->addRow("Initial LR", initialLearningRate);
@@ -57,6 +61,7 @@ LearningConfigWidget::LearningConfigWidget(QWidget* parent)
     rightFormLayout->addRow("Minimum LR", minLearningRate);
     rightFormLayout->addRow("Max epochs", maxEpochs);
     rightFormLayout->addRow("Inner epochs", innerEpochs);
+    rightFormLayout->addRow("Dataset file limit", datasetLimit);
 
     mainLayout->addLayout(leftFormLayout);
     mainLayout->addLayout(rightFormLayout);
@@ -72,6 +77,7 @@ void LearningConfigWidget::setConfig(const Neural::LearningConfig& config) {
     patience->setValue(config.patience);
     innerEpochs->setValue(config.innerEpochs);
     dropoutRate->setValue(config.dropoutRate);
+    datasetLimit->setValue(config.datasetLimitPerLabel);
 }
 
 Neural::LearningConfig LearningConfigWidget::getConfig() const {
@@ -82,6 +88,7 @@ Neural::LearningConfig LearningConfigWidget::getConfig() const {
         .maxEpochs = static_cast<std::size_t>(maxEpochs->value()),
         .patience = static_cast<std::size_t>(patience->value()),
         .innerEpochs = static_cast<std::size_t>(innerEpochs->value()),
+        .datasetLimitPerLabel = static_cast<std::size_t>(datasetLimit->value()),
         .dropoutRate = dropoutRate->value(),
     };
 }

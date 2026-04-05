@@ -2,11 +2,12 @@
 
 #include <QObject>
 #include "learning_config.h"
+#include "neural_network.h"
 #include "trainer.h"
-
 
 Q_DECLARE_METATYPE(Neural::TestResult);
 Q_DECLARE_METATYPE(Neural::LearningConfig);
+Q_DECLARE_METATYPE(Neural::NeuralNetworkConfiguration);
 
 
 class DigitsRecognizerController : public QObject
@@ -32,7 +33,7 @@ public slots:
     void run(const Neural::LearningConfig& config);
     void requestStop();
     void testOnce();
-    void loadNetwork(const QString& networkName, const QVector<unsigned>& layers = {});
+    void loadNetwork(const QString& networkName, Neural::NeuralNetworkConfiguration config = {});
     bool setTrainingDataset(const QString& pathToDataset);
     bool setTestingDataset(const QString& pathToDataset);
 

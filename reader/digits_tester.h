@@ -1,8 +1,7 @@
 #pragma once
 
 #include <QObject>
-#include <qtmetamacros.h>
-#include "neural_network.h"
+#include "neural_network_applier.h"
 
 
 class DigitsTester : public QObject

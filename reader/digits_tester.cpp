@@ -2,7 +2,7 @@
 #include "neural_network_loader.h"
 #include <QImage>
 #include <QDebug>
-#include <limits>
+
 
 DigitsTester::DigitsTester(QObject* parent) : QObject(parent)
 {}

@@ -6,7 +6,7 @@
 #include <ostream>
 
 #include "learning_config.h"
-#include "neural_network.h"
+#include "neural_network_applier.h"
 #include "dataset.h"
 
 namespace Neural {

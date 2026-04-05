@@ -71,35 +71,25 @@ void DigitsRecognizerController::testOnce() {
     emit updatedStatistics(result);
 }
 
-void DigitsRecognizerController::loadNetwork(const QString& network, const QVector<unsigned>& layers) {
+void DigitsRecognizerController::loadNetwork(const QString& network, Neural::NeuralNetworkConfiguration config) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't load network, while learning is running");
     }
-    std::vector<std::size_t> layersSizes;
-    std::transform(layers.begin(), layers.end(), std::back_inserter(layersSizes), [](unsigned size) {
-        return static_cast<unsigned long>(size);
-    });
-    if (layersSizes.empty()) {
-        layersSizes = DEFAULT_LAYERS;
+    if (config.layersSizes.empty()) {
+        config.layersSizes = DEFAULT_LAYERS;
     }
 
+    std::optional<Neural::NeuralNetwork> loadedNetwork;
     if (QFile::exists(network)) {
         try {
-            recognizer->setNetwork(
-                Neural::LoadNetwork(network.toStdString(), layersSizes)
-            );
-        } catch (const std::runtime_error& e) {
-            QMessageBox::warning(nullptr, "Can't load network", e.what());
-            loadNetwork("undefined", {784, 10, 10});
-            return;
-        }
-    } else {
-        Neural::NeuralNetwork config;
-        config.layersSizes = layersSizes;
-        config.initializeBiases();
-        config.initializeWeights();
-        recognizer->setNetwork(config);
+            loadedNetwork = Neural::LoadNetwork(network.toStdString());
+        } catch (const std::runtime_error& e) { }
     }
+    if (!loadedNetwork) {
+        loadedNetwork = Neural::CreateNetwork(config);
+    }
+    assert(loadedNetwork);
+    recognizer->setNetwork(loadedNetwork.value());
     networkName = network;
 
     if (recognizer->getTestingDataset()) {
@@ -144,7 +134,7 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
         .pathToTrainingDataset = pathToTrainingDataset.toStdString(),
         .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = networkName.toStdString(),
-        .layersConfiguration = recognizer->getNetwork().layersSizes,
+        .layersConfiguration = recognizer->getNetwork().config.layersSizes,
         .learningConfig = learningConfig,
     };
 }

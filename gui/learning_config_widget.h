@@ -25,4 +25,5 @@ private:
     QSpinBox* patience = nullptr;
     QSpinBox* innerEpochs = nullptr;
     QDoubleSpinBox* dropoutRate = nullptr;
+    QSpinBox* datasetLimit = nullptr;
 };

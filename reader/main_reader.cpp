@@ -2,13 +2,18 @@
 #include "digits_tester.h"
 
 #include <QApplication>
+#include <iostream>
 
 int main(int argc, char** argv) {
     QApplication a(argc, argv);
+
+    if (argc < 2) {
+        std::cerr << "Specify network" << std::endl;
+    }
     MainWindow window;
 
     DigitsTester tester;
-    tester.loadNetwork("/home/kanstancin/Documents/projects/matrixgui/build/newfmt2.wgt");
+    tester.loadNetwork(argv[1]);
     window.setController(&tester);
 
     window.show();

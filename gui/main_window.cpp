@@ -161,8 +161,8 @@ void MainWindow::handleOpenNetworkClicked() {
     dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().networkName));
     if (dialog.exec() == QDialog::Accepted) {
         const QString name = dialog.getNetworkName();
-        const auto sizes = dialog.getLayerSizes();
-        controller->loadNetwork(name, sizes);
+        const auto config = dialog.getConfiguration();
+        controller->loadNetwork(name, config);
     }
 }
 

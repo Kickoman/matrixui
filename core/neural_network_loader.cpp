@@ -4,6 +4,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
@@ -92,12 +93,12 @@ void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
 
     constexpr std::uint32_t version = 1;
     WriteBinaryLE(file, version);
-    WriteBinaryLE(file, static_cast<std::uint8_t>(network.hiddenActivation));
-    WriteBinaryLE(file, static_cast<std::uint8_t>(network.outputActivation));
+    WriteBinaryLE(file, static_cast<std::uint8_t>(network.config.hiddenActivation));
+    WriteBinaryLE(file, static_cast<std::uint8_t>(network.config.outputActivation));
 
-    const auto numLayers = static_cast<std::uint32_t>(network.layersSizes.size());
+    const auto numLayers = static_cast<std::uint32_t>(network.config.layersSizes.size());
     WriteBinaryLE(file, numLayers);
-    for (auto size : network.layersSizes) {
+    for (auto size : network.config.layersSizes) {
         WriteBinaryLE(file, static_cast<std::uint64_t>(size));
     }
 
@@ -117,7 +118,7 @@ void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
     }
 }
 
-std::optional<std::vector<std::size_t>> LoadLayerSizes(const std::string &filename) {
+std::optional<NeuralNetworkConfiguration> LoadConfig(const std::string &filename) {
     if (!std::filesystem::exists(filename)) {
         return std::nullopt;
     }
@@ -125,20 +126,26 @@ std::optional<std::vector<std::size_t>> LoadLayerSizes(const std::string &filena
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file for reading: " + filename);
     }
-    // Skip 32bit version, 16bit activations
-    file.seekg(sizeof(std::uint32_t) + 2 * sizeof(std::uint8_t));
+
+    file.seekg(sizeof(std::uint32_t)); // skip version
+
+    NeuralNetworkConfiguration config;
+    std::uint8_t hiddenActivation, outputActivation;
+    ReadBinaryLE(file, hiddenActivation);
+    ReadBinaryLE(file, outputActivation);
+    config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
+    config.outputActivation = static_cast<ActivationType>(outputActivation);
 
     try {
         std::uint32_t numLayers;
-        std::vector<std::size_t> layers;
         ReadBinaryLE(file, numLayers);
-        layers.resize(numLayers);
-        for (auto& layer : layers) {
+        config.layersSizes.resize(numLayers);
+        for (auto& layer : config.layersSizes) {
             std::uint64_t size;
             ReadBinaryLE(file, size);
             layer = static_cast<decltype(layer)>(size);
         }
-        return layers;
+        return config;
     } catch (...) {
         return std::nullopt;
     }
@@ -163,24 +170,24 @@ std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
     std::uint8_t hiddenActivation, outputActivation;
     ReadBinaryLE(file, hiddenActivation);
     ReadBinaryLE(file, outputActivation);
-    network.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
-    network.outputActivation = static_cast<ActivationType>(outputActivation);
+    network.config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
+    network.config.outputActivation = static_cast<ActivationType>(outputActivation);
 
     std::uint32_t numLayers;
     ReadBinaryLE(file, numLayers);
-    network.layersSizes.resize(numLayers);
+    network.config.layersSizes.resize(numLayers);
     for (std::uint32_t i = 0; i < numLayers; ++i) {
         std::uint64_t s;
         ReadBinaryLE(file, s);
-        network.layersSizes[i] = static_cast<std::size_t>(s);
+        network.config.layersSizes[i] = static_cast<std::size_t>(s);
     }
 
     network.weights.resize(numLayers - 1);
     network.biases.resize(numLayers - 1);
 
     for (std::size_t i = 0; i < numLayers - 1; ++i) {
-        std::size_t rows = network.layersSizes[i];
-        std::size_t cols = network.layersSizes[i+1];
+        std::size_t rows = network.config.layersSizes[i];
+        std::size_t cols = network.config.layersSizes[i+1];
         network.weights[i] = Matrix(rows, cols);
         network.biases[i] = Matrix(1, cols);
 
@@ -199,14 +206,9 @@ std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
 }
 
 
-NeuralNetwork LoadNetwork(const std::string& filename, const std::vector<std::size_t>& layers) {
-    if (std::filesystem::exists(filename)) {
-        auto networkMaybe = LoadNetwork(filename);
-        if (networkMaybe.has_value()) return *networkMaybe;
-    }
-
+NeuralNetwork CreateNetwork(const NeuralNetworkConfiguration &config) {
     NeuralNetwork network;
-    network.layersSizes = layers;
+    network.config = config;
     network.initializeWeights();
     network.initializeBiases();
     return network;

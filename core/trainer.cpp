@@ -57,7 +57,7 @@ void Trainer::setVerbose(const bool verbose) {
 }
 
 TestResult Trainer::test() const {
-    const std::size_t outputs = network.getNeuralNetworkConfig().layersSizes.back();
+    const std::size_t outputs = network.getNeuralNetworkConfig().outputSize();
 
     TestResult result(outputs);
     for (std::size_t outputIdx = 0; outputIdx < outputs && !stopRequested; ++outputIdx) {
@@ -176,7 +176,7 @@ double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRa
     size_t correctCount = 0;
     for (std::size_t i = 0; i < samples.size() && !stopRequested.load(); ++i) {
         const auto& sample = samples[i];
-        const auto expected = GenerateExpected(sample.label, network.getNeuralNetworkConfig().layersSizes.back());
+        const auto expected = GenerateExpected(sample.label, network.getNeuralNetworkConfig().outputSize());
 
         const auto prediction = GetPrediction(network.predict(sample.input));
         for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {

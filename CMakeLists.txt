@@ -55,9 +55,9 @@ set(
 
 set(SOURCES
     matrix/matrix.cpp
-    # digits_recognizer.cpp
     core/neural_network.cpp
     core/neural_network_loader.cpp
+    core/neural_network_applier.cpp
     png/pngreader.cpp
     core/dataset.cpp
     core/directory_dataset.cpp

@@ -1,12 +1,13 @@
 #pragma once
 
 #include <QDialog>
-
+#include "neural_network.h"
 
 class QLabel;
 class QLineEdit;
 class QPushButton;
 class QDialogButtonBox;
+class QComboBox;
 
 
 class NetworkCreateDialog : public QDialog
@@ -16,7 +17,7 @@ public:
     explicit NetworkCreateDialog(QWidget* parent = nullptr);
 
     QString getNetworkName() const;
-    QVector<unsigned> getLayerSizes() const;
+    Neural::NeuralNetworkConfiguration getConfiguration() const;
 
     void setCurrentNetworkPath(const QString& path);
 
@@ -31,7 +32,6 @@ private:
     QPushButton* networkPathButton = nullptr;
     QDialogButtonBox* buttonBox = nullptr;
 
-    // QLabel* networkPathLabel = nullptr;
-    // QLabel* networkLayersLabel = nullptr;
-
+    QComboBox* hiddenActivation = nullptr;
+    QComboBox* outputActivation = nullptr;
 };

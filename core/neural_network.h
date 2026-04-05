@@ -1,7 +1,7 @@
-#ifndef NEURAL_NETWORK_H
-#define NEURAL_NETWORK_H
+#pragma once
 
 #include "matrix.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -14,48 +14,28 @@ enum class ActivationType : std::uint8_t {
     Softmax,
 };
 
-struct NeuralNetwork {
+struct NeuralNetworkConfiguration {
     ActivationType hiddenActivation = ActivationType::ReLU;
     ActivationType outputActivation = ActivationType::Softmax;
     std::vector<std::size_t> layersSizes;
+};
+
+struct NeuralNetwork {
+    NeuralNetworkConfiguration config;
     std::vector<Matrix> weights;
     std::vector<Matrix> biases;
 
     void initializeWeights();
     void initializeBiases();
-};
 
-class NeuralNetworkApplier {
-public:
-    NeuralNetworkApplier() = default;
-    explicit NeuralNetworkApplier(const NeuralNetwork& config);
-    explicit NeuralNetworkApplier(NeuralNetwork&& config);
 
-    void initializeNetwork(const NeuralNetwork& config);
-    void initializeNetwork(NeuralNetwork&& config);
-
-    bool isInitialized() const;
-    const NeuralNetwork& getNeuralNetworkConfig() const;
-
-    void train(const Matrix& input, const Matrix& target, const double learningRate, const double dropoutRate = 0.);
-    Matrix predict(const Matrix& input) const;
-
-private:
-    struct ForwardPassResult {
-        std::vector<Matrix> activations;
-        std::vector<Matrix> dropoutMasks;
-    };
-
-    static double applyActivation(const double x, const ActivationType type);
-    static double applyActivationDerivative(const double x, const ActivationType type);
-
-    ForwardPassResult forwardPass(const Matrix& input, const double dropoutRate = 0.0) const;
-    void backwardPass(const ForwardPassResult& forwardPassResult, const Matrix& error, const double learningRate, const double dropoutRate);
-
-    bool initialized = false;
-    NeuralNetwork config;
+    bool empty() const { return config.layersSizes.empty(); }
+    std::size_t layers() const { return config.layersSizes.size(); }
+    std::size_t layerSize(const std::size_t index) const { return config.layersSizes[index]; }
+    std::size_t inputSize() const { return config.layersSizes.front(); }
+    std::size_t outputSize() const { return config.layersSizes.back(); }
+    ActivationType hiddenActivation() const { return config.hiddenActivation; }
+    ActivationType outputActivation() const { return config.outputActivation; }
 };
 
 }
-
-#endif // NEURAL_NETWORK_H
