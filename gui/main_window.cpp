@@ -15,19 +15,19 @@
 #include <QLabel>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <qboxlayout.h>
-#include <qevent.h>
-#include <qobject.h>
-#include <qpushbutton.h>
-#include <qrandom.h>
+#include <QSpacerItem>
+#include <qlayoutitem.h>
+#include <qnamespace.h>
 #include <stdexcept>
 #include "network_create_dialog.h"
+#include "learning_config_widget.h"
 
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
     terminal = new AdvancedTerminal(this);
+    terminal->setMaximumHeight(300);
 
     chart = new TimeChart(this);
     digitChart = new DigitChart(this);
@@ -41,18 +41,26 @@ MainWindow::MainWindow(QWidget* parent)
     currentNetworkLabel = new QLabel("No network", this);
     currentTestingDatasetLabel = new QLabel("No testing dataset", this);
     currentTrainingDatasetLabel = new QLabel("No training dataset", this);
+    learningConfigWidget = new LearningConfigWidget(this);
+    learningConfigWidget->setConfig({});
 
     auto* vLayout = new QVBoxLayout();
     auto* hLayout = new QHBoxLayout();
     auto* buttonLayout = new QHBoxLayout();
-    auto* infoLayout = new QVBoxLayout();
+    auto* infoLayout = new QHBoxLayout();
+    auto* networkInfoLayout = new QVBoxLayout();
+    auto* configInfoLayout = new QVBoxLayout();
     buttonLayout->addWidget(toggleLearningButton);
     buttonLayout->addWidget(openNetworkButton);
     buttonLayout->addWidget(openTrainingDatasetButton);
     buttonLayout->addWidget(openTestingDatasetButton);
-    infoLayout->addWidget(currentNetworkLabel);
-    infoLayout->addWidget(currentTestingDatasetLabel);
-    infoLayout->addWidget(currentTrainingDatasetLabel);
+
+    infoLayout->addLayout(networkInfoLayout);
+    infoLayout->addWidget(learningConfigWidget);
+    networkInfoLayout->addWidget(currentNetworkLabel);
+    networkInfoLayout->addWidget(currentTestingDatasetLabel);
+    networkInfoLayout->addWidget(currentTrainingDatasetLabel);
+    networkInfoLayout->setAlignment(Qt::AlignTop);
 
     vLayout->addLayout(buttonLayout);
     vLayout->addLayout(infoLayout);
@@ -89,11 +97,11 @@ void MainWindow::setController(DigitsRecognizerController* controller) {
     this->controller = controller;
     connect(controller, &DigitsRecognizerController::updatedStatistics, this, &MainWindow::handleStatistics);
     connect(controller, &DigitsRecognizerController::infoUpdated, this, &MainWindow::updateInfo);
-    connect(toggleLearningButton, &QPushButton::clicked, [controller]{
+    connect(toggleLearningButton, &QPushButton::clicked, [this, controller]{
         if (controller->getInfo().running) {
             controller->requestStop();
         } else {
-            controller->run();
+            controller->run(learningConfigWidget->getConfig());
         }
     });
     updateInfo();
@@ -145,6 +153,7 @@ void MainWindow::updateInfo() {
     toggleLearningButton->setText(
         info.running ? "Stop learning" : "Start learning"
     );
+    learningConfigWidget->setDisabled(info.running);
 }
 
 void MainWindow::handleOpenNetworkClicked() {

@@ -1,5 +1,6 @@
 #include "digits_runner.h"
 #include "directory_dataset.h"
+#include "learning_config.h"
 #include "neural_network.h"
 #include "trainer.h"
 #include "neural_network_loader.h"
@@ -50,13 +51,13 @@ DigitsRecognizerController::~DigitsRecognizerController() {
     QThreadPool::globalInstance()->waitForDone();
 }
 
-void DigitsRecognizerController::run() {
+void DigitsRecognizerController::run(const Neural::LearningConfig& config) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't start learning while learning in progress");
     }
-    QThreadPool::globalInstance()->start([this]{
+    QThreadPool::globalInstance()->start([this, config]{
         QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
-        recognizer->train();
+        recognizer->train(config);
         QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
     });
 }
@@ -144,6 +145,7 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
         .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = networkName.toStdString(),
         .layersConfiguration = recognizer->getNetwork().layersSizes,
+        .learningConfig = learningConfig,
     };
 }
 

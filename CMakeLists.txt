@@ -43,6 +43,7 @@ set(GUI_SOURCES
     gui/digits_runner.cpp
     gui/main_window.cpp
     gui/network_create_dialog.cpp
+    gui/learning_config_widget.cpp
 )
 
 set(
