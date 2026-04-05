@@ -2,40 +2,56 @@
 #define NEURAL_NETWORK_H
 
 #include "matrix.h"
+#include <cstdint>
 #include <vector>
-#include <random>
 
+namespace Neural {
 
-class NeuralNetwork {
+enum class ActivationType : std::uint8_t {
+    Sigmoid,
+    ReLU,
+    Tanh,
+    Softmax,
+};
+
+struct NeuralNetwork {
+    ActivationType hiddenActivation = ActivationType::ReLU;
+    ActivationType outputActivation = ActivationType::Sigmoid;
+    std::vector<std::size_t> layersSizes;
+    std::vector<Matrix> weights;
+    std::vector<Matrix> biases;
+
+    void initializeWeights();
+    void initializeBiases();
+};
+
+class NeuralNetworkApplier {
 public:
-    NeuralNetwork() = default;
-    NeuralNetwork(const std::vector<size_t>& sizes);
+    NeuralNetworkApplier() = default;
+    explicit NeuralNetworkApplier(const NeuralNetwork& config);
+    explicit NeuralNetworkApplier(NeuralNetwork&& config);
 
-    void initializeNetwork(const std::vector<size_t>& layerSizes);
+    void initializeNetwork(const NeuralNetwork& config);
+    void initializeNetwork(NeuralNetwork&& config);
+
     bool isInitialized() const;
-    void initializeWeights(std::mt19937& gen);
-
-    void setWeights(const std::vector<Matrix>& weights);
-    void setBiases(const std::vector<Matrix>& biases);
-
-    const std::vector<std::size_t>& getLayerSizes() const;
-    const std::vector<Matrix>& getWeights() const;
-    const std::vector<Matrix>& getBiases() const;
+    const NeuralNetwork& getNeuralNetworkConfig() const;
 
     void train(const Matrix& input, const Matrix& target, const double learningRate);
     Matrix predict(const Matrix& input) const;
 
 private:
-    static double sigmoid(double x);
-    static double sigmoidDerivative(double x);
+
+    static double applyActivation(const double x, const ActivationType type);
+    static double applyActivationDerivative(const double x, const ActivationType type);
 
     std::vector<Matrix> forwardPass(const Matrix& input) const;
     void backwardPass(const std::vector<Matrix>& activations, const Matrix& error, const double learningRate);
 
     bool initialized = false;
-    std::vector<size_t> layerSizes;
-    std::vector<Matrix> weights;
-    std::vector<Matrix> biases;
+    NeuralNetwork config;
 };
+
+}
 
 #endif // NEURAL_NETWORK_H

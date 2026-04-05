@@ -4,7 +4,6 @@
 #include <memory>
 #include <atomic>
 #include <ostream>
-#include <optional>
 
 #include "learning_config.h"
 #include "neural_network.h"
@@ -59,12 +58,14 @@ public:
     void requestStop();
 
     const NeuralNetwork& getNetwork() const;
+    const Neural::Dataset* getTestingDataset() const;
+    const Neural::Dataset* getTrainingDataset() const;
 
 private:
     double trainEpoch(std::vector<Sample>& samples, const double learningRate, const LearningConfig& config);
     std::ostream& log() const;
 
-    NeuralNetwork network;
+    NeuralNetworkApplier network;
     std::unique_ptr<Neural::Dataset> trainingDataset;
     std::unique_ptr<Neural::Dataset> testingDataset;
 

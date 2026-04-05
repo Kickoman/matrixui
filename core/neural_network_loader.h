@@ -12,4 +12,6 @@ std::optional<NeuralNetwork> LoadNetwork(const std::string& filename);
 
 void SaveNetwork(const NeuralNetwork& network, const std::string& filename);
 
+std::optional<std::vector<std::size_t>> LoadLayerSizes(const std::string& filename);
+
 }

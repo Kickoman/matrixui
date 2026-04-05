@@ -4,7 +4,7 @@
 #include "trainer.h"
 #include "neural_network_loader.h"
 #include "pngreader.h"
-#include <random>
+#include <qmessagebox.h>
 #include <stdexcept>
 #include <QThreadPool>
 #include <QDir>
@@ -41,10 +41,7 @@ DigitsRecognizerController::DigitsRecognizerController(Neural::Trainer* recogniz
     : recognizer(recognizer)
 {
     this->recognizer->setEpochCallback([this]{
-        const auto result = this->recognizer->test();
-        QMetaObject::invokeMethod(this, [this, result]{
-            emit updatedStatistics(result);
-        });
+        this->testOnce();
         Neural::SaveNetwork(this->recognizer->getNetwork(), this->networkName.toStdString());
     });
 }
@@ -68,6 +65,11 @@ void DigitsRecognizerController::requestStop() {
     recognizer->requestStop();
 }
 
+void DigitsRecognizerController::testOnce() {
+    const auto result = recognizer->test();
+    emit updatedStatistics(result);
+}
+
 void DigitsRecognizerController::loadNetwork(const QString& network, const QVector<unsigned>& layers) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't load network, while learning is running");
@@ -81,15 +83,27 @@ void DigitsRecognizerController::loadNetwork(const QString& network, const QVect
     }
 
     if (QFile::exists(network)) {
-        recognizer->setNetwork(
-            Neural::LoadNetwork(network.toStdString(), layersSizes)
-        );
+        try {
+            recognizer->setNetwork(
+                Neural::LoadNetwork(network.toStdString(), layersSizes)
+            );
+        } catch (const std::runtime_error& e) {
+            QMessageBox::warning(nullptr, "Can't load network", e.what());
+            loadNetwork("undefined", {784, 10, 10});
+            return;
+        }
     } else {
-        std::mt19937 gen;
-        NeuralNetwork network(layersSizes);
-        network.initializeWeights(gen);
+        Neural::NeuralNetwork config;
+        config.layersSizes = layersSizes;
+        config.initializeBiases();
+        config.initializeWeights();
+        recognizer->setNetwork(config);
     }
     networkName = network;
+
+    if (recognizer->getTestingDataset()) {
+        testOnce();
+    }
 
     emit infoUpdated();
 }
@@ -129,7 +143,7 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
         .pathToTrainingDataset = pathToTrainingDataset.toStdString(),
         .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = networkName.toStdString(),
-        .layersConfiguration = recognizer->getNetwork().getLayerSizes(),
+        .layersConfiguration = recognizer->getNetwork().layersSizes,
     };
 }
 

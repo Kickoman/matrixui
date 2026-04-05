@@ -26,6 +26,6 @@ signals:
     void infoUpdated(const Info& prediction);
 
 private:
-    NeuralNetwork network;
+    Neural::NeuralNetworkApplier network;
     QString networkName;
 };

@@ -13,6 +13,7 @@
 #include <qnamespace.h>
 
 #include "qinputvalidators.h"
+#include "neural_network_loader.h"
 
 
 NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
@@ -87,13 +88,7 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     qDebug() << "Selection: " << text;
     if (QFile::exists(text)) {
         try {
-            std::size_t numLayers;
-            std::ifstream in(text.toStdString());
-            in >> numLayers;
-            std::vector<std::size_t> layerSizes(numLayers);
-            for (std::size_t i = 0; i < numLayers; ++i) {
-                in >> layerSizes[i];
-            }
+            const auto layerSizes = Neural::LoadLayerSizes(text.toStdString()).value();
             QStringList layers;
             std::transform(layerSizes.begin(), layerSizes.end(), std::back_inserter(layers), [](std::size_t size) {
                 return QString::number(size);

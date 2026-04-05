@@ -24,12 +24,10 @@ public:
     static std::vector<std::string> listFiles(const std::string& directoryPath, const std::size_t limit = 0) {
         std::vector<std::string> files;
 
-        // Check if directory exists
         if (!std::filesystem::exists(directoryPath)) {
             throw std::runtime_error("Directory does not exist: " + directoryPath);
         }
 
-        // Check if it's actually a directory
         if (!std::filesystem::is_directory(directoryPath)) {
             throw std::runtime_error("Path is not a directory: " + directoryPath);
         }

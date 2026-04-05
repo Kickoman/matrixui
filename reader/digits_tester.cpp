@@ -52,5 +52,5 @@ void DigitsTester::processUpdates(const QImage& image) {
 }
 
 void DigitsTester::loadNetwork(const QString& networkName) {
-    network = Neural::LoadNetwork(networkName.toStdString()).value();
+    network.initializeNetwork(Neural::LoadNetwork(networkName.toStdString()).value());
 }

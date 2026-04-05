@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
     MainWindow window;
 
     DigitsTester tester;
-    tester.loadNetwork("/home/kanstancin/Documents/projects/matrixgui/build/tryagain1.wgt");
+    tester.loadNetwork("/home/kanstancin/Documents/projects/matrixgui/build/newfmt2.wgt");
     window.setController(&tester);
 
     window.show();
