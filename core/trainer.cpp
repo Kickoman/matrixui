@@ -180,7 +180,7 @@ double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRa
 
         const auto prediction = GetPrediction(network.predict(sample.input));
         for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
-            network.train(sample.input, expected, learningRate);
+            network.train(sample.input, expected, learningRate, config.dropoutRate);
         }
 
         if (prediction == sample.label) {

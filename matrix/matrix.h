@@ -32,6 +32,7 @@ public:
     Matrix operator/(double scalar) const;
 
     Matrix multiplyOptimized(const Matrix& other) const; // Just calls operator*
+    Matrix hadamard(const Matrix& other) const;
 
     void print() const;
     bool isSquare() const { return data.rows() == data.cols(); }
@@ -43,6 +44,8 @@ public:
     Matrix transpose() const;
     Matrix transform(const size_t rows, const size_t cols) const;
 };
+
+std::ostream& operator<<(std::ostream& stream, const Matrix& m);
 
 #endif // MATRIX_H
 
