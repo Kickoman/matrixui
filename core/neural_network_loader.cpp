@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
+#include <bit>
 
 namespace Neural {
 
