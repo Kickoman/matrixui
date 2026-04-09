@@ -15,11 +15,13 @@ const std::size_t GetPrediction(const Matrix& embedding) {
     double maxProbability = embedding(0, 0);
     for (std::size_t i = 1; i < embedding.getCols(); ++i) {
         const auto probability = embedding(0, i);
+        //std::cerr << probability << " ";
         if (probability > maxProbability) {
             maxProbability = probability;
             result = i;
         }
     }
+    //std::cerr << std::endl;
     return result;
 }
 
@@ -35,7 +37,7 @@ Matrix GenerateExpected(const std::size_t outputIndex, const std::size_t totalIn
 namespace Neural {
 
 void Trainer::setNetwork(const NeuralNetwork& network) {
-    this->network = network;
+    this->network.initializeNetwork(network);
 }
 
 void Trainer::setTrainingDataset(std::unique_ptr<Neural::Dataset>&& dataset) {
@@ -55,7 +57,8 @@ void Trainer::setVerbose(const bool verbose) {
 }
 
 TestResult Trainer::test() const {
-    const std::size_t outputs = network.getLayerSizes().back();
+    const std::size_t outputs = network.getNeuralNetworkConfig().outputSize();
+
     TestResult result(outputs);
     for (std::size_t outputIdx = 0; outputIdx < outputs && !stopRequested; ++outputIdx) {
         log() << "[test] Testing output " << outputIdx << std::flush;
@@ -93,7 +96,7 @@ void Trainer::train(const LearningConfig& config) {
         return;
     }
 
-    NeuralNetwork bestNetwork = network;
+    NeuralNetwork bestNetwork = network.getNeuralNetworkConfig();
     std::size_t stagnateEpochsCount = 0;
     double bestTrainAccuracy = 0;
     double learningRate = config.initialLearningRate;
@@ -107,7 +110,7 @@ void Trainer::train(const LearningConfig& config) {
 
         if (trainAccuracy > bestTrainAccuracy + 0.001) {
             bestTrainAccuracy = trainAccuracy;
-            bestNetwork = network;
+            bestNetwork = network.getNeuralNetworkConfig();
             stagnateEpochsCount = 0;
 
             log() << "New best accuracy: " << bestTrainAccuracy * 100.0 << "%" << std::endl;
@@ -135,11 +138,11 @@ void Trainer::train(const LearningConfig& config) {
             }
 
             log() << "Restoring best model." << std::endl;
-            network = bestNetwork;
+            network.initializeNetwork(bestNetwork);
         }
     }
 
-    network = bestNetwork;
+    network.initializeNetwork(bestNetwork);
     log() << "Restored best model with accuracy " << bestTrainAccuracy * 100 << "%" << std::endl;
     if (epochCallback) {
         epochCallback();
@@ -157,7 +160,15 @@ void Trainer::requestStop() {
 }
 
 const NeuralNetwork& Trainer::getNetwork() const {
-    return network;
+    return network.getNeuralNetworkConfig();
+}
+
+const Neural::Dataset* Trainer::getTestingDataset() const {
+    return testingDataset.get();
+}
+
+const Neural::Dataset* Trainer::getTrainingDataset() const {
+    return trainingDataset.get();
 }
 
 double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRate, const LearningConfig& config) {
@@ -165,13 +176,13 @@ double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRa
     size_t correctCount = 0;
     for (std::size_t i = 0; i < samples.size() && !stopRequested.load(); ++i) {
         const auto& sample = samples[i];
-        const auto expected = GenerateExpected(sample.label, network.getLayerSizes().back());
-
-        for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
-            network.train(sample.input, expected, learningRate);
-        }
+        const auto expected = GenerateExpected(sample.label, network.getNeuralNetworkConfig().outputSize());
 
         const auto prediction = GetPrediction(network.predict(sample.input));
+        for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
+            network.train(sample.input, expected, learningRate, config.dropoutRate);
+        }
+
         if (prediction == sample.label) {
             ++correctCount;
         }

@@ -1,10 +1,11 @@
 #include "digits_runner.h"
 #include "directory_dataset.h"
+#include "learning_config.h"
 #include "neural_network.h"
 #include "trainer.h"
 #include "neural_network_loader.h"
 #include "pngreader.h"
-#include <random>
+#include <qmessagebox.h>
 #include <stdexcept>
 #include <QThreadPool>
 #include <QDir>
@@ -41,10 +42,7 @@ DigitsRecognizerController::DigitsRecognizerController(Neural::Trainer* recogniz
     : recognizer(recognizer)
 {
     this->recognizer->setEpochCallback([this]{
-        const auto result = this->recognizer->test();
-        QMetaObject::invokeMethod(this, [this, result]{
-            emit updatedStatistics(result);
-        });
+        this->testOnce();
         Neural::SaveNetwork(this->recognizer->getNetwork(), this->networkName.toStdString());
     });
 }
@@ -53,13 +51,13 @@ DigitsRecognizerController::~DigitsRecognizerController() {
     QThreadPool::globalInstance()->waitForDone();
 }
 
-void DigitsRecognizerController::run() {
+void DigitsRecognizerController::run(const Neural::LearningConfig& config) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't start learning while learning in progress");
     }
-    QThreadPool::globalInstance()->start([this]{
+    QThreadPool::globalInstance()->start([this, config]{
         QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
-        recognizer->train();
+        recognizer->train(config);
         QMetaObject::invokeMethod(this, &DigitsRecognizerController::infoUpdated);
     });
 }
@@ -68,28 +66,35 @@ void DigitsRecognizerController::requestStop() {
     recognizer->requestStop();
 }
 
-void DigitsRecognizerController::loadNetwork(const QString& network, const QVector<unsigned>& layers) {
+void DigitsRecognizerController::testOnce() {
+    const auto result = recognizer->test();
+    emit updatedStatistics(result);
+}
+
+void DigitsRecognizerController::loadNetwork(const QString& network, Neural::NeuralNetworkConfiguration config) {
     if (recognizer->isRunning()) {
         throw std::runtime_error("Can't load network, while learning is running");
     }
-    std::vector<std::size_t> layersSizes;
-    std::transform(layers.begin(), layers.end(), std::back_inserter(layersSizes), [](unsigned size) {
-        return static_cast<unsigned long>(size);
-    });
-    if (layersSizes.empty()) {
-        layersSizes = DEFAULT_LAYERS;
+    if (config.layersSizes.empty()) {
+        config.layersSizes = DEFAULT_LAYERS;
     }
 
+    std::optional<Neural::NeuralNetwork> loadedNetwork;
     if (QFile::exists(network)) {
-        recognizer->setNetwork(
-            Neural::LoadNetwork(network.toStdString(), layersSizes)
-        );
-    } else {
-        std::mt19937 gen;
-        NeuralNetwork network(layersSizes);
-        network.initializeWeights(gen);
+        try {
+            loadedNetwork = Neural::LoadNetwork(network.toStdString());
+        } catch (const std::runtime_error& e) { }
     }
+    if (!loadedNetwork) {
+        loadedNetwork = Neural::CreateNetwork(config);
+    }
+    assert(loadedNetwork);
+    recognizer->setNetwork(loadedNetwork.value());
     networkName = network;
+
+    if (recognizer->getTestingDataset()) {
+        testOnce();
+    }
 
     emit infoUpdated();
 }
@@ -129,7 +134,8 @@ DigitsRecognizerController::Info DigitsRecognizerController::getInfo() const {
         .pathToTrainingDataset = pathToTrainingDataset.toStdString(),
         .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = networkName.toStdString(),
-        .layersConfiguration = recognizer->getNetwork().getLayerSizes(),
+        .layersConfiguration = recognizer->getNetwork().config.layersSizes,
+        .learningConfig = learningConfig,
     };
 }
 

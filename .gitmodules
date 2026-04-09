@@ -1,6 +1,3 @@
 [submodule "eigen"]
 	path = eigen
 	url = git@github.com:Kickoman/eigen.git
-[submodule "perftest"]
-	path = perftest
-	url = git@github.com:Kickoman/perftest.git

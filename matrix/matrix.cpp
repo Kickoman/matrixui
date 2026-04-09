@@ -1,4 +1,5 @@
 #include "matrix.h"
+#include <ostream>
 
 #ifdef USE_EIGEN
 #include "Eigen/Dense"
@@ -82,6 +83,20 @@ Matrix Matrix::multiplyOptimized(const Matrix& other) const {
     return *this * other; // Eigen already uses optimized multiplication
 }
 
+Matrix Matrix::hadamard(const Matrix& other) const {
+    assert(other.getCols() == this->getCols());
+    assert(other.getRows() == this->getRows());
+    const auto rows = getRows();
+    const auto cols = getCols();
+    Matrix res = *this;
+    for (size_t row = 0; row < rows; ++row) {
+        for (size_t col = 0; col < cols; ++col) {
+            res(row, col) *= other(row, col);
+        }
+    }
+    return res;
+}
+
 void Matrix::print() const {
     std::cout << data << std::endl;
 }
@@ -122,6 +137,17 @@ Matrix Matrix::transform(const size_t rows, const size_t cols) const {
     }
     return result;
 }
+
+std::ostream& operator<<(std::ostream& stream, const Matrix& m) {
+    for (std::size_t row = 0; row < m.getRows(); ++row) {
+        for (std::size_t col = 0; col < m.getCols(); ++col) {
+            stream << m(row, col) << " ";
+        }
+        stream << "\n";
+    }
+    return stream;
+}
+
 #else // USE EIGEN
 #include <iostream>
 #include <stdexcept>

@@ -1,5 +1,9 @@
 #include "network_create_dialog.h"
 
+#include "neural_network.h"
+#include "neural_network_loader.h"
+#include "qinputvalidators.h"
+
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -7,12 +11,7 @@
 #include <QHBoxLayout>
 #include <QDialogButtonBox>
 #include <QFileDialog>
-
-#include <fstream>
-#include <qfiledialog.h>
-#include <qnamespace.h>
-
-#include "qinputvalidators.h"
+#include <QComboBox>
 
 
 NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
@@ -24,15 +23,26 @@ NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
     networkPathInput = new QLineEdit(this);
     networkPathButton = new QPushButton("Select network...", this);
     networkLayersInput = new QLineEdit(this);
+    hiddenActivation = new QComboBox(this);
+    outputActivation = new QComboBox(this);
     buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
 
     networkLayersInput->setValidator(new CommaSeparatedIntsValidator(networkLayersInput));
+
+    hiddenActivation->addItem("Sigmoid", static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
+    hiddenActivation->addItem("ReLU", static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
+    hiddenActivation->addItem("SoftMax", static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
+    outputActivation->addItem("Sigmoid", static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
+    outputActivation->addItem("ReLU", static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
+    outputActivation->addItem("SoftMax", static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
 
     networkPathLayout->addWidget(networkPathInput);
     networkPathLayout->addWidget(networkPathButton);
 
     mainLayout->addRow("Network path", networkPathLayout);
     mainLayout->addRow("Layers", networkLayersInput);
+    mainLayout->addRow("Hidden layer activation function", hiddenActivation);
+    mainLayout->addRow("Output layer activation function", outputActivation);
     mainLayout->addRow(buttonBox);
 
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -50,14 +60,19 @@ QString NetworkCreateDialog::getNetworkName() const {
     return networkPathInput->text();
 }
 
-QVector<unsigned> NetworkCreateDialog::getLayerSizes() const {
+Neural::NeuralNetworkConfiguration NetworkCreateDialog::getConfiguration() const {
     const auto sizes = networkLayersInput->text().split(',', Qt::SkipEmptyParts);
-    QVector<unsigned> result;
+    std::vector<std::size_t> result;
     result.reserve(sizes.size());
     std::transform(sizes.begin(), sizes.end(), std::back_inserter(result), [](const QString& size) {
-        return size.toUInt();
+        return static_cast<std::size_t>(size.toUInt());
     });
-    return result;
+
+    return {
+        .hiddenActivation = static_cast<Neural::ActivationType>(hiddenActivation->currentData().toUInt()),
+        .outputActivation = static_cast<Neural::ActivationType>(outputActivation->currentData().toUInt()),
+        .layersSizes = result,
+    };
 }
 
 void NetworkCreateDialog::setCurrentNetworkPath(const QString& path) {
@@ -87,24 +102,27 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     qDebug() << "Selection: " << text;
     if (QFile::exists(text)) {
         try {
-            std::size_t numLayers;
-            std::ifstream in(text.toStdString());
-            in >> numLayers;
-            std::vector<std::size_t> layerSizes(numLayers);
-            for (std::size_t i = 0; i < numLayers; ++i) {
-                in >> layerSizes[i];
-            }
+            const auto config = Neural::LoadConfig(text.toStdString()).value();
             QStringList layers;
-            std::transform(layerSizes.begin(), layerSizes.end(), std::back_inserter(layers), [](std::size_t size) {
+            std::transform(config.layersSizes.begin(), config.layersSizes.end(), std::back_inserter(layers), [](std::size_t size) {
                 return QString::number(size);
             });
             networkLayersInput->setText(layers.join(", "));
+
+            const auto hiddenIndex = hiddenActivation->findData(static_cast<std::uint8_t>(config.hiddenActivation));
+            const auto outputIndex = outputActivation->findData(static_cast<std::uint8_t>(config.outputActivation));
+            if (hiddenIndex != -1) {
+                hiddenActivation->setCurrentIndex(hiddenIndex);
+            }
+            if (outputIndex != -1) {
+                outputActivation->setCurrentIndex(outputIndex);
+            }
         } catch (const std::exception& e) {
             qDebug() << "Error: " << e.what();
         }
         networkLayersInput->setEnabled(false);
     } else {
         networkLayersInput->setEnabled(true);
-        networkLayersInput->setText("");
+        networkLayersInput->setText("784, 10, 10");
     }
 }

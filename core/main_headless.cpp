@@ -121,7 +121,15 @@ int main(int argc, char** argv) {
     auto testingDataset = std::make_unique<Neural::DirectoryDataset>(datasetPath);
     trainingDataset->setFileReader(reader);
     testingDataset->setFileReader(reader);
-    recognizer.setNetwork(Neural::LoadNetwork(networkName, layers));
+
+    auto loadedMaybe = Neural::LoadNetwork(networkName);
+    if (!loadedMaybe) {
+        loadedMaybe = Neural::CreateNetwork({
+            .layersSizes = layers,
+        });
+    }
+
+    recognizer.setNetwork(loadedMaybe.value());
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
     recognizer.setEpochCallback([&recognizer, &networkName]{

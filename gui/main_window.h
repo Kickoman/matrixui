@@ -11,6 +11,7 @@ class DigitsRecognizerController;
 class QThread;
 class QPushButton;
 class QLabel;
+class LearningConfigWidget;
 namespace Neural { class TestResult; }
 
 class MainWindow : public QMainWindow
@@ -51,6 +52,7 @@ private:
     QLabel* currentNetworkLabel = nullptr;
     QLabel* currentTestingDatasetLabel = nullptr;
     QLabel* currentTrainingDatasetLabel = nullptr;
+    LearningConfigWidget* learningConfigWidget = nullptr;
 
     DigitsRecognizerController* controller = nullptr;
 };
