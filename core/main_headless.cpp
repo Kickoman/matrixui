@@ -12,10 +12,12 @@
 
 #include "trainer.h"
 #include "neural_network_loader.h"
+#include "neural_network_applier.h"
 #include "directory_dataset.h"
 #include "pngreader.h"
 #include "learning_config.h"
 #include "neural_network.h"
+#include "matrix.h"
 
 
 class InputParser {
@@ -175,8 +177,11 @@ Neural::NeuralNetworkConfiguration parseNetworkConfiguration(const InputParser& 
 void printUsage(const char* argv0) {
     const Neural::LearningConfig d{};
     std::cerr
-        << "Usage: " << argv0 << " --network <path.wgt> (--dataset <dir> | --train-dataset <dir> --test-dataset <dir>)\n\n"
-        << "Required:\n"
+        << "Usage:\n  " << argv0 << " --network <path.wgt> (--dataset <dir> | --train-dataset ... --test-dataset ...)\n"
+        << "  " << argv0 << " --network <path.wgt> --predict-image <image.png>\n\n"
+        << "Single-image classification (no dataset required):\n"
+        << "  --predict-image <path>     Load the network and print the predicted digit (0-9) to stdout.\n\n"
+        << "Training mode — required:\n"
         << "  --network <path>           Network save path (.wgt). Created if missing.\n"
         << "  --dataset <dir>            Use the same root for training and testing (subdirs 0..9).\n"
         << "  --train-dataset <dir>     Training data root; if omitted, uses --dataset.\n"
@@ -203,6 +208,42 @@ void printUsage(const char* argv0) {
         << "  -h, --help                 Show this text.\n";
 }
 
+std::size_t maxProbabilityClassIndex(const Matrix& output) {
+    if (output.getRows() != 1 || output.getCols() == 0) {
+        throw std::runtime_error("Network output must be a single row (1xN)");
+    }
+    std::size_t best = 0;
+    double bestValue = output(0, 0);
+    for (std::size_t i = 1; i < output.getCols(); ++i) {
+        const double v = output(0, i);
+        if (v > bestValue) {
+            bestValue = v;
+            best = i;
+        }
+    }
+    return best;
+}
+
+int runPredictImage(const std::string& networkPath, const std::string& imagePath) {
+    if (!std::filesystem::exists(imagePath)) {
+        std::cerr << "Image not found: " << imagePath << "\n";
+        return 6;
+    }
+    auto loaded = Neural::LoadNetwork(networkPath);
+    if (!loaded) {
+        std::cerr << "Failed to load network: " << networkPath << "\n";
+        return 5;
+    }
+
+    PngUtils::Cache cache;
+    Matrix input = PngUtils::fromImage(imagePath, 28, 28, cache).transform(1, 28 * 28);
+    Neural::NeuralNetworkApplier applier(std::move(loaded.value()));
+    const Matrix out = applier.predict(input);
+    const std::size_t digit = maxProbabilityClassIndex(out);
+    std::cout << digit << '\n';
+    return 0;
+}
+
 } // namespace
 
 
@@ -212,6 +253,26 @@ int main(int argc, char** argv) {
     if (cmd.cmdOptionExists("--help") || cmd.cmdOptionExists("-h")) {
         printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
         return 0;
+    }
+
+    if (cmd.cmdOptionExists("--predict-image")) {
+        if (!cmd.cmdOptionExists("--network")) {
+            std::cerr << "--predict-image requires --network\n";
+            printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
+            return 1;
+        }
+        const std::string networkName = cmd.getCmdOption("--network");
+        const std::string imagePath = cmd.getCmdOption("--predict-image");
+        if (networkName.empty() || imagePath.empty()) {
+            std::cerr << "--network and --predict-image require values\n";
+            return 1;
+        }
+        try {
+            return runPredictImage(networkName, imagePath);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << '\n';
+            return 4;
+        }
     }
 
     if (!cmd.cmdOptionExists("--network")) {

@@ -51,7 +51,6 @@ public:
     void setVerbose(const bool verbose);
     void setOutputStream(std::ostream* stream);
 
-    /// @param samplesPerLabelLimit 0 means no limit (use all files per label).
     TestResult test(std::size_t samplesPerLabelLimit = 0) const;
     void train(const LearningConfig& config = {});
 
