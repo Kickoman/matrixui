@@ -1,18 +1,12 @@
 #pragma once
 
 #include "matrix.h"
+#include "layers.h"
 
 #include <cstdint>
 #include <vector>
 
 namespace Neural {
-
-enum class ActivationType : std::uint8_t {
-    Sigmoid,
-    ReLU,
-    Tanh,
-    Softmax,
-};
 
 struct NeuralNetworkConfiguration {
     ActivationType hiddenActivation = ActivationType::ReLU;
