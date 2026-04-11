@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QDateTime>
+#include <unordered_map>
 
 class QChart;
 class QLineSeries;
@@ -17,14 +18,14 @@ public:
     void setTitle(const QString& title);
     QValueAxis* getAxisX();
     QValueAxis* getAxisY();
-    void addPoint(const double value);
+    void addPoint(double value, const QString& seriesName = {});
 
 private:
-    void updateYAxisRange();
+    QLineSeries* getSeries(const QString& name);
 
 private:
     QChart* chart = nullptr;
-    QLineSeries* series = nullptr;
+    std::unordered_map<QString /*series name*/, QLineSeries*> allSeries;
     QChartView* view = nullptr;
     QValueAxis* axisX = nullptr;
     QValueAxis* axisY = nullptr;
