@@ -140,34 +140,3 @@ if(BUILD_READER)
         reader/
     )
 endif()
-
-option(BUILD_MATRIX_BENCHMARK "Build MatrixBenchmark executable" OFF)
-
-if(BUILD_MATRIX_BENCHMARK)
-    message("Building MatrixBenchmark with perftest library")
-
-    set(PERFBENCH_BUILD_EXAMPLES OFF CACHE BOOL "Build example benchmarks" FORCE)
-    set(PERFBENCH_BUILD_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
-
-    add_subdirectory(perftest)
-
-    add_library(matrix_benchmarks OBJECT
-        benchmarks/matrix_benchmarks.cpp
-        benchmarks/recognition_benchmarks.cpp
-        # digits_recognizer.cpp
-        core/neural_network.cpp
-        png/pngreader.cpp
-        matrix/matrix.cpp
-    )
-
-    target_link_libraries(matrix_benchmarks perfbench)
-    target_include_directories(matrix_benchmarks PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/eigen
-    )
-
-    target_sources(perfbench_main PRIVATE
-        $<TARGET_OBJECTS:matrix_benchmarks>
-    )
-
-    target_compile_options(matrix_benchmarks PRIVATE -O3 -DNDEBUG)
-endif()
