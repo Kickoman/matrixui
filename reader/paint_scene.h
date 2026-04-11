@@ -12,7 +12,7 @@ public:
 
 private:
     void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
-    void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
 
     QPointF previousPointPosition;
 };

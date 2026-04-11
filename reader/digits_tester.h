@@ -19,7 +19,7 @@ public:
 
 public slots:
     void processUpdates(const QImage& image);
-    void loadNetwork(const QString &networkName);
+    bool loadNetwork(const QString& networkName);
 
 signals:
     void infoUpdated(const Info& prediction);
