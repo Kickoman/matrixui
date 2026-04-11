@@ -86,6 +86,22 @@ inline void ReadBinaryLE(std::ifstream& file, double& value) {
     std::memcpy(&value, &temp, sizeof(double));
 }
 
+void WriteBulkLE(std::ofstream& file, const std::vector<double>& values) {
+    if constexpr (IsLittleEndian()) {
+        file.write(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(double));
+    } else {
+        for (double val : values) WriteBinaryLE(file, val);
+    }
+}
+
+void ReadBulkLE(std::ifstream& file, std::vector<double>& values) {
+    if constexpr (IsLittleEndian()) {
+        file.read(reinterpret_cast<char*>(values.data()), values.size() * sizeof(double));
+    } else {
+        for (double& val : values) ReadBinaryLE(file, val);
+    }
+}
+
 double StdDevByActivation(const ActivationType activation, const std::size_t inputSize) {
     switch (activation) {
         case ActivationType::ReLU:    return std::sqrt(2. / inputSize);
@@ -131,14 +147,22 @@ void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
 
     for (const auto& layerData : network.layerStack) {
         if (const auto* dense = std::get_if<DenseLayer>(&layerData)) {
-            for (std::size_t row = 0; row < dense->weights.getRows(); ++row) {
-                for (std::size_t col = 0; col < dense->weights.getCols(); ++col) {
-                    WriteBinaryLE(file, dense->weights(row, col));
+            const std::size_t rows = dense->weights.getRows();
+            const std::size_t cols = dense->weights.getCols();
+
+            std::vector<double> weightBuf(rows * cols);
+            for (std::size_t row = 0; row < rows; ++row) {
+                for (std::size_t col = 0; col < cols; ++col) {
+                    weightBuf[row * cols + col] = dense->weights(row, col);
                 }
             }
-            for (std::size_t col = 0; col < dense->biases.getCols(); ++col) {
-                WriteBinaryLE(file, dense->biases(0, col));
+            WriteBulkLE(file, weightBuf);
+
+            std::vector<double> biasBuf(cols);
+            for (std::size_t col = 0; col < cols; ++col) {
+                biasBuf[col] = dense->biases(0, col);
             }
+            WriteBulkLE(file, biasBuf);
         }
     }
 }
@@ -219,13 +243,18 @@ std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
         dense.gradientWeights = Matrix::zeros(rows, cols);
         dense.gradientBiases = Matrix::zeros(1, cols);
 
+        std::vector<double> weightBuf(rows * cols);
+        ReadBulkLE(file, weightBuf);
         for (std::size_t row = 0; row < rows; ++row) {
             for (std::size_t col = 0; col < cols; ++col) {
-                ReadBinaryLE(file, dense.weights(row, col));
+                dense.weights(row, col) = weightBuf[row * cols + col];
             }
         }
+
+        std::vector<double> biasBuf(cols);
+        ReadBulkLE(file, biasBuf);
         for (std::size_t col = 0; col < cols; ++col) {
-            ReadBinaryLE(file, dense.biases(0, col));
+            dense.biases(0, col) = biasBuf[col];
         }
 
         network.layerStack.push_back(std::move(dense));

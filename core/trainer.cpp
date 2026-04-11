@@ -171,13 +171,20 @@ const Neural::Dataset* Trainer::getTrainingDataset() const {
 
 double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRate, const LearningConfig& config) {
     Neural::Dataset::ShuffleSamples(samples);
+
+    const std::size_t outputSize = network.getNeuralNetworkConfig().outputSize();
+    std::vector<Matrix> expectedOutputs(outputSize);
+    for (std::size_t i = 0; i < outputSize; ++i) {
+        expectedOutputs[i] = GenerateExpected(i, outputSize);
+    }
+
     size_t correctCount = 0;
     for (std::size_t i = 0; i < samples.size() && !stopRequested.load(); ++i) {
         const auto& sample = samples[i];
-        const auto expected = GenerateExpected(sample.label, network.getNeuralNetworkConfig().outputSize());
+        const auto& expected = expectedOutputs[sample.label];
 
-        const auto prediction = GetPrediction(network.predict(sample.input));
-        for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
+        const auto prediction = GetPrediction(network.train(sample.input, expected, learningRate, config.dropoutRate));
+        for (std::size_t epoch = 1; epoch < config.innerEpochs; ++epoch) {
             network.train(sample.input, expected, learningRate, config.dropoutRate);
         }
 

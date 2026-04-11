@@ -42,7 +42,7 @@ Matrix NeuralNetworkApplier::predict(const Matrix& input) const {
     return current;
 }
 
-void NeuralNetworkApplier::train(
+Matrix NeuralNetworkApplier::train(
     const Matrix& input,
     const Matrix& target,
     const double learningRate,
@@ -58,6 +58,7 @@ void NeuralNetworkApplier::train(
         current = std::visit([&](auto& l) { return l.forward(current, ctx); }, layer);
     }
 
+    Matrix output = current;
     Matrix grad = current - target;
 
     for (int i = static_cast<int>(config.layerStack.size()) - 1; i >= 0; --i) {
@@ -67,6 +68,8 @@ void NeuralNetworkApplier::train(
     for (auto& layer : config.layerStack) {
         std::visit([lr = learningRate](auto& l) { l.applyGradients(lr); }, layer);
     }
+
+    return output;
 }
 
 }

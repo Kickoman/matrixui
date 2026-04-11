@@ -55,19 +55,19 @@ Matrix DenseLayer::forward(const Matrix& input, const ForwardContext&) {
 }
 
 Matrix DenseLayer::backward(const Matrix& gradOutput) {
-    gradientWeights = gradientWeights + inputCache.transpose() * gradOutput;
-    gradientBiases = gradientBiases + gradOutput;
+    gradientWeights += inputCache.transpose() * gradOutput;
+    gradientBiases += gradOutput;
     return gradOutput * weights.transpose();
 }
 
 void DenseLayer::applyGradients(const double learningRate) {
-    weights = weights - gradientWeights * learningRate;
-    biases = biases - gradientBiases * learningRate;
+    weights -= gradientWeights * learningRate;
+    biases -= gradientBiases * learningRate;
 }
 
 void DenseLayer::zeroGradients() {
-    gradientWeights = Matrix::zeros(gradientWeights.getRows(), gradientWeights.getCols());
-    gradientBiases = Matrix::zeros(gradientBiases.getRows(), gradientBiases.getCols());
+    gradientWeights.setZero();
+    gradientBiases.setZero();
 }
 
 Matrix ActivationLayer::forward(const Matrix& input) const {
@@ -102,7 +102,6 @@ Matrix DropoutLayer::forward(const Matrix& input) const {
 }
 
 Matrix DropoutLayer::forward(const Matrix& input, const ForwardContext& ctx) {
-    mask = Matrix::ones(input.getRows(), input.getCols());
     if (!ctx.training || ctx.dropoutRate == 0) {
         return input;
     }
@@ -129,6 +128,9 @@ Matrix DropoutLayer::forward(const Matrix& input, const ForwardContext& ctx) {
 }
 
 Matrix DropoutLayer::backward(const Matrix& gradOutput) {
+    if (mask.getRows() == 0) {
+        return gradOutput;
+    }
     return gradOutput.hadamard(mask);
 }
 

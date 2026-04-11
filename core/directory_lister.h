@@ -52,12 +52,18 @@ public:
     static std::vector<std::string> listFilesWithExtensions(
         const std::string& directoryPath,
         const std::vector<std::string>& extensions,
-        const int fileLimit = 0
+        const std::size_t fileLimit = 0
     ) {
-        auto allFiles = listFiles(directoryPath);
-        std::vector<std::string> filteredFiles;
+        if (!std::filesystem::exists(directoryPath) || !std::filesystem::is_directory(directoryPath)) {
+            throw std::runtime_error("Directory does not exist: " + directoryPath);
+        }
 
-        for (const auto& file : allFiles) {
+        std::vector<std::string> filteredFiles;
+        for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            const auto file = entry.path().string();
             for (const auto& ext : extensions) {
                 if (file.size() >= ext.size() &&
                     file.compare(file.size() - ext.size(), ext.size(), ext) == 0) {
@@ -69,7 +75,6 @@ public:
                 break;
             }
         }
-
         return filteredFiles;
     }
 };

@@ -27,9 +27,13 @@ public:
     Matrix operator+(const Matrix& other) const;
     Matrix operator-(const Matrix& other) const;
     Matrix operator*(const Matrix& other) const;
+    Matrix& operator+=(const Matrix& other);
+    Matrix& operator-=(const Matrix& other);
 
     Matrix operator*(double scalar) const;
     Matrix operator/(double scalar) const;
+
+    void setZero();
 
     Matrix multiplyOptimized(const Matrix& other) const; // Just calls operator*
     Matrix hadamard(const Matrix& other) const;
@@ -80,9 +84,13 @@ public:
     Matrix operator+(const Matrix& other) const;
     Matrix operator-(const Matrix& other) const;
     Matrix operator*(const Matrix& other) const;
+    Matrix& operator+=(const Matrix& other);
+    Matrix& operator-=(const Matrix& other);
 
     Matrix operator*(double scalar) const;
     Matrix operator/(double scalar) const;
+
+    void setZero();
 
     Matrix multiplyOptimized(const Matrix& other) const;
 

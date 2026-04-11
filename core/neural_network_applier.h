@@ -16,7 +16,7 @@ public:
     bool isInitialized() const;
     const NeuralNetwork& getNeuralNetworkConfig() const;
 
-    void train(const Matrix& input, const Matrix& target, double learningRate, double dropoutRate = 0.);
+    Matrix train(const Matrix& input, const Matrix& target, double learningRate, double dropoutRate = 0.);
     Matrix predict(const Matrix& input) const;
 
 private:

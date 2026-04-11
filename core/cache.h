@@ -82,7 +82,7 @@ std::size_t default_memory_calculator(const Key& key, const Value& value) {
 template<typename Key, typename Value>
 class LRUCache {
 private:
-    using ListIterator = typename std::list<std::pair<Key, Value>>::iterator;
+    using ListIterator = typename std::list<Key>::iterator;
 
     struct CacheEntry {
         Value value;
@@ -144,7 +144,6 @@ public:
 
             entry.value = std::move(value);
             cache_list_.splice(cache_list_.begin(), cache_list_, entry.list_iterator);
-            entry.list_iterator->second = entry.value; // Update value in list
         } else {
             const auto memory_usage = config_.max_memory_bytes > 0 ?
                 calculate_memory_usage(key, value) : 0;
@@ -155,7 +154,7 @@ public:
                 evict_lru();
             }
 
-            cache_list_.emplace_front(key, value);
+            cache_list_.emplace_front(key);
             auto list_it = cache_list_.begin();
 
             CacheEntry entry{std::move(value), list_it, memory_usage};
@@ -238,7 +237,7 @@ public:
 
 private:
     std::unordered_map<Key, CacheEntry> cache_map_;
-    std::list<std::pair<Key, Value>> cache_list_;
+    std::list<Key> cache_list_;
     CacheConfig<Key, Value> config_;
     CacheStats stats_;
     std::size_t current_memory_usage_ = 0;
@@ -246,8 +245,7 @@ private:
     void evict_lru() {
         if (cache_list_.empty()) return;
 
-        const auto& lru_item = cache_list_.back();
-        const auto key = lru_item.first;
+        const auto key = cache_list_.back();
 
         auto it = cache_map_.find(key);
         if (it != cache_map_.end()) {

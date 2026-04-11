@@ -79,6 +79,20 @@ Matrix Matrix::operator/(double scalar) const {
     return Matrix(data / scalar);
 }
 
+void Matrix::setZero() {
+    data.setZero();
+}
+
+Matrix& Matrix::operator+=(const Matrix& other) {
+    data += other.data;
+    return *this;
+}
+
+Matrix& Matrix::operator-=(const Matrix& other) {
+    data -= other.data;
+    return *this;
+}
+
 Matrix Matrix::multiplyOptimized(const Matrix& other) const {
     return *this * other; // Eigen already uses optimized multiplication
 }
@@ -86,15 +100,7 @@ Matrix Matrix::multiplyOptimized(const Matrix& other) const {
 Matrix Matrix::hadamard(const Matrix& other) const {
     assert(other.getCols() == this->getCols());
     assert(other.getRows() == this->getRows());
-    const auto rows = getRows();
-    const auto cols = getCols();
-    Matrix res = *this;
-    for (size_t row = 0; row < rows; ++row) {
-        for (size_t col = 0; col < cols; ++col) {
-            res(row, col) *= other(row, col);
-        }
-    }
-    return res;
+    return Matrix(data.cwiseProduct(other.data));
 }
 
 void Matrix::print() const {
@@ -262,6 +268,26 @@ Matrix Matrix::operator/(double scalar) const {
         }
     }
     return result;
+}
+
+void Matrix::setZero() {
+    for (auto& row : data)
+        for (auto& val : row)
+            val = 0.0;
+}
+
+Matrix& Matrix::operator+=(const Matrix& other) {
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            data[i][j] += other.data[i][j];
+    return *this;
+}
+
+Matrix& Matrix::operator-=(const Matrix& other) {
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            data[i][j] -= other.data[i][j];
+    return *this;
 }
 
 Matrix Matrix::multiplyOptimized(const Matrix& other) const {
