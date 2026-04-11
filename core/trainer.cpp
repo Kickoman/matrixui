@@ -56,7 +56,7 @@ void Trainer::setVerbose(const bool verbose) {
     this->verbose = verbose;
 }
 
-TestResult Trainer::test() const {
+TestResult Trainer::test(std::size_t samplesPerLabelLimit) const {
     const std::size_t outputs = network.getNeuralNetworkConfig().outputSize();
 
     TestResult result(outputs);
@@ -64,7 +64,7 @@ TestResult Trainer::test() const {
         log() << "[test] Testing output " << outputIdx << std::flush;
 
         TestStatistics statistics;
-        const auto samples = testingDataset->getSamplesForLabel(outputIdx);
+        const auto samples = testingDataset->getSamplesForLabel(outputIdx, samplesPerLabelLimit);
         for (const auto& sample : samples) {
             if (stopRequested) {
                 break;
