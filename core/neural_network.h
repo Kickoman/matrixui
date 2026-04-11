@@ -1,18 +1,11 @@
 #pragma once
 
 #include "matrix.h"
+#include "layers.h"
 
-#include <cstdint>
 #include <vector>
 
 namespace Neural {
-
-enum class ActivationType : std::uint8_t {
-    Sigmoid,
-    ReLU,
-    Tanh,
-    Softmax,
-};
 
 struct NeuralNetworkConfiguration {
     ActivationType hiddenActivation = ActivationType::ReLU;
@@ -22,16 +15,9 @@ struct NeuralNetworkConfiguration {
 
 struct NeuralNetwork {
     NeuralNetworkConfiguration config;
-    std::vector<Matrix> weights;
-    std::vector<Matrix> biases;
+    std::vector<LayerData> layerStack;
 
-    void initializeWeights();
-    void initializeBiases();
-
-
-    bool empty() const { return config.layersSizes.empty(); }
-    std::size_t layers() const { return config.layersSizes.size(); }
-    std::size_t layerSize(const std::size_t index) const { return config.layersSizes[index]; }
+    bool empty() const { return layerStack.empty(); }
     std::size_t inputSize() const { return config.layersSizes.front(); }
     std::size_t outputSize() const { return config.layersSizes.back(); }
     ActivationType hiddenActivation() const { return config.hiddenActivation; }

@@ -15,13 +15,11 @@ const std::size_t GetPrediction(const Matrix& embedding) {
     double maxProbability = embedding(0, 0);
     for (std::size_t i = 1; i < embedding.getCols(); ++i) {
         const auto probability = embedding(0, i);
-        //std::cerr << probability << " ";
         if (probability > maxProbability) {
             maxProbability = probability;
             result = i;
         }
     }
-    //std::cerr << std::endl;
     return result;
 }
 
@@ -56,7 +54,7 @@ void Trainer::setVerbose(const bool verbose) {
     this->verbose = verbose;
 }
 
-TestResult Trainer::test(std::size_t samplesPerLabelLimit) const {
+TestResult Trainer::test(std::size_t samplesPerLabelLimit) {
     const std::size_t outputs = network.getNeuralNetworkConfig().outputSize();
 
     TestResult result(outputs);
@@ -173,13 +171,20 @@ const Neural::Dataset* Trainer::getTrainingDataset() const {
 
 double Trainer::trainEpoch(std::vector<Sample>& samples, const double learningRate, const LearningConfig& config) {
     Neural::Dataset::ShuffleSamples(samples);
+
+    const std::size_t outputSize = network.getNeuralNetworkConfig().outputSize();
+    std::vector<Matrix> expectedOutputs(outputSize);
+    for (std::size_t i = 0; i < outputSize; ++i) {
+        expectedOutputs[i] = GenerateExpected(i, outputSize);
+    }
+
     size_t correctCount = 0;
     for (std::size_t i = 0; i < samples.size() && !stopRequested.load(); ++i) {
         const auto& sample = samples[i];
-        const auto expected = GenerateExpected(sample.label, network.getNeuralNetworkConfig().outputSize());
+        const auto& expected = expectedOutputs[sample.label];
 
-        const auto prediction = GetPrediction(network.predict(sample.input));
-        for (std::size_t epoch = 0; epoch < config.innerEpochs; ++epoch) {
+        const auto prediction = GetPrediction(network.train(sample.input, expected, learningRate, config.dropoutRate));
+        for (std::size_t epoch = 1; epoch < config.innerEpochs; ++epoch) {
             network.train(sample.input, expected, learningRate, config.dropoutRate);
         }
 

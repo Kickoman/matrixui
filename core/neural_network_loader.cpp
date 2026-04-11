@@ -1,5 +1,6 @@
 #include "neural_network_loader.h"
 #include "neural_network.h"
+#include "layers.h"
 
 #include <exception>
 #include <filesystem>
@@ -9,6 +10,8 @@
 #include <cstdint>
 #include <cstring>
 #include <bit>
+#include <random>
+#include <cmath>
 
 namespace Neural {
 
@@ -83,7 +86,46 @@ inline void ReadBinaryLE(std::ifstream& file, double& value) {
     std::memcpy(&value, &temp, sizeof(double));
 }
 
+void WriteBulkLE(std::ofstream& file, const std::vector<double>& values) {
+    if constexpr (IsLittleEndian()) {
+        file.write(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(double));
+    } else {
+        for (double val : values) WriteBinaryLE(file, val);
+    }
 }
+
+void ReadBulkLE(std::ifstream& file, std::vector<double>& values) {
+    if constexpr (IsLittleEndian()) {
+        file.read(reinterpret_cast<char*>(values.data()), values.size() * sizeof(double));
+    } else {
+        for (double& val : values) ReadBinaryLE(file, val);
+    }
+}
+
+double StdDevByActivation(const ActivationType activation, const std::size_t inputSize) {
+    switch (activation) {
+        case ActivationType::ReLU:    return std::sqrt(2. / inputSize);
+        case ActivationType::Sigmoid: return std::sqrt(1. / inputSize);
+        default:                      return std::sqrt(1. / inputSize);
+    }
+}
+
+void PushActivationLayers(
+    std::vector<LayerData>& stack,
+    const NeuralNetworkConfiguration& config,
+    const bool isLastLayer
+) {
+    if (!isLastLayer) {
+        stack.push_back(ActivationLayer{config.hiddenActivation});
+        stack.push_back(DropoutLayer{});
+    } else if (config.outputActivation == ActivationType::Softmax) {
+        stack.push_back(SoftmaxLayer{});
+    } else {
+        stack.push_back(ActivationLayer{config.outputActivation});
+    }
+}
+
+} // namespace
 
 
 void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
@@ -103,23 +145,29 @@ void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
         WriteBinaryLE(file, static_cast<std::uint64_t>(size));
     }
 
-    for (std::size_t i = 0; i < network.weights.size(); ++i) {
-        const auto& weights = network.weights[i];
-        const auto& biases = network.biases[i];
+    for (const auto& layerData : network.layerStack) {
+        if (const auto* dense = std::get_if<DenseLayer>(&layerData)) {
+            const std::size_t rows = dense->weights.getRows();
+            const std::size_t cols = dense->weights.getCols();
 
-        for (std::size_t row = 0; row < weights.getRows(); ++row) {
-            for (std::size_t col = 0; col < weights.getCols(); ++col) {
-                WriteBinaryLE(file, weights(row, col));
+            std::vector<double> weightBuf(rows * cols);
+            for (std::size_t row = 0; row < rows; ++row) {
+                for (std::size_t col = 0; col < cols; ++col) {
+                    weightBuf[row * cols + col] = dense->weights(row, col);
+                }
             }
-        }
+            WriteBulkLE(file, weightBuf);
 
-        for (std::size_t col = 0; col < biases.getCols(); ++col) {
-            WriteBinaryLE(file, biases(0, col));
+            std::vector<double> biasBuf(cols);
+            for (std::size_t col = 0; col < cols; ++col) {
+                biasBuf[col] = dense->biases(0, col);
+            }
+            WriteBulkLE(file, biasBuf);
         }
     }
 }
 
-std::optional<NeuralNetworkConfiguration> LoadConfig(const std::string &filename) {
+std::optional<NeuralNetworkConfiguration> LoadConfig(const std::string& filename) {
     if (!std::filesystem::exists(filename)) {
         return std::nullopt;
     }
@@ -183,35 +231,71 @@ std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
         network.config.layersSizes[i] = static_cast<std::size_t>(s);
     }
 
-    network.weights.resize(numLayers - 1);
-    network.biases.resize(numLayers - 1);
+    const std::size_t numTransitions = numLayers - 1;
+    for (std::size_t i = 0; i < numTransitions; ++i) {
+        const std::size_t rows = network.config.layersSizes[i];
+        const std::size_t cols = network.config.layersSizes[i + 1];
+        const bool isLastLayer = (i == numTransitions - 1);
 
-    for (std::size_t i = 0; i < numLayers - 1; ++i) {
-        std::size_t rows = network.config.layersSizes[i];
-        std::size_t cols = network.config.layersSizes[i+1];
-        network.weights[i] = Matrix(rows, cols);
-        network.biases[i] = Matrix(1, cols);
+        DenseLayer dense;
+        dense.weights = Matrix(rows, cols);
+        dense.biases = Matrix(1, cols);
+        dense.gradientWeights = Matrix::zeros(rows, cols);
+        dense.gradientBiases = Matrix::zeros(1, cols);
 
+        std::vector<double> weightBuf(rows * cols);
+        ReadBulkLE(file, weightBuf);
         for (std::size_t row = 0; row < rows; ++row) {
             for (std::size_t col = 0; col < cols; ++col) {
-                ReadBinaryLE(file, network.weights[i](row, col));
+                dense.weights(row, col) = weightBuf[row * cols + col];
             }
         }
 
+        std::vector<double> biasBuf(cols);
+        ReadBulkLE(file, biasBuf);
         for (std::size_t col = 0; col < cols; ++col) {
-            ReadBinaryLE(file, network.biases[i](0, col));
+            dense.biases(0, col) = biasBuf[col];
         }
+
+        network.layerStack.push_back(std::move(dense));
+        PushActivationLayers(network.layerStack, network.config, isLastLayer);
     }
 
     return network;
 }
 
 
-NeuralNetwork CreateNetwork(const NeuralNetworkConfiguration &config) {
+NeuralNetwork CreateNetwork(const NeuralNetworkConfiguration& config) {
     NeuralNetwork network;
     network.config = config;
-    network.initializeWeights();
-    network.initializeBiases();
+
+    std::mt19937 generator;
+    const std::size_t numTransitions = config.layersSizes.size() - 1;
+
+    for (std::size_t i = 0; i < numTransitions; ++i) {
+        const bool isLastLayer = (i == numTransitions - 1);
+        const std::size_t inputSize = config.layersSizes[i];
+        const std::size_t outputSize = config.layersSizes[i + 1];
+
+        const ActivationType activation = isLastLayer ? config.outputActivation : config.hiddenActivation;
+        const double stddev = StdDevByActivation(activation, inputSize);
+        std::normal_distribution<double> dist(0., stddev);
+
+        DenseLayer dense;
+        dense.weights = Matrix(inputSize, outputSize);
+        for (std::size_t row = 0; row < inputSize; ++row) {
+            for (std::size_t col = 0; col < outputSize; ++col) {
+                dense.weights(row, col) = dist(generator);
+            }
+        }
+        dense.biases = Matrix(1, outputSize, 0.01);
+        dense.gradientWeights = Matrix::zeros(inputSize, outputSize);
+        dense.gradientBiases = Matrix::zeros(1, outputSize);
+
+        network.layerStack.push_back(std::move(dense));
+        PushActivationLayers(network.layerStack, config, isLastLayer);
+    }
+
     return network;
 }
 
