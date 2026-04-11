@@ -1,5 +1,7 @@
 #include "advanced_terminal.h"
 
+#include <QScrollBar>
+
 
 AdvancedTerminal::AdvancedTerminal(QWidget* parent)
     : QPlainTextEdit(parent)
@@ -25,9 +27,24 @@ void AdvancedTerminal::write(const QString& text)
         processedText = processBackspaces(processedText);
     }
     processedText = processedText.replace("\t", "    ");
-    moveCursor(QTextCursor::End);
-    insertPlainText(processedText);
-    ensureCursorVisible();
+
+    QScrollBar* scrollBar = verticalScrollBar();
+    bool atBottom = scrollBar->value() >= scrollBar->maximum();
+    int savedValue = scrollBar->value();
+
+    QTextCursor cursor(document());
+    cursor.movePosition(QTextCursor::End);
+    cursor.insertText(processedText);
+
+    if (atBottom) {
+        scrollBar->setValue(scrollBar->maximum());
+    } else {
+        // Restore immediately and also after deferred layout updates fire
+        scrollBar->setValue(savedValue);
+        QMetaObject::invokeMethod(this, [this, savedValue]() {
+            verticalScrollBar()->setValue(savedValue);
+        }, Qt::QueuedConnection);
+    }
 }
 
 void AdvancedTerminal::writeLine(const QString& text) {
@@ -52,12 +69,12 @@ QString AdvancedTerminal::processCarriageReturns(const QString& text)
             result += parts[i];
         } else {
             // For carriage return, we replace the current line
-            QTextCursor cursor = textCursor();
+            QTextCursor cursor(document());
+            cursor.movePosition(QTextCursor::End);
             cursor.movePosition(QTextCursor::StartOfLine);
             cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
             cursor.removeSelectedText();
             cursor.insertText(parts[i]);
-            setTextCursor(cursor);
         }
     }
 

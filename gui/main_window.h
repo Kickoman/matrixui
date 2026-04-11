@@ -29,7 +29,6 @@ public:
     void closeEvent(QCloseEvent* event) override;
 
 public slots:
-    void handleTimer();
     void handleStatistics(const Neural::TestResult& result);
 
 private slots:

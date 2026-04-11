@@ -116,19 +116,6 @@ void MainWindow::closeEvent(QCloseEvent* event) {
     QMainWindow::closeEvent(event);
 }
 
-void MainWindow::handleTimer()
-{
-    const double value = QRandomGenerator::global()->bounded(100.0);
-    logger() << "Appending " << value << std::endl;
-    chart->addPoint(value);
-
-    for (unsigned i = 0; i < 10; ++i) {
-        const double val = QRandomGenerator::global()->bounded(5.0);
-        digitChart->setValue(i, val);
-        logger() << "Set " << val << " for " << i << std::endl;
-    }
-}
-
 void MainWindow::handleStatistics(const Neural::TestResult& result) {
     const auto& total = result.getTotal();
     const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
