@@ -3,6 +3,8 @@
 #include "stb_image.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 #include "matrix.h"
 
@@ -38,6 +40,22 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
     return result;
 }
 
+
+void PngUtils::toImage(const Matrix& image, const std::string& filename) {
+    const int rows = static_cast<int>(image.getRows());
+    const int cols = static_cast<int>(image.getCols());
+    std::vector<unsigned char> pixels(rows * cols);
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            // Invert: 0=white (255), 1=black (0), matching fromImage convention.
+            const double v = std::clamp(image(y, x), 0.0, 1.0);
+            pixels[y * cols + x] = static_cast<unsigned char>((1.0 - v) * 255.0);
+        }
+    }
+    if (!stbi_write_png(filename.c_str(), cols, rows, 1, pixels.data(), cols)) {
+        throw std::runtime_error("Failed to write image: " + filename);
+    }
+}
 
 Matrix PngUtils::fromImage(const std::string &filename, const unsigned int targetHeight, const unsigned int targetWidth, Cache &cache) {
     const auto cacheHit = cache.get(filename);

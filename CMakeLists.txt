@@ -64,6 +64,12 @@ set(SOURCES
     core/trainer.cpp
 )
 
+set(GAN_SOURCES
+    core/generator.cpp
+    core/discriminator.cpp
+    core/gan_trainer.cpp
+)
+
 set(READER_SOURCES
     reader/main_reader.cpp
     reader/main_window.cpp
@@ -109,6 +115,22 @@ if(BUILD_CLI)
     )
 
     target_include_directories(${PROJECT_NAME}_headless PRIVATE
+        core/
+        matrix/
+        png/
+    )
+endif()
+
+option(BUILD_GAN "Build GAN CLI version" ON)
+if(BUILD_GAN)
+    add_executable(
+        ${PROJECT_NAME}_gan
+        ${SOURCES}
+        ${GAN_SOURCES}
+        core/main_headless_gan.cpp
+    )
+
+    target_include_directories(${PROJECT_NAME}_gan PRIVATE
         core/
         matrix/
         png/

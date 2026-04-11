@@ -19,6 +19,11 @@ public:
     Matrix train(const Matrix& input, const Matrix& target, double learningRate, double dropoutRate = 0.);
     Matrix predict(const Matrix& input) const;
 
+    Matrix forward(const Matrix& input, double dropoutRate = 0.0);
+    Matrix backward(const Matrix& lossGradient);
+    void applyGradients(double learningRate);
+    void zeroGradients();
+
 private:
     bool initialized = false;
     NeuralNetwork config;
