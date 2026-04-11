@@ -51,7 +51,7 @@ public:
     void setVerbose(const bool verbose);
     void setOutputStream(std::ostream* stream);
 
-    TestResult test(std::size_t samplesPerLabelLimit = 0) const;
+    TestResult test(std::size_t samplesPerLabelLimit = 0);
     void train(const LearningConfig& config = {});
 
     bool isRunning() const;

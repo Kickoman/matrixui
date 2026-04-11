@@ -15,13 +15,11 @@ const std::size_t GetPrediction(const Matrix& embedding) {
     double maxProbability = embedding(0, 0);
     for (std::size_t i = 1; i < embedding.getCols(); ++i) {
         const auto probability = embedding(0, i);
-        //std::cerr << probability << " ";
         if (probability > maxProbability) {
             maxProbability = probability;
             result = i;
         }
     }
-    //std::cerr << std::endl;
     return result;
 }
 
@@ -56,7 +54,7 @@ void Trainer::setVerbose(const bool verbose) {
     this->verbose = verbose;
 }
 
-TestResult Trainer::test(std::size_t samplesPerLabelLimit) const {
+TestResult Trainer::test(std::size_t samplesPerLabelLimit) {
     const std::size_t outputs = network.getNeuralNetworkConfig().outputSize();
 
     TestResult result(outputs);

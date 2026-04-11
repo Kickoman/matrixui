@@ -55,7 +55,7 @@ set(
 
 set(SOURCES
     matrix/matrix.cpp
-    core/neural_network.cpp
+    core/layers.cpp
     core/neural_network_loader.cpp
     core/neural_network_applier.cpp
     png/pngreader.cpp
