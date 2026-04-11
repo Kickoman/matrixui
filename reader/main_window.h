@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QMainWindow>
 #include "digits_tester.h"
 
@@ -9,6 +10,8 @@ class QPushButton;
 class QLabel;
 class DigitChart;
 class QGraphicsPixmapItem;
+class QTimer;
+class QResizeEvent;
 
 
 class MainWindow : public QMainWindow
@@ -19,7 +22,7 @@ public:
     ~MainWindow();
 
     void setController(DigitsTester* tester);
-    void resizeEvent(QResizeEvent *event);
+    void resizeEvent(QResizeEvent* event) override;
 
 signals:
     void sceneUpdated(const QImage& image);
@@ -30,9 +33,10 @@ private slots:
     void handleUpdateTimer();
     void handleSceneUpdated(const QImage& image);
     void handleClearButton();
+    void handleOpenNetworkClicked();
 
 private:
-    QTimer* updateTimer;
+    QTimer* updateTimer = nullptr;
     DigitsTester* controller = nullptr;
 
     QGraphicsScene* scene = nullptr;

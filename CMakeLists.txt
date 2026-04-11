@@ -69,6 +69,7 @@ set(READER_SOURCES
     reader/main_window.cpp
     reader/paint_scene.cpp
     reader/digits_tester.cpp
+    reader/digit_input_preprocess.cpp
 )
 
 include_directories(eigen)
@@ -136,6 +137,7 @@ if(BUILD_READER)
         matrix/
         png/
         gui_common/
+        reader/
     )
 endif()
 
