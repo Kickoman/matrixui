@@ -14,12 +14,12 @@ class QTimer;
 class QResizeEvent;
 
 
-class MainWindow : public QMainWindow
+class DigitsClassifierModeWidget : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
-    ~MainWindow();
+    explicit DigitsClassifierModeWidget(QWidget* parent = nullptr);
+    ~DigitsClassifierModeWidget();
 
     void setController(DigitsTester* tester);
     void resizeEvent(QResizeEvent* event) override;

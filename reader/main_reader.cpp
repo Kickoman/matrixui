@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    MainWindow window;
+    DigitsClassifierModeWidget window;
 
     DigitsTester tester;
     if (!tester.loadNetwork(QString::fromUtf8(argv[1]))) {

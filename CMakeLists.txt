@@ -40,14 +40,24 @@ if(USE_EIGEN)
 endif(USE_EIGEN)
 
 set(GUI_SOURCES
-    gui/digits_runner.cpp
-    gui/main_window.cpp
+    gui/mode_factory.cpp
+    gui/mode_settings.cpp
+    gui/mode_widget.cpp
+    gui/mode_controller.cpp
     gui/network_create_dialog.cpp
     gui/learning_config_widget.cpp
+    gui/new_mode_widget.cpp
+    gui/mode_container_widget.cpp
+    gui/digits_classifier_controller.cpp
+    gui/digits_classifier_mode_widget.cpp
+    gui/main_controller.cpp
+    gui/main_window.cpp
 )
 
 set(
     GUI_COMMON_SOURCES
+    gui_common/add_tab_bar.cpp
+    gui_common/add_tab_widget.cpp
     gui_common/advanced_terminal.cpp
     gui_common/time_chart.cpp
     gui_common/digit_chart.cpp

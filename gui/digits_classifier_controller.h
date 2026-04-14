@@ -1,16 +1,20 @@
 #pragma once
 
-#include <QObject>
+#include "mode_controller.h"
 #include "learning_config.h"
 #include "neural_network.h"
 #include "trainer.h"
+#include "mode_settings.h"
+
+#include <QThread>
+#include <QPointer>
 
 Q_DECLARE_METATYPE(Neural::TestResult);
 Q_DECLARE_METATYPE(Neural::LearningConfig);
 Q_DECLARE_METATYPE(Neural::NeuralNetworkConfiguration);
 
 
-class DigitsRecognizerController : public QObject
+class DigitsClassifierController : public ModeController
 {
     Q_OBJECT
 public:
@@ -24,14 +28,19 @@ public:
         Neural::LearningConfig learningConfig;
     };
 
-    DigitsRecognizerController(Neural::Trainer* recognizer);
-    ~DigitsRecognizerController();
+    explicit DigitsClassifierController(QObject* parent = nullptr);
+    ~DigitsClassifierController();
 
     Info getInfo() const;
 
+    void waitUntilFinished() override;
+    void loadSettings();
+    void saveSettings();
+    void setLogger(std::ostream* stream);
+
 public slots:
     void run(const Neural::LearningConfig& config);
-    void requestStop();
+    void requestStop() override;
     void testOnce();
     void loadNetwork(const QString& networkName, Neural::NeuralNetworkConfiguration config = {});
     bool setTrainingDataset(const QString& pathToDataset);
@@ -45,9 +54,12 @@ signals:
 private:
     void updateStatistic(const Neural::TestResult& result) const;
 
+    QPointer<QThread> internalRunner;
+
+    ModeSettings settings;
     QString networkName;
     QString pathToTrainingDataset;
     QString pathToTestingDataset;
     Neural::LearningConfig learningConfig;
-    Neural::Trainer* recognizer;
+    Neural::Trainer recognizer;
 };
