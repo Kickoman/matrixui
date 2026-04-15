@@ -29,12 +29,16 @@ NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
 
     networkLayersInput->setValidator(new CommaSeparatedIntsValidator(networkLayersInput));
 
-    hiddenActivation->addItem("Sigmoid", static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
-    hiddenActivation->addItem("ReLU", static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
-    hiddenActivation->addItem("SoftMax", static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
-    outputActivation->addItem("Sigmoid", static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
-    outputActivation->addItem("ReLU", static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
-    outputActivation->addItem("SoftMax", static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
+    hiddenActivation->addItem("Sigmoid",    static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
+    hiddenActivation->addItem("ReLU",       static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
+    hiddenActivation->addItem("Leaky ReLU", static_cast<std::uint8_t>(Neural::ActivationType::LeakyReLU));
+    hiddenActivation->addItem("Tanh",       static_cast<std::uint8_t>(Neural::ActivationType::Tanh));
+    hiddenActivation->addItem("SoftMax",    static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
+    outputActivation->addItem("Sigmoid",    static_cast<std::uint8_t>(Neural::ActivationType::Sigmoid));
+    outputActivation->addItem("ReLU",       static_cast<std::uint8_t>(Neural::ActivationType::ReLU));
+    outputActivation->addItem("Leaky ReLU", static_cast<std::uint8_t>(Neural::ActivationType::LeakyReLU));
+    outputActivation->addItem("Tanh",       static_cast<std::uint8_t>(Neural::ActivationType::Tanh));
+    outputActivation->addItem("SoftMax",    static_cast<std::uint8_t>(Neural::ActivationType::Softmax));
 
     networkPathLayout->addWidget(networkPathInput);
     networkPathLayout->addWidget(networkPathButton);
@@ -77,6 +81,15 @@ Neural::NeuralNetworkConfiguration NetworkCreateDialog::getConfiguration() const
 
 void NetworkCreateDialog::setCurrentNetworkPath(const QString& path) {
     networkPathInput->setText(path);
+}
+
+void NetworkCreateDialog::setDefaultLayersText(const QString& layers) {
+    defaultLayersText = layers;
+}
+
+void NetworkCreateDialog::setDefaultActivations(Neural::ActivationType hidden, Neural::ActivationType output) {
+    defaultHiddenActivation = hidden;
+    defaultOutputActivation = output;
 }
 
 void NetworkCreateDialog::handleNetworkPathButtonClicked() {
@@ -123,6 +136,8 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
         networkLayersInput->setEnabled(false);
     } else {
         networkLayersInput->setEnabled(true);
-        networkLayersInput->setText("784, 10, 10");
+        networkLayersInput->setText(defaultLayersText);
+        hiddenActivation->setCurrentIndex(hiddenActivation->findData(static_cast<std::uint8_t>(defaultHiddenActivation)));
+        outputActivation->setCurrentIndex(outputActivation->findData(static_cast<std::uint8_t>(defaultOutputActivation)));
     }
 }

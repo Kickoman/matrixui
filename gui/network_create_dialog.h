@@ -20,12 +20,17 @@ public:
     Neural::NeuralNetworkConfiguration getConfiguration() const;
 
     void setCurrentNetworkPath(const QString& path);
+    void setDefaultLayersText(const QString& layers);
+    void setDefaultActivations(Neural::ActivationType hidden, Neural::ActivationType output);
 
 private slots:
     void handleNetworkPathButtonClicked();
     void handleSelectedPathChanged(const QString& text);
 
 private:
+    QString defaultLayersText{"784, 10, 10"};
+    Neural::ActivationType defaultHiddenActivation{Neural::ActivationType::ReLU};
+    Neural::ActivationType defaultOutputActivation{Neural::ActivationType::Softmax};
 
     QLineEdit* networkPathInput = nullptr;
     QLineEdit* networkLayersInput = nullptr;

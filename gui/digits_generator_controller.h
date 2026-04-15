@@ -48,8 +48,8 @@ public slots:
     void requestStop() override;
     bool loadClassifier(const QString& path);
     bool loadDataset(const QString& path);
-    void loadGenerator(const QString& path);
-    void loadDiscriminator(const QString& path);
+    void loadGenerator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
+    void loadDiscriminator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
 
 signals:
     void infoUpdated();

@@ -24,9 +24,9 @@ void GanTrainer::trainDiscriminatorStep(
 ) {
     discriminator.zeroGradients();
 
-    // Real sample: target is 1 (real).
+    // Real sample: target is 0.9 (one-sided label smoothing — prevents D from being overconfident).
     const Matrix realScore = discriminator.forward(realSample, dropoutRate);
-    discriminator.backward(bce_gradient(realScore, Matrix(1, 1, 1.0)));
+    discriminator.backward(bce_gradient(realScore, Matrix(1, 1, 0.9)));
 
     // Fake sample: target is 0 (fake).
     // Gradients accumulate on top of the real-sample pass above.

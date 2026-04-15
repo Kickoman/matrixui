@@ -104,9 +104,10 @@ void ReadBulkLE(std::ifstream& file, std::vector<double>& values) {
 
 double StdDevByActivation(const ActivationType activation, const std::size_t inputSize) {
     switch (activation) {
-        case ActivationType::ReLU:    return std::sqrt(2. / inputSize);
-        case ActivationType::Sigmoid: return std::sqrt(1. / inputSize);
-        default:                      return std::sqrt(1. / inputSize);
+        case ActivationType::ReLU:
+        case ActivationType::LeakyReLU: return std::sqrt(2. / inputSize);  // He initialization
+        case ActivationType::Sigmoid:   return std::sqrt(1. / inputSize);
+        default:                        return std::sqrt(1. / inputSize);
     }
 }
 
@@ -269,7 +270,7 @@ NeuralNetwork CreateNetwork(const NeuralNetworkConfiguration& config) {
     NeuralNetwork network;
     network.config = config;
 
-    std::mt19937 generator;
+    std::mt19937 generator{std::random_device{}()};
     const std::size_t numTransitions = config.layersSizes.size() - 1;
 
     for (std::size_t i = 0; i < numTransitions; ++i) {

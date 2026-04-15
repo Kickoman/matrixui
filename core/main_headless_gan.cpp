@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
     // Load or create discriminator
     Neural::NeuralNetworkConfiguration discConfig;
     discConfig.layersSizes      = buildDiscLayers();
-    discConfig.hiddenActivation = Neural::ActivationType::ReLU;
+    discConfig.hiddenActivation = Neural::ActivationType::LeakyReLU;
     discConfig.outputActivation = Neural::ActivationType::Sigmoid;
     Neural::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
 

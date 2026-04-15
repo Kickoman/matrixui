@@ -64,7 +64,7 @@ Neural::NeuralNetwork makeDiscriminatorNetwork() {
     cfg.layersSizes = {IMAGE_SIZE};
     cfg.layersSizes.insert(cfg.layersSizes.end(), DEFAULT_DISC_HIDDEN.begin(), DEFAULT_DISC_HIDDEN.end());
     cfg.layersSizes.push_back(1);
-    cfg.hiddenActivation = Neural::ActivationType::ReLU;
+    cfg.hiddenActivation = Neural::ActivationType::LeakyReLU;
     cfg.outputActivation = Neural::ActivationType::Sigmoid;
     return Neural::CreateNetwork(cfg);
 }
@@ -226,22 +226,30 @@ bool DigitsGeneratorController::loadDataset(const QString& path) {
     return true;
 }
 
-void DigitsGeneratorController::loadGenerator(const QString& path) {
-    if (internalRunner && internalRunner->isRunning()) return;
+void DigitsGeneratorController::loadGenerator(const QString& path, Neural::NeuralNetworkConfiguration config) {
+    if (trainingRunning.load(std::memory_order_relaxed)) return;
     generatorPath = path;
     if (QFile::exists(path)) {
         if (auto net = Neural::LoadNetwork(path.toStdString()))
             generatorNet = std::move(net);
+    } else if (!config.layersSizes.empty()) {
+        generatorNet = Neural::CreateNetwork(config);
+    } else {
+        generatorNet = std::nullopt;
     }
     emit infoUpdated();
 }
 
-void DigitsGeneratorController::loadDiscriminator(const QString& path) {
-    if (internalRunner && internalRunner->isRunning()) return;
+void DigitsGeneratorController::loadDiscriminator(const QString& path, Neural::NeuralNetworkConfiguration config) {
+    if (trainingRunning.load(std::memory_order_relaxed)) return;
     discriminatorPath = path;
     if (QFile::exists(path)) {
         if (auto net = Neural::LoadNetwork(path.toStdString()))
             discriminatorNet = std::move(net);
+    } else if (!config.layersSizes.empty()) {
+        discriminatorNet = Neural::CreateNetwork(config);
+    } else {
+        discriminatorNet = std::nullopt;
     }
     emit infoUpdated();
 }

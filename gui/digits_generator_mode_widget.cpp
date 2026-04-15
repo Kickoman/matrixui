@@ -3,6 +3,7 @@
 #include "advanced_terminal.h"
 #include "time_chart.h"
 #include "gan_config_widget.h"
+#include "network_create_dialog.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -107,13 +108,25 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     });
 
     connect(loadGeneratorButton, &QPushButton::clicked, [this] {
-        const QString path = QFileDialog::getSaveFileName(this, "Set generator file", controller->getInfo().generatorPath.c_str(), "Network weights (*.wgt)");
-        if (!path.isEmpty()) controller->loadGenerator(path);
+        const auto ganConfig = ganConfigWidget->getConfig();
+        const std::size_t inputSize = ganConfig.latentDim + ganConfig.numClasses;
+        NetworkCreateDialog dialog(this);
+        dialog.setWindowTitle("Open generator network");
+        dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().generatorPath));
+        dialog.setDefaultLayersText(QString("%1, 256, 512, 784").arg(inputSize));
+        dialog.setDefaultActivations(Neural::ActivationType::LeakyReLU, Neural::ActivationType::Sigmoid);
+        if (dialog.exec() == QDialog::Accepted)
+            controller->loadGenerator(dialog.getNetworkName(), dialog.getConfiguration());
     });
 
     connect(loadDiscriminatorButton, &QPushButton::clicked, [this] {
-        const QString path = QFileDialog::getSaveFileName(this, "Set discriminator file", controller->getInfo().discriminatorPath.c_str(), "Network weights (*.wgt)");
-        if (!path.isEmpty()) controller->loadDiscriminator(path);
+        NetworkCreateDialog dialog(this);
+        dialog.setWindowTitle("Open discriminator network");
+        dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().discriminatorPath));
+        dialog.setDefaultLayersText("784, 512, 256, 1");
+        dialog.setDefaultActivations(Neural::ActivationType::LeakyReLU, Neural::ActivationType::Sigmoid);
+        if (dialog.exec() == QDialog::Accepted)
+            controller->loadDiscriminator(dialog.getNetworkName(), dialog.getConfiguration());
     });
 
     connect(generateButton, &QPushButton::clicked, this, &DigitsGeneratorModeWidget::handleGenerateClicked);

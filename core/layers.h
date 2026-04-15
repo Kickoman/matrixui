@@ -17,6 +17,7 @@ enum class LayerType {
 enum class ActivationType : std::uint8_t {
     Sigmoid,
     ReLU,
+    LeakyReLU,
     Tanh,
     Softmax,
 };

@@ -6,22 +6,29 @@
 namespace Neural {
 
 
+static constexpr double kLeakyReLUAlpha = 0.2;
+
 double applyActivation(const double x, const ActivationType type) {
     assert(type != ActivationType::Softmax);
     switch(type) {
-        case ActivationType::Sigmoid: return 1.0 / (1.0 + std::exp(-x));
-        case ActivationType::ReLU:    return std::max(0.0, x);
-        case ActivationType::Tanh:    return std::tanh(x);
+        case ActivationType::Sigmoid:   return 1.0 / (1.0 + std::exp(-x));
+        case ActivationType::ReLU:      return std::max(0.0, x);
+        case ActivationType::LeakyReLU: return x > 0.0 ? x : kLeakyReLUAlpha * x;
+        case ActivationType::Tanh:      return std::tanh(x);
         default: return x;
     }
 }
 
+// x is the cached output value (post-activation).
+// For ReLU/LeakyReLU, output and input have the same sign so the derivative
+// is derivable from the output alone.
 double applyActivationDerivative(const double x, const ActivationType type) {
     assert(type != ActivationType::Softmax);
     switch(type) {
-        case ActivationType::Sigmoid: return x * (1.0 - x);
-        case ActivationType::ReLU:    return x > 0.0 ? 1.0 : 0.0;
-        case ActivationType::Tanh:    return 1.0 - x*x;
+        case ActivationType::Sigmoid:   return x * (1.0 - x);
+        case ActivationType::ReLU:      return x > 0.0 ? 1.0 : 0.0;
+        case ActivationType::LeakyReLU: return x > 0.0 ? 1.0 : kLeakyReLUAlpha;
+        case ActivationType::Tanh:      return 1.0 - x*x;
         default: return 1.0;
     }
 }
