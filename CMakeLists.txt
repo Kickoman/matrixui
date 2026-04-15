@@ -84,13 +84,6 @@ set(GAN_SOURCES
     core/gan_trainer.cpp
 )
 
-# set(READER_SOURCES
-#     reader/main_reader.cpp
-#     reader/main_window.cpp
-#     reader/digits_tester.cpp
-#     # reader/digit_input_preprocess.cpp
-# )
-
 include_directories(eigen)
 
 if(BUILD_GUI)
@@ -149,29 +142,3 @@ if(BUILD_GAN)
         png/
     )
 endif()
-
-# if(BUILD_READER)
-#     add_executable(
-#         ${PROJECT_NAME}_reader
-#         ${MATRIX_SOURCES}
-#         ${SOURCES}
-#         ${GUI_COMMON_SOURCES}
-#         ${READER_SOURCES}
-#     )
-
-#     target_link_libraries(${PROJECT_NAME}_reader
-#         Qt${QT_VERSION_MAJOR}::Gui
-#         Qt${QT_VERSION_MAJOR}::Widgets
-#         # Qt${QT_VERSION_MAJOR}::Concurrent
-#         Qt${QT_VERSION_MAJOR}::Charts
-#     )
-
-#     target_include_directories(
-#         ${PROJECT_NAME}_reader PRIVATE
-#         core/
-#         matrix/
-#         png/
-#         gui_common/
-#         reader/
-#     )
-# endif()
