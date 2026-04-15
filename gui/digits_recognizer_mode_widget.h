@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QImage>
-#include <QMainWindow>
-#include "digits_tester.h"
+#include "mode_widget.h"
+#include "digits_recognizer_mode_controller.h"
 
+class QImage;
 class QGraphicsScene;
 class QGraphicsView;
 class QPushButton;
@@ -12,23 +12,24 @@ class DigitChart;
 class QGraphicsPixmapItem;
 class QTimer;
 class QResizeEvent;
+class DigitsRecognizerModeController;
 
 
-class DigitsClassifierModeWidget : public QMainWindow
+class DigitsRecognizerModeWidget : public ModeWidget
 {
     Q_OBJECT
 public:
-    explicit DigitsClassifierModeWidget(QWidget* parent = nullptr);
-    ~DigitsClassifierModeWidget();
+    explicit DigitsRecognizerModeWidget(QWidget* parent = nullptr);
+    ~DigitsRecognizerModeWidget();
 
-    void setController(DigitsTester* tester);
+    void setController(DigitsRecognizerModeController* tester);
     void resizeEvent(QResizeEvent* event) override;
 
 signals:
     void sceneUpdated(const QImage& image);
 
 private slots:
-    void handleInfoUpdated(const DigitsTester::Info& info);
+    void handleInfoUpdated(const DigitsRecognizerModeController::Info& info);
     void handleSceneChanged();
     void handleUpdateTimer();
     void handleSceneUpdated(const QImage& image);
@@ -37,7 +38,7 @@ private slots:
 
 private:
     QTimer* updateTimer = nullptr;
-    DigitsTester* controller = nullptr;
+    DigitsRecognizerModeController* controller = nullptr;
 
     QGraphicsScene* scene = nullptr;
     QGraphicsView* view = nullptr;

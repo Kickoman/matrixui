@@ -1,10 +1,10 @@
 #pragma once
 
-#include <QObject>
+#include "mode_controller.h"
 #include "neural_network_applier.h"
 
 
-class DigitsTester : public QObject
+class DigitsRecognizerModeController : public ModeController
 {
     Q_OBJECT
 public:
@@ -14,8 +14,8 @@ public:
         QVector<double> probabilities;
     };
 
-    explicit DigitsTester(QObject* parent = nullptr);
-    ~DigitsTester();
+    explicit DigitsRecognizerModeController(QObject* parent = nullptr);
+    ~DigitsRecognizerModeController();
 
 public slots:
     void processUpdates(const QImage& image);

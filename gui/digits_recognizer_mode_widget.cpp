@@ -1,8 +1,9 @@
-#include "main_window.h"
+#include "digits_recognizer_mode_widget.h"
 
+#include "mode_widget.h"
 #include "digit_input_preprocess.h"
 #include "digit_chart.h"
-#include "digits_tester.h"
+#include "digits_recognizer_mode_controller.h"
 #include "paint_scene.h"
 
 #include <QFileDialog>
@@ -22,8 +23,8 @@
 
 #include <algorithm>
 
-DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
-    : QMainWindow(parent)
+DigitsRecognizerModeWidget::DigitsRecognizerModeWidget(QWidget* parent)
+    : ModeWidget("Digits recognizer", parent)
 {
     view = new QGraphicsView(this);
     scene = new PaintScene(view);
@@ -62,40 +63,38 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
     hLayout->addWidget(view);
     hLayout->addLayout(resultLayout);
 
-    auto* mainWidget = new QWidget(this);
-    mainWidget->setLayout(vLayout);
-    setCentralWidget(mainWidget);
+    setLayout(vLayout);
 
     scene->setSceneRect(0, 0, view->width() - reader::kSceneViewChromePx,
                         view->height() - reader::kSceneViewChromePx);
 
     updateTimer = new QTimer(this);
-    connect(scene, &QGraphicsScene::changed, this, &DigitsClassifierModeWidget::handleSceneChanged);
-    connect(updateTimer, &QTimer::timeout, this, &DigitsClassifierModeWidget::handleUpdateTimer);
-    connect(clearButton, &QPushButton::clicked, this, &DigitsClassifierModeWidget::handleClearButton);
+    connect(scene, &QGraphicsScene::changed, this, &DigitsRecognizerModeWidget::handleSceneChanged);
+    connect(updateTimer, &QTimer::timeout, this, &DigitsRecognizerModeWidget::handleUpdateTimer);
+    connect(clearButton, &QPushButton::clicked, this, &DigitsRecognizerModeWidget::handleClearButton);
 }
 
-DigitsClassifierModeWidget::~DigitsClassifierModeWidget() = default;
+DigitsRecognizerModeWidget::~DigitsRecognizerModeWidget() = default;
 
-void DigitsClassifierModeWidget::setController(DigitsTester* controller) {
+void DigitsRecognizerModeWidget::setController(DigitsRecognizerModeController* controller) {
     this->controller = controller;
-    connect(controller, &DigitsTester::infoUpdated, this, &DigitsClassifierModeWidget::handleInfoUpdated);
-    connect(this, &DigitsClassifierModeWidget::sceneUpdated, controller, &DigitsTester::processUpdates);
-    connect(this, &DigitsClassifierModeWidget::sceneUpdated, this, &DigitsClassifierModeWidget::handleSceneUpdated);
-    connect(openNetworkButton, &QPushButton::clicked, this, &DigitsClassifierModeWidget::handleOpenNetworkClicked);
+    connect(controller, &DigitsRecognizerModeController::infoUpdated, this, &DigitsRecognizerModeWidget::handleInfoUpdated);
+    connect(this, &DigitsRecognizerModeWidget::sceneUpdated, controller, &DigitsRecognizerModeController::processUpdates);
+    connect(this, &DigitsRecognizerModeWidget::sceneUpdated, this, &DigitsRecognizerModeWidget::handleSceneUpdated);
+    connect(openNetworkButton, &QPushButton::clicked, this, &DigitsRecognizerModeWidget::handleOpenNetworkClicked);
 }
 
-void DigitsClassifierModeWidget::resizeEvent(QResizeEvent* event) {
+void DigitsRecognizerModeWidget::resizeEvent(QResizeEvent* event) {
     scene->setSceneRect(0, 0, view->width() - reader::kSceneViewChromePx,
                         view->height() - reader::kSceneViewChromePx);
-    QMainWindow::resizeEvent(event);
+    ModeWidget::resizeEvent(event);
 }
 
-void DigitsClassifierModeWidget::handleSceneChanged() {
+void DigitsRecognizerModeWidget::handleSceneChanged() {
     updateTimer->start(reader::kUpdateDebounceMs);
 }
 
-void DigitsClassifierModeWidget::handleUpdateTimer() {
+void DigitsRecognizerModeWidget::handleUpdateTimer() {
     QRectF itemsRect = scene->itemsBoundingRect();
     if (itemsRect.isEmpty())
         return;
@@ -128,23 +127,23 @@ void DigitsClassifierModeWidget::handleUpdateTimer() {
     emit sceneUpdated(scaled);
 }
 
-void DigitsClassifierModeWidget::handleInfoUpdated(const DigitsTester::Info& info) {
+void DigitsRecognizerModeWidget::handleInfoUpdated(const DigitsRecognizerModeController::Info& info) {
     predictedNumber->setText(QString::number(info.predictedNumber));
     for (int i = 0; i < info.probabilities.size(); ++i) {
         digitChart->setValue(static_cast<unsigned>(i), info.probabilities[i] * 100);
     }
 }
 
-void DigitsClassifierModeWidget::handleSceneUpdated(const QImage& image) {
+void DigitsRecognizerModeWidget::handleSceneUpdated(const QImage& image) {
     previewItem->setPixmap(QPixmap::fromImage(image));
     previewView->fitInView(previewItem, Qt::KeepAspectRatio);
 }
 
-void DigitsClassifierModeWidget::handleClearButton() {
+void DigitsRecognizerModeWidget::handleClearButton() {
     scene->clear();
 }
 
-void DigitsClassifierModeWidget::handleOpenNetworkClicked() {
+void DigitsRecognizerModeWidget::handleOpenNetworkClicked() {
     if (!controller)
         return;
     const QString path = QFileDialog::getOpenFileName(

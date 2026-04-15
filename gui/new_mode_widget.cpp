@@ -24,6 +24,7 @@ NewModeWidget::NewModeWidget(QWidget* parent)
     digitsRecognitionPlaygroundButton->setFont(buttonFont);
     ganButton->setFixedSize(buttonSize);
     ganButton->setFont(buttonFont);
+    ganButton->setDisabled(true);
 
     auto* layout = new QHBoxLayout(this);
     layout->addWidget(digitsClassifierButton);

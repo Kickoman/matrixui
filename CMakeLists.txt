@@ -50,6 +50,9 @@ set(GUI_SOURCES
     gui/mode_container_widget.cpp
     gui/digits_classifier_controller.cpp
     gui/digits_classifier_mode_widget.cpp
+    gui/digits_recognizer_mode_controller.cpp
+    gui/digits_recognizer_mode_widget.cpp
+    gui/digit_input_preprocess.cpp
     gui/main_controller.cpp
     gui/main_window.cpp
 )
@@ -61,6 +64,7 @@ set(
     gui_common/advanced_terminal.cpp
     gui_common/time_chart.cpp
     gui_common/digit_chart.cpp
+    gui_common/paint_scene.cpp
 )
 
 set(SOURCES
@@ -80,13 +84,12 @@ set(GAN_SOURCES
     core/gan_trainer.cpp
 )
 
-set(READER_SOURCES
-    reader/main_reader.cpp
-    reader/main_window.cpp
-    reader/paint_scene.cpp
-    reader/digits_tester.cpp
-    reader/digit_input_preprocess.cpp
-)
+# set(READER_SOURCES
+#     reader/main_reader.cpp
+#     reader/main_window.cpp
+#     reader/digits_tester.cpp
+#     # reader/digit_input_preprocess.cpp
+# )
 
 include_directories(eigen)
 
@@ -147,28 +150,28 @@ if(BUILD_GAN)
     )
 endif()
 
-if(BUILD_READER)
-    add_executable(
-        ${PROJECT_NAME}_reader
-        ${MATRIX_SOURCES}
-        ${SOURCES}
-        ${GUI_COMMON_SOURCES}
-        ${READER_SOURCES}
-    )
+# if(BUILD_READER)
+#     add_executable(
+#         ${PROJECT_NAME}_reader
+#         ${MATRIX_SOURCES}
+#         ${SOURCES}
+#         ${GUI_COMMON_SOURCES}
+#         ${READER_SOURCES}
+#     )
 
-    target_link_libraries(${PROJECT_NAME}_reader
-        Qt${QT_VERSION_MAJOR}::Gui
-        Qt${QT_VERSION_MAJOR}::Widgets
-        # Qt${QT_VERSION_MAJOR}::Concurrent
-        Qt${QT_VERSION_MAJOR}::Charts
-    )
+#     target_link_libraries(${PROJECT_NAME}_reader
+#         Qt${QT_VERSION_MAJOR}::Gui
+#         Qt${QT_VERSION_MAJOR}::Widgets
+#         # Qt${QT_VERSION_MAJOR}::Concurrent
+#         Qt${QT_VERSION_MAJOR}::Charts
+#     )
 
-    target_include_directories(
-        ${PROJECT_NAME}_reader PRIVATE
-        core/
-        matrix/
-        png/
-        gui_common/
-        reader/
-    )
-endif()
+#     target_include_directories(
+#         ${PROJECT_NAME}_reader PRIVATE
+#         core/
+#         matrix/
+#         png/
+#         gui_common/
+#         reader/
+#     )
+# endif()

@@ -1,17 +1,17 @@
-#include "digits_tester.h"
+#include "digits_recognizer_mode_controller.h"
 #include "digit_input_preprocess.h"
 #include "neural_network_loader.h"
 
 #include <QImage>
 
 
-DigitsTester::DigitsTester(QObject* parent) : QObject(parent)
+DigitsRecognizerModeController::DigitsRecognizerModeController(QObject* parent) : ModeController(parent)
 {}
 
-DigitsTester::~DigitsTester()
+DigitsRecognizerModeController::~DigitsRecognizerModeController()
 {}
 
-void DigitsTester::processUpdates(const QImage& image) {
+void DigitsRecognizerModeController::processUpdates(const QImage& image) {
     if (!network.isInitialized())
         return;
 
@@ -55,7 +55,7 @@ void DigitsTester::processUpdates(const QImage& image) {
     });
 }
 
-bool DigitsTester::loadNetwork(const QString& networkName) {
+bool DigitsRecognizerModeController::loadNetwork(const QString& networkName) {
     auto loaded = Neural::LoadNetwork(networkName.toStdString());
     if (!loaded.has_value())
         return false;
