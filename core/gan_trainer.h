@@ -7,6 +7,8 @@
 #include "../matrix/matrix.h"
 #include <vector>
 #include <ostream>
+#include <functional>
+#include <atomic>
 
 namespace Neural {
 
@@ -26,6 +28,12 @@ public:
         const GanConfig& config,
         std::ostream* log = nullptr
     );
+
+    // Called at the end of each epoch with (epoch, avgDiscScore, avgGenScore).
+    void setEpochCallback(std::function<void(std::size_t, double, double)> callback);
+
+    // Signal training to stop after the current epoch completes.
+    void requestStop();
 
     const Generator& getGenerator() const;
     const Discriminator& getDiscriminator() const;
@@ -49,6 +57,9 @@ private:
     Generator generator;
     Discriminator discriminator;
     NeuralNetworkApplier classifier;
+
+    std::function<void(std::size_t, double, double)> epochCallback;
+    std::atomic<bool> stopFlag{false};
 };
 
 }

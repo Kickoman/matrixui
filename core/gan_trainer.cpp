@@ -79,6 +79,7 @@ void GanTrainer::train(
     std::ostream* log
 ) {
     if (realSamples.empty()) return;
+    stopFlag.store(false, std::memory_order_relaxed);
 
     std::mt19937 rng{std::random_device{}()};
     std::uniform_int_distribution<std::size_t> labelDist(0, config.numClasses - 1);
@@ -113,12 +114,14 @@ void GanTrainer::train(
                 label, config.classifierLossWeight, config.generatorLr
             );
             ++steps;
+
+            if (stopFlag.load(std::memory_order_relaxed)) break;
         }
 
-        if (log && steps > 0) {
-            const double avgDiscReal = totalDiscScore / (steps * config.discriminatorStepsPerGenStep);
-            const double avgGenFool  = totalGenScore / steps;
+        const double avgDiscReal = steps > 0 ? totalDiscScore / (steps * config.discriminatorStepsPerGenStep) : 0.0;
+        const double avgGenFool  = steps > 0 ? totalGenScore / steps : 0.0;
 
+        if (log && steps > 0) {
             // Sample a generated image for each class and log what the classifier thinks.
             const std::size_t logLabel = epoch % config.numClasses;
             const Matrix sample = generator.generate(logLabel);
@@ -132,9 +135,20 @@ void GanTrainer::train(
                  << "  D(real)=" << avgDiscReal
                  << "  D(G(z))=" << avgGenFool
                  << "  sample(label=" << logLabel << " -> classifier=" << predictedLabel << ")"
-                 << "\n";
+                 << std::endl;
         }
+
+        if (epochCallback) epochCallback(epoch, avgDiscReal, avgGenFool);
+        if (stopFlag.load(std::memory_order_relaxed)) break;
     }
+}
+
+void GanTrainer::setEpochCallback(std::function<void(std::size_t, double, double)> callback) {
+    epochCallback = std::move(callback);
+}
+
+void GanTrainer::requestStop() {
+    stopFlag.store(true, std::memory_order_relaxed);
 }
 
 const Generator& GanTrainer::getGenerator() const { return generator; }

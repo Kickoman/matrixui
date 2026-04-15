@@ -52,6 +52,9 @@ set(GUI_SOURCES
     gui/digits_classifier_mode_widget.cpp
     gui/digits_recognizer_mode_controller.cpp
     gui/digits_recognizer_mode_widget.cpp
+    gui/digits_generator_controller.cpp
+    gui/digits_generator_mode_widget.cpp
+    gui/gan_config_widget.cpp
     gui/digit_input_preprocess.cpp
     gui/main_controller.cpp
     gui/main_window.cpp
@@ -93,6 +96,7 @@ if(BUILD_GUI)
         ${GUI_COMMON_SOURCES}
         ${MATRIX_SOURCES}
         ${SOURCES}
+        ${GAN_SOURCES}
         gui/main.cpp
     )
 

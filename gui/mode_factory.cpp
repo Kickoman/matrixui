@@ -4,6 +4,8 @@
 #include "digits_classifier_mode_widget.h"
 #include "digits_recognizer_mode_widget.h"
 #include "digits_recognizer_mode_controller.h"
+#include "digits_generator_controller.h"
+#include "digits_generator_mode_widget.h"
 
 #include <stdexcept>
 
@@ -29,6 +31,17 @@ namespace {
             .view = view,
         };
     }
+
+    Mode CreateDigitsGeneratorMode() {
+        auto* controller = new DigitsGeneratorController();
+        auto* view = new DigitsGeneratorModeWidget();
+        controller->setLogger(view->getTerminalStream());
+        view->setController(controller);
+        return {
+            .controller = controller,
+            .view = view,
+        };
+    }
 }
 
 
@@ -38,7 +51,8 @@ Mode CreateMode(ModeType mode) {
             return CreateDigitsClassifierMode();
         case ModeType::DigitsRecognizer:
             return CreateDigitsRecognizerMode();
-        default:
-            throw std::runtime_error("Unsupported");
+        case ModeType::DigitsGenerator:
+            return CreateDigitsGeneratorMode();
     }
+    throw std::runtime_error("Unsupported mode");
 }

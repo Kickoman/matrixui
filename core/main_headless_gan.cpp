@@ -222,7 +222,6 @@ int main(int argc, char** argv) {
     const std::string datasetPath      = cmd.getCmdOption("--dataset");
     const std::string generatorPath    = cmd.getCmdOption("--generator",    "generator.wgt");
     const std::string discriminatorPath= cmd.getCmdOption("--discriminator","discriminator.wgt");
-    const std::size_t datasetLimit     = parseSizeOpt(cmd, "--dataset-limit", 0);
 
     // GAN config
     Neural::GanConfig ganConfig{};
@@ -235,6 +234,7 @@ int main(int argc, char** argv) {
     ganConfig.dropoutRate               = parseDoubleOpt(cmd, "--dropout",             ganConfig.dropoutRate);
     ganConfig.classifierLossWeight      = parseDoubleOpt(cmd, "--classifier-weight",   ganConfig.classifierLossWeight);
     ganConfig.numClasses                = parseSizeOpt  (cmd, "--num-classes",         ganConfig.numClasses);
+    ganConfig.datasetLimitPerLabel      = parseSizeOpt  (cmd, "--dataset-limit",       ganConfig.datasetLimitPerLabel);
 
     // Generator topology: latentDim -> hidden... -> 784, Sigmoid output
     const std::vector<std::size_t> kDefaultGenHidden  = {256, 512};
@@ -292,7 +292,7 @@ int main(int argc, char** argv) {
     Neural::DirectoryDataset dataset(datasetPath);
     dataset.setFileReader(reader);
 
-    const auto allSamples = dataset.getAllSamples(datasetLimit);
+    const auto allSamples = dataset.getAllSamples(ganConfig.datasetLimitPerLabel);
     std::vector<Matrix> realImages;
     realImages.reserve(allSamples.size());
     for (const auto& s : allSamples)

@@ -1,0 +1,28 @@
+#pragma once
+
+#include <QWidget>
+#include "gan_config.h"
+
+class QDoubleSpinBox;
+class QSpinBox;
+
+class GanConfigWidget : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit GanConfigWidget(QWidget* parent = nullptr);
+
+    void setConfig(const Neural::GanConfig& config);
+    Neural::GanConfig getConfig() const;
+
+private:
+    QSpinBox* epochs = nullptr;
+    QSpinBox* batchSize = nullptr;
+    QDoubleSpinBox* generatorLr = nullptr;
+    QDoubleSpinBox* discriminatorLr = nullptr;
+    QSpinBox* discriminatorSteps = nullptr;
+    QDoubleSpinBox* dropoutRate = nullptr;
+    QDoubleSpinBox* classifierLossWeight = nullptr;
+    QSpinBox* latentDim = nullptr;
+    QSpinBox* datasetLimitPerLabel = nullptr;
+};

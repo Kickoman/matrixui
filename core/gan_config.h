@@ -18,6 +18,8 @@ struct GanConfig {
     // generator update. Higher values push the generator harder toward the
     // requested digit class.
     double classifierLossWeight = 1.0;
+    // Maximum number of images to load per label (0 = no limit).
+    std::size_t datasetLimitPerLabel = 0;
 };
 
 }
