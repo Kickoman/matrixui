@@ -92,6 +92,10 @@ void GanTrainer::train(
     // Uninitialized sentinel: first epoch sets EMA to the raw value directly,
     // avoiding the bias that comes from starting at an arbitrary 0.5.
     double emaReal = -1.0, emaGen = -1.0;
+    double prevEmaReal = -1.0, prevEmaGen = -1.0;
+    std::size_t flatEpochCount = 0;
+    std::size_t kickEpochsRemaining = 0;
+    double kickSavedGLr = 0.0;
 
     for (std::size_t epoch = 0; epoch < config.epochs; ++epoch) {
         std::shuffle(indices.begin(), indices.end(), rng);
@@ -99,6 +103,11 @@ void GanTrainer::train(
         double totalDiscScore = 0.0;
         double totalGenScore = 0.0;
         std::size_t steps = 0;
+
+        // During a kick, D dropout is raised to weaken it and give G room.
+        const double effectiveDropout = (kickEpochsRemaining > 0)
+            ? std::min(config.dropoutRate * config.flatnessDropoutBoost, 0.95)
+            : config.dropoutRate;
 
         for (std::size_t i = 0; i + config.batchSize <= indices.size(); i += config.batchSize) {
             // Pick the label for this step — used for both fake generation in D
@@ -111,7 +120,7 @@ void GanTrainer::train(
                 const Matrix fake = generator.generate(label);
                 trainDiscriminatorStep(
                     realSamples[idx], fake,
-                    currentDLr, config.dropoutRate
+                    currentDLr, effectiveDropout
                 );
                 totalDiscScore += discriminator.score(realSamples[idx])(0, 0);
             }
@@ -130,6 +139,8 @@ void GanTrainer::train(
 
         // Update EMA — always, so GUI always gets smoothed curves.
         // First epoch: seed from actual values to avoid bias toward the 0.5 init.
+        prevEmaReal = emaReal;
+        prevEmaGen  = emaGen;
         if (emaReal < 0.0) {
             emaReal = avgDiscReal;
             emaGen  = avgGenFool;
@@ -138,8 +149,29 @@ void GanTrainer::train(
             emaGen  = config.lrEmaAlpha * emaGen  + (1.0 - config.lrEmaAlpha) * avgGenFool;
         }
 
-        // Adaptive lr adjustment — gated on feature flag and warm-up.
-        if (config.adaptiveLr && epoch >= config.lrWarmupEpochs) {
+        // Flatness detection — fires only when no kick is already active.
+        if (config.flatnessDetection && epoch >= config.lrWarmupEpochs
+                && prevEmaReal >= 0.0 && kickEpochsRemaining == 0) {
+            const bool emaRealFlat = std::abs(emaReal - prevEmaReal) < config.flatnessThreshold;
+            const bool emaGenFlat  = std::abs(emaGen  - prevEmaGen)  < config.flatnessThreshold;
+            if (emaRealFlat && emaGenFlat) {
+                ++flatEpochCount;
+                if (flatEpochCount >= config.flatnessWindow) {
+                    // Fire kick: raise D dropout (via effectiveDropout next epoch)
+                    // and spike G lr. Adaptive lr is suspended for the duration.
+                    kickSavedGLr = currentGLr;
+                    currentGLr = std::clamp(
+                        currentGLr * config.flatnessGenLrBoost, config.lrMin, config.lrMax);
+                    kickEpochsRemaining = config.flatnessKickDuration;
+                    flatEpochCount = 0;
+                }
+            } else {
+                flatEpochCount = 0;
+            }
+        }
+
+        // Adaptive lr adjustment — suspended during a kick to avoid fighting it.
+        if (config.adaptiveLr && epoch >= config.lrWarmupEpochs && kickEpochsRemaining == 0) {
             if (emaReal < config.dRealTargetLow && emaGen < config.genFoolTargetLow) {
                 // D collapsed: scoring everything near 0. Boost D, slow G.
                 currentDLr = std::clamp(currentDLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
@@ -155,6 +187,13 @@ void GanTrainer::train(
             }
         }
 
+        // Decrement kick counter; restore G lr when it expires.
+        if (kickEpochsRemaining > 0) {
+            --kickEpochsRemaining;
+            if (kickEpochsRemaining == 0)
+                currentGLr = kickSavedGLr;
+        }
+
         if (log && steps > 0) {
             // Sample a generated image for each class and log what the classifier thinks.
             const std::size_t logLabel = epoch % config.numClasses;
@@ -168,11 +207,14 @@ void GanTrainer::train(
             *log << "Epoch " << epoch + 1 << "/" << config.epochs
                  << "  D(real)=" << avgDiscReal
                  << "  D(G(z))=" << avgGenFool;
-            if (config.adaptiveLr)
+            if (config.adaptiveLr || config.flatnessDetection)
                 *log << "  ema_D(real)=" << emaReal
                      << "  ema_D(G(z))=" << emaGen
                      << "  dLr=" << currentDLr
                      << "  gLr=" << currentGLr;
+            if (config.flatnessDetection)
+                *log << "  flat=" << flatEpochCount << "/" << config.flatnessWindow
+                     << (kickEpochsRemaining > 0 ? "  [KICK]" : "");
             *log << "  sample(label=" << logLabel << " -> classifier=" << predictedLabel << ")"
                  << std::endl;
         }

@@ -112,7 +112,14 @@ void printUsage(const char* argv0) {
         << "  --lr-adjust-factor <x>     Multiplicative lr step per epoch (default " << d.lrAdjustFactor << ").\n"
         << "  --lr-min <x>               Lower lr clamp (default " << d.lrMin << ").\n"
         << "  --lr-max <x>               Upper lr clamp (default " << d.lrMax << ").\n"
-        << "  --lr-warmup-epochs <n>     Epochs before adaptive adjustments begin (default " << d.lrWarmupEpochs << ").\n\n"
+        << "  --lr-warmup-epochs <n>     Epochs before adaptive adjustments begin (default " << d.lrWarmupEpochs << ").\n"
+        << "\nFlatness detection:\n"
+        << "  --flatness-detection           Enable plateau detection (off by default).\n"
+        << "  --flatness-threshold <x>       Max EMA change per epoch to count as flat (default " << d.flatnessThreshold << ").\n"
+        << "  --flatness-window <n>          Consecutive flat epochs before kick fires (default " << d.flatnessWindow << ").\n"
+        << "  --flatness-kick-duration <n>   Epochs to hold the kick (default " << d.flatnessKickDuration << ").\n"
+        << "  --flatness-dropout-boost <x>   Multiply D dropout by this during kick (default " << d.flatnessDropoutBoost << ").\n"
+        << "  --flatness-gen-lr-boost <x>    Multiply G lr by this during kick (default " << d.flatnessGenLrBoost << ").\n\n"
         << "Generation mode (no training, no dataset required):\n"
         << "  --generate                 Load the generator and produce sample images.\n"
         << "  --label <n>                Digit to generate (required with --generate).\n"
@@ -248,6 +255,12 @@ int main(int argc, char** argv) {
     ganConfig.lrMin                     = parseDoubleOpt(cmd, "--lr-min",              ganConfig.lrMin);
     ganConfig.lrMax                     = parseDoubleOpt(cmd, "--lr-max",              ganConfig.lrMax);
     ganConfig.lrWarmupEpochs            = parseSizeOpt  (cmd, "--lr-warmup-epochs",    ganConfig.lrWarmupEpochs);
+    ganConfig.flatnessDetection         = cmd.cmdOptionExists("--flatness-detection");
+    ganConfig.flatnessThreshold         = parseDoubleOpt(cmd, "--flatness-threshold",       ganConfig.flatnessThreshold);
+    ganConfig.flatnessWindow            = parseSizeOpt  (cmd, "--flatness-window",          ganConfig.flatnessWindow);
+    ganConfig.flatnessKickDuration      = parseSizeOpt  (cmd, "--flatness-kick-duration",   ganConfig.flatnessKickDuration);
+    ganConfig.flatnessDropoutBoost      = parseDoubleOpt(cmd, "--flatness-dropout-boost",   ganConfig.flatnessDropoutBoost);
+    ganConfig.flatnessGenLrBoost        = parseDoubleOpt(cmd, "--flatness-gen-lr-boost",    ganConfig.flatnessGenLrBoost);
 
     // Generator topology: latentDim -> hidden... -> 784, Sigmoid output
     const std::vector<std::size_t> kDefaultGenHidden  = {256, 512};

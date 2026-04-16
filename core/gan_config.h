@@ -34,6 +34,17 @@ struct GanConfig {
     double      lrMin              = 1e-6;
     double      lrMax              = 1e-2;
     std::size_t lrWarmupEpochs     = 5;     // Skip adjustments for first N epochs
+
+    // Flatness detection: when both EMA signals are barely moving for
+    // flatnessWindow consecutive epochs, apply a kick to escape the plateau.
+    // Kick = raise D dropout + spike G lr for flatnessKickDuration epochs,
+    // then restore. Adaptive lr is suspended during the kick. Off by default.
+    bool        flatnessDetection    = false;
+    double      flatnessThreshold    = 0.005; // Max |ema_delta| per epoch to count as flat
+    std::size_t flatnessWindow       = 10;    // Consecutive flat epochs before kick fires
+    std::size_t flatnessKickDuration = 5;     // Epochs to hold the kick
+    double      flatnessDropoutBoost = 2.0;   // Multiply D dropoutRate by this during kick
+    double      flatnessGenLrBoost   = 3.0;   // Multiply G lr by this during kick
 };
 
 }

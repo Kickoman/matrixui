@@ -76,6 +76,39 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     lrWarmupEpochs->setMaximum(1000);
     lrWarmupEpochs->setToolTip("Epochs before adaptive adjustments begin");
 
+    flatnessCheck = new QCheckBox("Enable", this);
+
+    flatnessThreshold = new QDoubleSpinBox(this);
+    flatnessThreshold->setDecimals(4);
+    flatnessThreshold->setMinimum(0.0001);
+    flatnessThreshold->setMaximum(0.1);
+    flatnessThreshold->setSingleStep(0.001);
+    flatnessThreshold->setToolTip("Max EMA change per epoch to count as flat");
+
+    flatnessWindow = new QSpinBox(this);
+    flatnessWindow->setMinimum(1);
+    flatnessWindow->setMaximum(1000);
+    flatnessWindow->setToolTip("Consecutive flat epochs before boosting both LRs");
+
+    flatnessKickDuration = new QSpinBox(this);
+    flatnessKickDuration->setMinimum(1);
+    flatnessKickDuration->setMaximum(100);
+    flatnessKickDuration->setToolTip("Epochs to hold the kick before reverting");
+
+    flatnessDropoutBoost = new QDoubleSpinBox(this);
+    flatnessDropoutBoost->setDecimals(2);
+    flatnessDropoutBoost->setMinimum(1.0);
+    flatnessDropoutBoost->setMaximum(10.0);
+    flatnessDropoutBoost->setSingleStep(0.5);
+    flatnessDropoutBoost->setToolTip("Multiply D dropout rate by this during kick (weakens D)");
+
+    flatnessGenLrBoost = new QDoubleSpinBox(this);
+    flatnessGenLrBoost->setDecimals(2);
+    flatnessGenLrBoost->setMinimum(1.0);
+    flatnessGenLrBoost->setMaximum(20.0);
+    flatnessGenLrBoost->setSingleStep(0.5);
+    flatnessGenLrBoost->setToolTip("Multiply G lr by this during kick (spikes G to exploit weakened D)");
+
     auto* mainLayout = new QHBoxLayout(this);
     auto* leftForm = new QFormLayout();
     leftForm->addRow("Epochs", epochs);
@@ -96,9 +129,18 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     adaptiveForm->addRow("Adjust factor", lrAdjustFactor);
     adaptiveForm->addRow("Warmup epochs", lrWarmupEpochs);
 
+    auto* flatnessForm = new QFormLayout();
+    flatnessForm->addRow("Flatness detect", flatnessCheck);
+    flatnessForm->addRow("Threshold", flatnessThreshold);
+    flatnessForm->addRow("Window", flatnessWindow);
+    flatnessForm->addRow("Kick duration", flatnessKickDuration);
+    flatnessForm->addRow("D dropout boost", flatnessDropoutBoost);
+    flatnessForm->addRow("G lr boost", flatnessGenLrBoost);
+
     mainLayout->addLayout(leftForm);
     mainLayout->addLayout(rightForm);
     mainLayout->addLayout(adaptiveForm);
+    mainLayout->addLayout(flatnessForm);
 
     setLayout(mainLayout);
 
@@ -119,6 +161,12 @@ void GanConfigWidget::setConfig(const Neural::GanConfig& config) {
     lrEmaAlpha->setValue(config.lrEmaAlpha);
     lrAdjustFactor->setValue(config.lrAdjustFactor);
     lrWarmupEpochs->setValue(static_cast<int>(config.lrWarmupEpochs));
+    flatnessCheck->setChecked(config.flatnessDetection);
+    flatnessThreshold->setValue(config.flatnessThreshold);
+    flatnessWindow->setValue(static_cast<int>(config.flatnessWindow));
+    flatnessKickDuration->setValue(static_cast<int>(config.flatnessKickDuration));
+    flatnessDropoutBoost->setValue(config.flatnessDropoutBoost);
+    flatnessGenLrBoost->setValue(config.flatnessGenLrBoost);
 }
 
 Neural::GanConfig GanConfigWidget::getConfig() const {
@@ -137,5 +185,11 @@ Neural::GanConfig GanConfigWidget::getConfig() const {
         .lrEmaAlpha = lrEmaAlpha->value(),
         .lrAdjustFactor = lrAdjustFactor->value(),
         .lrWarmupEpochs = static_cast<std::size_t>(lrWarmupEpochs->value()),
+        .flatnessDetection = flatnessCheck->isChecked(),
+        .flatnessThreshold = flatnessThreshold->value(),
+        .flatnessWindow = static_cast<std::size_t>(flatnessWindow->value()),
+        .flatnessKickDuration = static_cast<std::size_t>(flatnessKickDuration->value()),
+        .flatnessDropoutBoost = flatnessDropoutBoost->value(),
+        .flatnessGenLrBoost = flatnessGenLrBoost->value(),
     };
 }

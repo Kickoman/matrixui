@@ -32,4 +32,12 @@ private:
     QDoubleSpinBox* lrEmaAlpha        = nullptr;
     QDoubleSpinBox* lrAdjustFactor    = nullptr;
     QSpinBox*       lrWarmupEpochs    = nullptr;
+
+    // Flatness detection controls
+    QCheckBox*      flatnessCheck        = nullptr;
+    QDoubleSpinBox* flatnessThreshold    = nullptr;
+    QSpinBox*       flatnessWindow       = nullptr;
+    QSpinBox*       flatnessKickDuration = nullptr;
+    QDoubleSpinBox* flatnessDropoutBoost = nullptr;
+    QDoubleSpinBox* flatnessGenLrBoost   = nullptr;
 };
