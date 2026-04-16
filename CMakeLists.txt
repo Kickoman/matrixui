@@ -113,13 +113,6 @@ if(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Charts
     )
 
-    # target_include_directories(${PROJECT_NAME} PRIVATE
-    #     core/
-    #     gui/
-    #     gui_common/
-    #     matrix/
-    #     png/
-    # )
 endif()
 
 if(BUILD_CLI)
@@ -129,21 +122,9 @@ if(BUILD_CLI)
         core/main_headless.cpp
     )
 
-    # target_include_directories(${PROJECT_NAME}_headless PRIVATE
-    #     core/
-    #     matrix/
-    #     png/
-    # )
-
     add_executable(
         ${PROJECT_NAME}_gan
         ${CORE_SOURCES}
         core/main_headless_gan.cpp
     )
-
-    # target_include_directories(${PROJECT_NAME}_gan PRIVATE
-    #     core/
-    #     matrix/
-    #     png/
-    # )
 endif()
