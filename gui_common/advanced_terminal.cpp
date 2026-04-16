@@ -1,4 +1,4 @@
-#include "advanced_terminal.h"
+#include "gui_common/advanced_terminal.h"
 
 #include <QScrollBar>
 

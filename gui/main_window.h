@@ -2,7 +2,7 @@
 
 #include <QMainWindow>
 
-#include "mode_factory.h"
+#include "gui/lib/mode_factory.h"
 
 
 class QTabWidget;

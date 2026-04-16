@@ -1,7 +1,8 @@
-#include "main_controller.h"
-#include "mode_container_widget.h"
-#include "mode_widget.h"
-#include "mode_controller.h"
+#include "gui/main_controller.h"
+
+#include "gui/lib/mode_container_widget.h"
+#include "gui/lib/mode_widget.h"
+#include "gui/lib/mode_controller.h"
 
 #include <QPointer>
 

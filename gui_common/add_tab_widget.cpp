@@ -1,5 +1,5 @@
-#include "add_tab_widget.h"
-#include "add_tab_bar.h"
+#include "gui_common/add_tab_widget.h"
+#include "gui_common/add_tab_bar.h"
 
 #include <QTabBar>
 #include <QToolButton>

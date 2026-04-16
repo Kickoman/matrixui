@@ -40,22 +40,26 @@ if(USE_EIGEN)
 endif(USE_EIGEN)
 
 set(GUI_SOURCES
-    gui/mode_factory.cpp
-    gui/mode_settings.cpp
-    gui/mode_widget.cpp
-    gui/mode_controller.cpp
-    gui/network_create_dialog.cpp
-    gui/learning_config_widget.cpp
-    gui/new_mode_widget.cpp
-    gui/mode_container_widget.cpp
-    gui/digits_classifier_controller.cpp
-    gui/digits_classifier_mode_widget.cpp
-    gui/digits_recognizer_mode_controller.cpp
-    gui/digits_recognizer_mode_widget.cpp
-    gui/digits_generator_controller.cpp
-    gui/digits_generator_mode_widget.cpp
-    gui/gan_config_widget.cpp
-    gui/digit_input_preprocess.cpp
+    gui/lib/mode_factory.cpp
+    gui/lib/mode_settings.cpp
+    gui/lib/mode_widget.cpp
+    gui/lib/mode_controller.cpp
+    gui/lib/network_create_dialog.cpp
+    gui/lib/new_mode_widget.cpp
+    gui/lib/mode_container_widget.cpp
+
+    gui/classifier/digits_classifier_controller.cpp
+    gui/classifier/digits_classifier_mode_widget.cpp
+    gui/classifier/learning_config_widget.cpp
+
+    gui/recognizer/digits_recognizer_mode_controller.cpp
+    gui/recognizer/digits_recognizer_mode_widget.cpp
+    gui/recognizer/digit_input_preprocess.cpp
+
+    gui/generator/digits_generator_controller.cpp
+    gui/generator/digits_generator_mode_widget.cpp
+    gui/generator/gan_config_widget.cpp
+
     gui/main_controller.cpp
     gui/main_window.cpp
 )
@@ -70,21 +74,25 @@ set(
     gui_common/paint_scene.cpp
 )
 
-set(SOURCES
-    matrix/matrix.cpp
-    core/layers.cpp
-    core/neural_network_loader.cpp
-    core/neural_network_applier.cpp
-    png/pngreader.cpp
-    core/dataset.cpp
-    core/directory_dataset.cpp
-    core/trainer.cpp
-)
+set(
+    CORE_SOURCES
+    core/lib/layers.cpp
+    core/lib/neural_network_loader.cpp
+    core/lib/neural_network_applier.cpp
+    core/lib/dataset.cpp
+    core/lib/directory_dataset.cpp
 
-set(GAN_SOURCES
-    core/generator.cpp
-    core/discriminator.cpp
-    core/gan_trainer.cpp
+    # Classifier
+    core/classifier/trainer.cpp
+
+    # Generator
+    core/generator/generator.cpp
+    core/generator/discriminator.cpp
+    core/generator/gan_trainer.cpp
+
+    # Other
+    matrix/matrix.cpp
+    png/pngreader.cpp
 )
 
 include_directories(eigen)
@@ -92,11 +100,9 @@ include_directories(eigen)
 if(BUILD_GUI)
     add_executable(
         ${PROJECT_NAME}
+        ${CORE_SOURCES}
         ${GUI_SOURCES}
         ${GUI_COMMON_SOURCES}
-        ${MATRIX_SOURCES}
-        ${SOURCES}
-        ${GAN_SOURCES}
         gui/main.cpp
     )
 
@@ -107,42 +113,37 @@ if(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Charts
     )
 
-    target_include_directories(${PROJECT_NAME} PRIVATE
-        core/
-        gui/
-        gui_common/
-        matrix/
-        png/
-    )
+    # target_include_directories(${PROJECT_NAME} PRIVATE
+    #     core/
+    #     gui/
+    #     gui_common/
+    #     matrix/
+    #     png/
+    # )
 endif()
 
 if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
-        ${MATRIX_SOURCES}
-        ${SOURCES}
+        ${CORE_SOURCES}
         core/main_headless.cpp
     )
 
-    target_include_directories(${PROJECT_NAME}_headless PRIVATE
-        core/
-        matrix/
-        png/
-    )
-endif()
+    # target_include_directories(${PROJECT_NAME}_headless PRIVATE
+    #     core/
+    #     matrix/
+    #     png/
+    # )
 
-option(BUILD_GAN "Build GAN CLI version" ON)
-if(BUILD_GAN)
     add_executable(
         ${PROJECT_NAME}_gan
-        ${SOURCES}
-        ${GAN_SOURCES}
+        ${CORE_SOURCES}
         core/main_headless_gan.cpp
     )
 
-    target_include_directories(${PROJECT_NAME}_gan PRIVATE
-        core/
-        matrix/
-        png/
-    )
+    # target_include_directories(${PROJECT_NAME}_gan PRIVATE
+    #     core/
+    #     matrix/
+    #     png/
+    # )
 endif()

@@ -1,8 +1,8 @@
 #ifndef PNGREADER_H
 #define PNGREADER_H
 
-#include "matrix.h"
-#include "cache.h"
+#include "matrix/matrix.h"
+#include "core/lib/cache.h"
 
 namespace PngUtils {
 

@@ -1,8 +1,9 @@
-#include "main_window.h"
+#include "gui/main_window.h"
+#include "gui/main_controller.h"
 
-#include "main_controller.h"
-#include "mode_container_widget.h"
-#include "add_tab_widget.h"
+#include "gui_common/add_tab_widget.h"
+
+#include "gui/lib/mode_container_widget.h"
 
 #include <QVBoxLayout>
 #include <QSplitter>

@@ -1,4 +1,4 @@
-#include "digit_chart.h"
+#include "gui_common/digit_chart.h"
 
 #include <QChart>
 #include <QChartView>

@@ -10,14 +10,16 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "trainer.h"
-#include "neural_network_loader.h"
-#include "neural_network_applier.h"
-#include "directory_dataset.h"
-#include "pngreader.h"
-#include "learning_config.h"
-#include "neural_network.h"
-#include "matrix.h"
+#include "core/classifier/trainer.h"
+
+#include "core/lib/neural_network_loader.h"
+#include "core/lib/neural_network_applier.h"
+#include "core/lib/directory_dataset.h"
+#include "core/lib/learning_config.h"
+#include "core/lib/neural_network.h"
+
+#include "png/pngreader.h"
+#include "matrix/matrix.h"
 
 
 class InputParser {

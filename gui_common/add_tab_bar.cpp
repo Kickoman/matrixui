@@ -1,4 +1,4 @@
-#include "add_tab_bar.h"
+#include "gui_common/add_tab_bar.h"
 
 AddTabBar::AddTabBar(QWidget* parent) : QTabBar(parent)
 { }

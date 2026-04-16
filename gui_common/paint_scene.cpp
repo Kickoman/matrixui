@@ -1,4 +1,4 @@
-#include "paint_scene.h"
+#include "gui_common/paint_scene.h"
 
 #include <QGraphicsSceneMouseEvent>
 

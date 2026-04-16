@@ -5,16 +5,18 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "neural_network_loader.h"
-#include "neural_network_applier.h"
-#include "directory_dataset.h"
-#include "dataset.h"
-#include "gan_config.h"
-#include "gan_trainer.h"
-#include "generator.h"
-#include "discriminator.h"
-#include "pngreader.h"
-#include "matrix.h"
+#include "core/lib/neural_network_loader.h"
+#include "core/lib/neural_network_applier.h"
+#include "core/lib/directory_dataset.h"
+#include "core/lib/dataset.h"
+
+#include "core/generator/gan_config.h"
+#include "core/generator/gan_trainer.h"
+#include "core/generator/generator.h"
+#include "core/generator/discriminator.h"
+
+#include "png/pngreader.h"
+#include "matrix/matrix.h"
 
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#include "matrix.h"
+#include "matrix/matrix.h"
 
 Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHeight, const unsigned targetWidth) {
     int width, height, channels;

@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-#include "mode_factory.h"
+#include "gui/lib/mode_factory.h"
 
 class QWidget;
 class ModeContainerWidget;
