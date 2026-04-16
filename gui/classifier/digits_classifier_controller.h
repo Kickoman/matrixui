@@ -10,7 +10,7 @@
 #include <QThread>
 #include <QPointer>
 
-Q_DECLARE_METATYPE(Neural::TestResult);
+Q_DECLARE_METATYPE(Neural::Classifier::TestResult);
 Q_DECLARE_METATYPE(Neural::LearningConfig);
 Q_DECLARE_METATYPE(Neural::NeuralNetworkConfiguration);
 
@@ -50,10 +50,10 @@ public slots:
 
 signals:
     void infoUpdated();
-    void updatedStatistics(const Neural::TestResult& result) const;
+    void updatedStatistics(const Neural::Classifier::TestResult& result) const;
 
 private:
-    void updateStatistic(const Neural::TestResult& result) const;
+    void updateStatistic(const Neural::Classifier::TestResult& result) const;
 
     QPointer<QThread> internalRunner;
 
@@ -62,5 +62,5 @@ private:
     QString pathToTrainingDataset;
     QString pathToTestingDataset;
     Neural::LearningConfig learningConfig;
-    Neural::Trainer recognizer;
+    Neural::Classifier::Trainer recognizer;
 };

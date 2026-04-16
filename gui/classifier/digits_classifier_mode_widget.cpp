@@ -107,7 +107,7 @@ void DigitsClassifierModeWidget::closeEvent(QCloseEvent* event) {
     QWidget::closeEvent(event);
 }
 
-void DigitsClassifierModeWidget::handleStatistics(const Neural::TestResult& result) {
+void DigitsClassifierModeWidget::handleStatistics(const Neural::Classifier::TestResult& result) {
     const auto& total = result.getTotal();
     const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
     chart->addPoint(rate);

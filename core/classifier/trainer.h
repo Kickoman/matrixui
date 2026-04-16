@@ -11,6 +11,8 @@
 
 namespace Neural {
 
+namespace Classifier {
+
 struct TestStatistics {
     std::size_t passedTests = 0;
     std::size_t totalTests = 0;
@@ -78,4 +80,6 @@ private:
 };
 
 
-}
+} // Classifier
+
+} // Neural

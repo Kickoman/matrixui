@@ -141,11 +141,11 @@ QImage DigitsGeneratorController::generateSample(std::size_t label) const {
     const std::size_t inputSize = generatorNet->config.layersSizes.front();
     const std::size_t numClasses = 10;
     const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::Generator gen(*generatorNet, latentDim, numClasses);
+    Neural::GAN::Generator gen(*generatorNet, latentDim, numClasses);
     return matrixToQImage(gen.generate(label));
 }
 
-void DigitsGeneratorController::run(const Neural::GanConfig& config) {
+void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
     if (!canRunTraining()) return;
     if (trainingRunning.load(std::memory_order_relaxed)) return;
 
@@ -159,11 +159,11 @@ void DigitsGeneratorController::run(const Neural::GanConfig& config) {
         const Neural::NeuralNetwork genNet  = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, config.numClasses));
         const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork());
 
-        Neural::Generator     gen (genNet,  config.latentDim, config.numClasses);
-        Neural::Discriminator disc(discNet);
+        Neural::GAN::Generator     gen (genNet,  config.latentDim, config.numClasses);
+        Neural::GAN::Discriminator disc(discNet);
         Neural::NeuralNetworkApplier cls(*classifierNet);
 
-        Neural::GanTrainer trainer(std::move(gen), std::move(disc), std::move(cls));
+        Neural::GAN::GanTrainer trainer(std::move(gen), std::move(disc), std::move(cls));
         activeTrainer.store(&trainer, std::memory_order_release);
 
         trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {

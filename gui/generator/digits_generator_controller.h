@@ -14,9 +14,9 @@
 #include <vector>
 #include <atomic>
 
-namespace Neural { class GanTrainer; }
+namespace Neural { namespace GAN { class GanTrainer; } }
 
-Q_DECLARE_METATYPE(Neural::GanConfig)
+Q_DECLARE_METATYPE(Neural::GAN::GanConfig)
 
 class DigitsGeneratorController : public ModeController
 {
@@ -45,7 +45,7 @@ public:
     void setLogger(std::ostream* stream);
 
 public slots:
-    void run(const Neural::GanConfig& config);
+    void run(const Neural::GAN::GanConfig& config);
     void requestStop() override;
     bool loadClassifier(const QString& path);
     bool loadDataset(const QString& path);
@@ -60,7 +60,7 @@ private:
     bool canRunTraining() const;
 
     QPointer<QThread> internalRunner;
-    std::atomic<Neural::GanTrainer*> activeTrainer{nullptr};
+    std::atomic<Neural::GAN::GanTrainer*> activeTrainer{nullptr};
     std::atomic<bool> trainingRunning{false};
 
     ModeSettings settings;

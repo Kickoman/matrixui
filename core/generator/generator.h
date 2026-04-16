@@ -4,6 +4,7 @@
 #include <random>
 
 namespace Neural {
+namespace GAN {
 
 class Generator {
 public:
@@ -41,4 +42,5 @@ private:
     mutable std::mt19937 rng{std::random_device{}()};
 };
 
-}
+} // namespace GAN
+} // namespace Neural

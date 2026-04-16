@@ -360,7 +360,7 @@ int main(int argc, char** argv) {
               << "\tTest file limit per label: " << testFileLimit << "\n"
               << std::endl;
 
-    Neural::Trainer recognizer;
+    Neural::Classifier::Trainer recognizer;
     PngUtils::Cache pngCache;
     const auto reader = [&pngCache](const std::filesystem::path& path) {
         return PngUtils::fromImage(path.string(), 28, 28, pngCache).transform(1, 28 * 28);

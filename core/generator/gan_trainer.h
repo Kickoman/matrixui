@@ -14,6 +14,8 @@
 
 namespace Neural {
 
+namespace GAN {
+
 class GanTrainer {
 public:
     // classifier is copied — its weights are never updated (applyGradients is
@@ -67,4 +69,5 @@ private:
     std::atomic<bool> stopFlag{false};
 };
 
-}
+} // GAN
+} // Neural

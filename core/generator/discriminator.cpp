@@ -1,6 +1,7 @@
 #include "core/generator/discriminator.h"
 
 namespace Neural {
+namespace GAN {
 
 Discriminator::Discriminator(NeuralNetwork network)
     : applier(std::move(network)) {}
@@ -33,4 +34,5 @@ const NeuralNetwork& Discriminator::getNetwork() const {
     return applier.getNeuralNetworkConfig();
 }
 
-}
+} // namespace GAN
+} // namespace Neural

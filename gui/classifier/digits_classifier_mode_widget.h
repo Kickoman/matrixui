@@ -11,7 +11,7 @@ class QThread;
 class QPushButton;
 class QLabel;
 class LearningConfigWidget;
-namespace Neural { class TestResult; }
+namespace Neural { namespace Classifier { class TestResult; } }
 
 class DigitsClassifierModeWidget : public ModeWidget
 {
@@ -26,7 +26,7 @@ public:
     void closeEvent(QCloseEvent* event) override;
 
 public slots:
-    void handleStatistics(const Neural::TestResult& result);
+    void handleStatistics(const Neural::Classifier::TestResult& result);
 
 private slots:
     void updateInfo();

@@ -178,6 +178,6 @@ void DigitsClassifierController::setLogger(std::ostream* stream) {
     recognizer.setOutputStream(stream);
 }
 
-void DigitsClassifierController::updateStatistic(const Neural::TestResult& result) const {
+void DigitsClassifierController::updateStatistic(const Neural::Classifier::TestResult& result) const {
     emit updatedStatistics(result);
 }

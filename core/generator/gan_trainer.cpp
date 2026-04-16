@@ -8,6 +8,8 @@
 
 namespace Neural {
 
+namespace GAN {
+
 GanTrainer::GanTrainer(
     Generator generator,
     Discriminator discriminator,
@@ -236,4 +238,5 @@ void GanTrainer::requestStop() {
 const Generator& GanTrainer::getGenerator() const { return generator; }
 const Discriminator& GanTrainer::getDiscriminator() const { return discriminator; }
 
-}
+} // namespace GAN
+} // namespace Neural

@@ -3,6 +3,7 @@
 #include "core/lib/neural_network_applier.h"
 
 namespace Neural {
+namespace GAN {
 
 // Discriminator: maps an image (784-dim) to a single real/fake score in [0, 1].
 // The network must be configured with a Sigmoid output activation.
@@ -30,4 +31,5 @@ private:
     NeuralNetworkApplier applier;
 };
 
-}
+} // namespace GAN
+} // namespace Neural

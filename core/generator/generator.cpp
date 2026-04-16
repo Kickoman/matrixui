@@ -1,6 +1,7 @@
 #include "core/generator/generator.h"
 
 namespace Neural {
+namespace GAN {
 
 Generator::Generator(NeuralNetwork network, const std::size_t latentDim, const std::size_t numClasses)
     : applier(std::move(network)), latentDim(latentDim), numClasses(numClasses) {}
@@ -55,4 +56,5 @@ const NeuralNetwork& Generator::getNetwork() const {
     return applier.getNeuralNetworkConfig();
 }
 
-}
+} // namespace GAN
+} // namespace Neural

@@ -83,7 +83,7 @@ Neural::NeuralNetwork loadOrCreate(
 }
 
 void printUsage(const char* argv0) {
-    const Neural::GanConfig d{};
+    const Neural::GAN::GanConfig d{};
     std::cerr
         << "Usage:\n  " << argv0 << " --classifier <path.wgt> --dataset <dir> [options]\n\n"
         << "Required:\n"
@@ -163,7 +163,7 @@ int runGenerate(const InputParser& cmd) {
     // Input size = latentDim + numClasses; infer latentDim from the saved network.
     const std::size_t inputSize = generatorNet->config.layersSizes.front();
     const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::Generator generator(std::move(*generatorNet), latentDim, numClasses);
+    Neural::GAN::Generator generator(std::move(*generatorNet), latentDim, numClasses);
 
     // Optional classifier for printing the predicted label alongside the output.
     std::optional<Neural::NeuralNetworkApplier> classifier;
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
     const std::string discriminatorPath= cmd.getCmdOption("--discriminator","discriminator.wgt");
 
     // GAN config
-    Neural::GanConfig ganConfig{};
+    Neural::GAN::GanConfig ganConfig{};
     ganConfig.latentDim                 = parseSizeOpt  (cmd, "--latent-dim",  ganConfig.latentDim);
     ganConfig.generatorLr               = parseDoubleOpt(cmd, "--gen-lr",      ganConfig.generatorLr);
     ganConfig.discriminatorLr           = parseDoubleOpt(cmd, "--disc-lr",     ganConfig.discriminatorLr);
@@ -303,14 +303,14 @@ int main(int argc, char** argv) {
     genConfig.layersSizes      = buildGenLayers();
     genConfig.hiddenActivation = Neural::ActivationType::ReLU;
     genConfig.outputActivation = Neural::ActivationType::Sigmoid;
-    Neural::Generator generator(loadOrCreate(generatorPath, genConfig), ganConfig.latentDim, ganConfig.numClasses);
+    Neural::GAN::Generator generator(loadOrCreate(generatorPath, genConfig), ganConfig.latentDim, ganConfig.numClasses);
 
     // Load or create discriminator
     Neural::NeuralNetworkConfiguration discConfig;
     discConfig.layersSizes      = buildDiscLayers();
     discConfig.hiddenActivation = Neural::ActivationType::LeakyReLU;
     discConfig.outputActivation = Neural::ActivationType::Sigmoid;
-    Neural::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
+    Neural::GAN::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
 
     // Load real training samples
     PngUtils::Cache pngCache;
@@ -340,7 +340,7 @@ int main(int argc, char** argv) {
               << "\n\n";
 
     // Train
-    Neural::GanTrainer trainer(std::move(generator), std::move(discriminator), std::move(classifier));
+    Neural::GAN::GanTrainer trainer(std::move(generator), std::move(discriminator), std::move(classifier));
     trainer.train(realImages, ganConfig, &std::cout);
 
     // Save

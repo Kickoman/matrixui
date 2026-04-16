@@ -3,6 +3,7 @@
 #include <cstddef>
 
 namespace Neural {
+namespace GAN {
 
 struct GanConfig {
     std::size_t latentDim = 100;
@@ -47,4 +48,5 @@ struct GanConfig {
     double      flatnessGenLrBoost   = 3.0;   // Multiply G lr by this during kick
 };
 
-}
+} // namespace GAN
+} // namespace Neural

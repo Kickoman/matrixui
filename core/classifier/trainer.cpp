@@ -35,6 +35,7 @@ Matrix GenerateExpected(const std::size_t outputIndex, const std::size_t totalIn
 
 
 namespace Neural {
+namespace Classifier {
 
 void Trainer::setNetwork(const NeuralNetwork& network) {
     this->network.initializeNetwork(network);
@@ -215,4 +216,5 @@ void Trainer::setOutputStream(std::ostream* stream) {
     this->stream = stream;
 }
 
-}
+} // Classifier
+} // Trainer

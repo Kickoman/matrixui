@@ -13,8 +13,8 @@ class GanConfigWidget : public QWidget
 public:
     explicit GanConfigWidget(QWidget* parent = nullptr);
 
-    void setConfig(const Neural::GanConfig& config);
-    Neural::GanConfig getConfig() const;
+    void setConfig(const Neural::GAN::GanConfig& config);
+    Neural::GAN::GanConfig getConfig() const;
 
 private:
     QSpinBox* epochs = nullptr;
