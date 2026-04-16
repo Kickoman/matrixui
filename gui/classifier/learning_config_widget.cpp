@@ -1,5 +1,5 @@
 #include "gui/classifier/learning_config_widget.h"
-#include "core/lib/learning_config.h"
+#include "core/classifier/learning_config.h"
 
 #include <QFormLayout>
 #include <QDoubleSpinBox>
@@ -69,7 +69,7 @@ LearningConfigWidget::LearningConfigWidget(QWidget* parent)
     setLayout(mainLayout);
 }
 
-void LearningConfigWidget::setConfig(const Neural::LearningConfig& config) {
+void LearningConfigWidget::setConfig(const Neural::Classifier::LearningConfig& config) {
     initialLearningRate->setValue(config.initialLearningRate);
     minLearningRate->setValue(config.minLearningRate);
     learningRateDecay->setValue(config.learningRateDecay);
@@ -80,7 +80,7 @@ void LearningConfigWidget::setConfig(const Neural::LearningConfig& config) {
     datasetLimit->setValue(config.datasetLimitPerLabel);
 }
 
-Neural::LearningConfig LearningConfigWidget::getConfig() const {
+Neural::Classifier::LearningConfig LearningConfigWidget::getConfig() const {
     return {
         .initialLearningRate = initialLearningRate->value(),
         .minLearningRate = minLearningRate->value(),

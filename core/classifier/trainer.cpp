@@ -1,7 +1,7 @@
 #include "core/classifier/trainer.h"
+#include "core/classifier/learning_config.h"
 
 #include "core/lib/dataset.h"
-#include "core/lib/learning_config.h"
 #include "core/lib/neural_network.h"
 
 #include <iostream>

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/lib/learning_config.h"
 #include "core/lib/neural_network.h"
+
+#include "core/classifier/learning_config.h"
 #include "core/classifier/trainer.h"
 
 #include "gui/lib/mode_settings.h"
@@ -11,7 +12,7 @@
 #include <QPointer>
 
 Q_DECLARE_METATYPE(Neural::Classifier::TestResult);
-Q_DECLARE_METATYPE(Neural::LearningConfig);
+Q_DECLARE_METATYPE(Neural::Classifier::LearningConfig);
 Q_DECLARE_METATYPE(Neural::NeuralNetworkConfiguration);
 
 
@@ -26,7 +27,7 @@ public:
         std::string pathToTestingDataset;
         std::string networkName;
         std::vector<std::size_t> layersConfiguration;
-        Neural::LearningConfig learningConfig;
+        Neural::Classifier::LearningConfig learningConfig;
     };
 
     explicit DigitsClassifierController(QObject* parent = nullptr);
@@ -40,7 +41,7 @@ public:
     void setLogger(std::ostream* stream);
 
 public slots:
-    void run(const Neural::LearningConfig& config);
+    void run(const Neural::Classifier::LearningConfig& config);
     void requestStop() override;
     void testOnce();
     void loadNetwork(const QString& networkName, Neural::NeuralNetworkConfiguration config = {});
@@ -61,6 +62,6 @@ private:
     QString networkName;
     QString pathToTrainingDataset;
     QString pathToTestingDataset;
-    Neural::LearningConfig learningConfig;
+    Neural::Classifier::LearningConfig learningConfig;
     Neural::Classifier::Trainer recognizer;
 };

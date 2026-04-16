@@ -64,7 +64,7 @@ Run `--help` for the full flag list as implemented in `core/main_headless.cpp`.
 - `--hidden-activation <name>` — `sigmoid`, `relu`, `tanh`, or `softmax`. Default: `relu`.
 - `--output-activation <name>` — Same set. Default: `softmax`.
 
-**Learning (defaults match `Neural::LearningConfig` in `core/learning_config.h`)**
+**Learning (defaults match `Neural::Classifier::LearningConfig` in `core/learning_config.h`)**
 
 - `--initial-lr`, `--min-lr`, `--lr-decay`
 - `--max-epochs`, `--patience`, `--inner-epochs`

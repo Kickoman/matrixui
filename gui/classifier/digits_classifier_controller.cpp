@@ -1,11 +1,11 @@
 #include "gui/classifier/digits_classifier_controller.h"
 
+#include "core/classifier//learning_config.h"
+#include "core/classifier/trainer.h"
+
 #include "core/lib/directory_dataset.h"
-#include "core/lib/learning_config.h"
 #include "core/lib/neural_network.h"
 #include "core/lib/neural_network_loader.h"
-
-#include "core/classifier/trainer.h"
 
 #include "gui/lib/mode_controller.h"
 #include "png/pngreader.h"
@@ -72,7 +72,7 @@ void DigitsClassifierController::saveSettings() {
     settings.setValue("last_testing_dataset_path", pathToTestingDataset);
 }
 
-void DigitsClassifierController::run(const Neural::LearningConfig& config) {
+void DigitsClassifierController::run(const Neural::Classifier::LearningConfig& config) {
     if (recognizer.isRunning()) {
         throw std::runtime_error("Can't start learning while learning in progress");
     }

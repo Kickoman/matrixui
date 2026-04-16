@@ -5,7 +5,8 @@
 #include <ostream>
 #include <memory>
 
-#include "core/lib/learning_config.h"
+#include "core/classifier/learning_config.h"
+
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/dataset.h"
 

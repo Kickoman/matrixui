@@ -2,7 +2,7 @@
 
 
 #include <QWidget>
-#include "core/lib/learning_config.h"
+#include "core/classifier/learning_config.h"
 
 class QDoubleSpinBox;
 class QSpinBox;
@@ -14,8 +14,8 @@ class LearningConfigWidget : public QWidget
 public:
     explicit LearningConfigWidget(QWidget* parent = nullptr);
 
-    void setConfig(const Neural::LearningConfig& config);
-    Neural::LearningConfig getConfig() const;
+    void setConfig(const Neural::Classifier::LearningConfig& config);
+    Neural::Classifier::LearningConfig getConfig() const;
 
 private:
     QDoubleSpinBox* initialLearningRate = nullptr;
