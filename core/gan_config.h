@@ -20,6 +20,19 @@ struct GanConfig {
     double classifierLossWeight = 1.0;
     // Maximum number of images to load per label (0 = no limit).
     std::size_t datasetLimitPerLabel = 0;
+
+    // Adaptive learning rate: dynamically adjusts dLr and gLr each epoch based
+    // on EMA-smoothed D(real) and D(G(z)) to counteract discriminator or
+    // generator domination. Off by default — existing behaviour unchanged.
+    bool        adaptiveLr         = false;
+    double      lrEmaAlpha         = 0.9;   // EMA decay: higher = slower reaction
+    double      dRealTargetHigh    = 0.80;  // D(real) above this → D dominating
+    double      genFoolTargetLow   = 0.30;  // D(G(z)) below this (combined) → D dominating
+    double      genFoolTargetHigh  = 0.60;  // D(G(z)) above this → G dominating
+    double      lrAdjustFactor     = 1.05;  // Multiplicative step per epoch (~5%)
+    double      lrMin              = 1e-6;
+    double      lrMax              = 1e-2;
+    std::size_t lrWarmupEpochs     = 5;     // Skip adjustments for first N epochs
 };
 
 }

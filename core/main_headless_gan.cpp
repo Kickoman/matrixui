@@ -105,7 +105,14 @@ void printUsage(const char* argv0) {
         << "  --classifier-weight <x>    Weight of classifier loss in generator update (default "
                                          << d.classifierLossWeight << ").\n"
         << "  --num-classes <n>          Number of digit classes (default " << d.numClasses << ").\n"
-        << "  --dataset-limit <n>        Max images per label to load (0 = all; default 0).\n\n"
+        << "  --dataset-limit <n>        Max images per label to load (0 = all; default 0).\n"
+        << "\nAdaptive learning rate:\n"
+        << "  --adaptive-lr              Enable adaptive lr adjustment (off by default).\n"
+        << "  --lr-ema-alpha <x>         EMA smoothing factor; higher = slower reaction (default " << d.lrEmaAlpha << ").\n"
+        << "  --lr-adjust-factor <x>     Multiplicative lr step per epoch (default " << d.lrAdjustFactor << ").\n"
+        << "  --lr-min <x>               Lower lr clamp (default " << d.lrMin << ").\n"
+        << "  --lr-max <x>               Upper lr clamp (default " << d.lrMax << ").\n"
+        << "  --lr-warmup-epochs <n>     Epochs before adaptive adjustments begin (default " << d.lrWarmupEpochs << ").\n\n"
         << "Generation mode (no training, no dataset required):\n"
         << "  --generate                 Load the generator and produce sample images.\n"
         << "  --label <n>                Digit to generate (required with --generate).\n"
@@ -235,6 +242,12 @@ int main(int argc, char** argv) {
     ganConfig.classifierLossWeight      = parseDoubleOpt(cmd, "--classifier-weight",   ganConfig.classifierLossWeight);
     ganConfig.numClasses                = parseSizeOpt  (cmd, "--num-classes",         ganConfig.numClasses);
     ganConfig.datasetLimitPerLabel      = parseSizeOpt  (cmd, "--dataset-limit",       ganConfig.datasetLimitPerLabel);
+    ganConfig.adaptiveLr                = cmd.cmdOptionExists("--adaptive-lr");
+    ganConfig.lrEmaAlpha                = parseDoubleOpt(cmd, "--lr-ema-alpha",        ganConfig.lrEmaAlpha);
+    ganConfig.lrAdjustFactor            = parseDoubleOpt(cmd, "--lr-adjust-factor",    ganConfig.lrAdjustFactor);
+    ganConfig.lrMin                     = parseDoubleOpt(cmd, "--lr-min",              ganConfig.lrMin);
+    ganConfig.lrMax                     = parseDoubleOpt(cmd, "--lr-max",              ganConfig.lrMax);
+    ganConfig.lrWarmupEpochs            = parseSizeOpt  (cmd, "--lr-warmup-epochs",    ganConfig.lrWarmupEpochs);
 
     // Generator topology: latentDim -> hidden... -> 784, Sigmoid output
     const std::vector<std::size_t> kDefaultGenHidden  = {256, 512};

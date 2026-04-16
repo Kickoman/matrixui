@@ -53,7 +53,7 @@ public slots:
 
 signals:
     void infoUpdated();
-    void epochCompleted(std::size_t epoch, double avgDiscScore, double avgGenScore);
+    void epochCompleted(std::size_t epoch, double avgDiscScore, double avgGenScore, double emaReal, double emaGen);
 
 private:
     bool canRunTraining() const;

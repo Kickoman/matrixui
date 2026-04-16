@@ -194,9 +194,11 @@ void DigitsGeneratorModeWidget::updateInfo() {
     generateButton->setEnabled(idle);
 }
 
-void DigitsGeneratorModeWidget::handleEpochCompleted(std::size_t /*epoch*/, double dScore, double gScore) {
-    lossChart->addPoint(dScore * 100, "D(real)");
-    lossChart->addPoint(gScore * 100, "D(G(z))");
+void DigitsGeneratorModeWidget::handleEpochCompleted(std::size_t /*epoch*/, double dScore, double gScore, double emaReal, double emaGen) {
+    lossChart->addPoint(dScore * 100,  "D(real)");
+    lossChart->addPoint(gScore * 100,  "D(G(z))");
+    lossChart->addPoint(emaReal * 100, "EMA D(real)");
+    lossChart->addPoint(emaGen  * 100, "EMA D(G(z))");
 }
 
 void DigitsGeneratorModeWidget::handleGenerateClicked() {

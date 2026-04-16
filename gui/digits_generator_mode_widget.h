@@ -24,7 +24,7 @@ public:
 
 private slots:
     void updateInfo();
-    void handleEpochCompleted(std::size_t epoch, double dScore, double gScore);
+    void handleEpochCompleted(std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen);
     void handleGenerateClicked();
 
 private:

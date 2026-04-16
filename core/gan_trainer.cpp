@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <numeric>
 #include <random>
+#include <cmath>
 
 namespace Neural {
 
@@ -86,6 +87,10 @@ void GanTrainer::train(
     std::vector<std::size_t> indices(realSamples.size());
     std::iota(indices.begin(), indices.end(), 0);
 
+    double currentDLr = config.discriminatorLr;
+    double currentGLr = config.generatorLr;
+    double emaReal = 0.5, emaGen = 0.5;  // neutral init
+
     for (std::size_t epoch = 0; epoch < config.epochs; ++epoch) {
         std::shuffle(indices.begin(), indices.end(), rng);
 
@@ -104,14 +109,14 @@ void GanTrainer::train(
                 const Matrix fake = generator.generate(label);
                 trainDiscriminatorStep(
                     realSamples[idx], fake,
-                    config.discriminatorLr, config.dropoutRate
+                    currentDLr, config.dropoutRate
                 );
                 totalDiscScore += discriminator.score(realSamples[idx])(0, 0);
             }
 
             // Train generator one step conditioned on the chosen label.
             totalGenScore += trainGeneratorStep(
-                label, config.classifierLossWeight, config.generatorLr
+                label, config.classifierLossWeight, currentGLr
             );
             ++steps;
 
@@ -120,6 +125,23 @@ void GanTrainer::train(
 
         const double avgDiscReal = steps > 0 ? totalDiscScore / (steps * config.discriminatorStepsPerGenStep) : 0.0;
         const double avgGenFool  = steps > 0 ? totalGenScore / steps : 0.0;
+
+        // Update EMA — always, so GUI always gets smoothed curves.
+        emaReal = config.lrEmaAlpha * emaReal + (1.0 - config.lrEmaAlpha) * avgDiscReal;
+        emaGen  = config.lrEmaAlpha * emaGen  + (1.0 - config.lrEmaAlpha) * avgGenFool;
+
+        // Adaptive lr adjustment — gated on feature flag and warm-up.
+        if (config.adaptiveLr && epoch >= config.lrWarmupEpochs) {
+            if (emaReal > config.dRealTargetHigh && emaGen < config.genFoolTargetLow) {
+                // D dominating: slow D, speed G.
+                currentDLr = std::clamp(currentDLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
+                currentGLr = std::clamp(currentGLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
+            } else if (emaGen > config.genFoolTargetHigh) {
+                // G dominating: slow G, speed D.
+                currentGLr = std::clamp(currentGLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
+                currentDLr = std::clamp(currentDLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
+            }
+        }
 
         if (log && steps > 0) {
             // Sample a generated image for each class and log what the classifier thinks.
@@ -133,17 +155,22 @@ void GanTrainer::train(
 
             *log << "Epoch " << epoch + 1 << "/" << config.epochs
                  << "  D(real)=" << avgDiscReal
-                 << "  D(G(z))=" << avgGenFool
-                 << "  sample(label=" << logLabel << " -> classifier=" << predictedLabel << ")"
+                 << "  D(G(z))=" << avgGenFool;
+            if (config.adaptiveLr)
+                *log << "  ema_D(real)=" << emaReal
+                     << "  ema_D(G(z))=" << emaGen
+                     << "  dLr=" << currentDLr
+                     << "  gLr=" << currentGLr;
+            *log << "  sample(label=" << logLabel << " -> classifier=" << predictedLabel << ")"
                  << std::endl;
         }
 
-        if (epochCallback) epochCallback(epoch, avgDiscReal, avgGenFool);
+        if (epochCallback) epochCallback(epoch, avgDiscReal, avgGenFool, emaReal, emaGen);
         if (stopFlag.load(std::memory_order_relaxed)) break;
     }
 }
 
-void GanTrainer::setEpochCallback(std::function<void(std::size_t, double, double)> callback) {
+void GanTrainer::setEpochCallback(std::function<void(std::size_t, double, double, double, double)> callback) {
     epochCallback = std::move(callback);
 }
 

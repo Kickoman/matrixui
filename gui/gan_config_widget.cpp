@@ -1,5 +1,6 @@
 #include "gan_config_widget.h"
 
+#include <QCheckBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QDoubleSpinBox>
@@ -54,6 +55,27 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     datasetLimitPerLabel->setMaximum(1000000);
     datasetLimitPerLabel->setSpecialValueText("No limit");
 
+    adaptiveLrCheck = new QCheckBox("Enable", this);
+
+    lrEmaAlpha = new QDoubleSpinBox(this);
+    lrEmaAlpha->setDecimals(3);
+    lrEmaAlpha->setMinimum(0.0);
+    lrEmaAlpha->setMaximum(0.999);
+    lrEmaAlpha->setSingleStep(0.01);
+    lrEmaAlpha->setToolTip("EMA smoothing: higher = slower reaction to score changes");
+
+    lrAdjustFactor = new QDoubleSpinBox(this);
+    lrAdjustFactor->setDecimals(3);
+    lrAdjustFactor->setMinimum(1.001);
+    lrAdjustFactor->setMaximum(2.0);
+    lrAdjustFactor->setSingleStep(0.01);
+    lrAdjustFactor->setToolTip("Multiplicative lr change per epoch when imbalance detected");
+
+    lrWarmupEpochs = new QSpinBox(this);
+    lrWarmupEpochs->setMinimum(0);
+    lrWarmupEpochs->setMaximum(1000);
+    lrWarmupEpochs->setToolTip("Epochs before adaptive adjustments begin");
+
     auto* mainLayout = new QHBoxLayout(this);
     auto* leftForm = new QFormLayout();
     leftForm->addRow("Epochs", epochs);
@@ -68,8 +90,15 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     rightForm->addRow("Latent dim", latentDim);
     rightForm->addRow("Dataset limit / label", datasetLimitPerLabel);
 
+    auto* adaptiveForm = new QFormLayout();
+    adaptiveForm->addRow("Adaptive LR", adaptiveLrCheck);
+    adaptiveForm->addRow("EMA alpha", lrEmaAlpha);
+    adaptiveForm->addRow("Adjust factor", lrAdjustFactor);
+    adaptiveForm->addRow("Warmup epochs", lrWarmupEpochs);
+
     mainLayout->addLayout(leftForm);
     mainLayout->addLayout(rightForm);
+    mainLayout->addLayout(adaptiveForm);
 
     setLayout(mainLayout);
 
@@ -86,6 +115,10 @@ void GanConfigWidget::setConfig(const Neural::GanConfig& config) {
     classifierLossWeight->setValue(config.classifierLossWeight);
     latentDim->setValue(static_cast<int>(config.latentDim));
     datasetLimitPerLabel->setValue(static_cast<int>(config.datasetLimitPerLabel));
+    adaptiveLrCheck->setChecked(config.adaptiveLr);
+    lrEmaAlpha->setValue(config.lrEmaAlpha);
+    lrAdjustFactor->setValue(config.lrAdjustFactor);
+    lrWarmupEpochs->setValue(static_cast<int>(config.lrWarmupEpochs));
 }
 
 Neural::GanConfig GanConfigWidget::getConfig() const {
@@ -100,5 +133,9 @@ Neural::GanConfig GanConfigWidget::getConfig() const {
         .dropoutRate = dropoutRate->value(),
         .classifierLossWeight = classifierLossWeight->value(),
         .datasetLimitPerLabel = static_cast<std::size_t>(datasetLimitPerLabel->value()),
+        .adaptiveLr = adaptiveLrCheck->isChecked(),
+        .lrEmaAlpha = lrEmaAlpha->value(),
+        .lrAdjustFactor = lrAdjustFactor->value(),
+        .lrWarmupEpochs = static_cast<std::size_t>(lrWarmupEpochs->value()),
     };
 }

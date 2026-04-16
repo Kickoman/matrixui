@@ -164,13 +164,13 @@ void DigitsGeneratorController::run(const Neural::GanConfig& config) {
         Neural::GanTrainer trainer(std::move(gen), std::move(disc), std::move(cls));
         activeTrainer.store(&trainer, std::memory_order_release);
 
-        trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore) {
+        trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {
             // Save after each epoch (same pattern as classifier)
             Neural::SaveNetwork(trainer.getGenerator().getNetwork(),     generatorPath.toStdString());
             Neural::SaveNetwork(trainer.getDiscriminator().getNetwork(), discriminatorPath.toStdString());
 
-            QMetaObject::invokeMethod(this, [this, epoch, dScore, gScore] {
-                emit epochCompleted(epoch, dScore, gScore);
+            QMetaObject::invokeMethod(this, [this, epoch, dScore, gScore, emaReal, emaGen] {
+                emit epochCompleted(epoch, dScore, gScore, emaReal, emaGen);
             });
         });
 

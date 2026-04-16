@@ -3,6 +3,7 @@
 #include <QWidget>
 #include "gan_config.h"
 
+class QCheckBox;
 class QDoubleSpinBox;
 class QSpinBox;
 
@@ -25,4 +26,10 @@ private:
     QDoubleSpinBox* classifierLossWeight = nullptr;
     QSpinBox* latentDim = nullptr;
     QSpinBox* datasetLimitPerLabel = nullptr;
+
+    // Adaptive lr controls
+    QCheckBox*      adaptiveLrCheck   = nullptr;
+    QDoubleSpinBox* lrEmaAlpha        = nullptr;
+    QDoubleSpinBox* lrAdjustFactor    = nullptr;
+    QSpinBox*       lrWarmupEpochs    = nullptr;
 };

@@ -29,8 +29,11 @@ public:
         std::ostream* log = nullptr
     );
 
-    // Called at the end of each epoch with (epoch, avgDiscScore, avgGenScore).
-    void setEpochCallback(std::function<void(std::size_t, double, double)> callback);
+    // Called at the end of each epoch with:
+    //   (epoch, avgDiscReal, avgGenFool, emaReal, emaGen)
+    // emaReal/emaGen are EMA-smoothed versions of avgDiscReal/avgGenFool.
+    // Always emitted; used by adaptive lr internally and exposed for plotting.
+    void setEpochCallback(std::function<void(std::size_t, double, double, double, double)> callback);
 
     // Signal training to stop after the current epoch completes.
     void requestStop();
@@ -58,7 +61,7 @@ private:
     Discriminator discriminator;
     NeuralNetworkApplier classifier;
 
-    std::function<void(std::size_t, double, double)> epochCallback;
+    std::function<void(std::size_t, double, double, double, double)> epochCallback;
     std::atomic<bool> stopFlag{false};
 };
 
