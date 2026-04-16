@@ -26,8 +26,9 @@ struct GanConfig {
     // generator domination. Off by default — existing behaviour unchanged.
     bool        adaptiveLr         = false;
     double      lrEmaAlpha         = 0.9;   // EMA decay: higher = slower reaction
+    double      dRealTargetLow     = 0.30;  // D(real) below this (with genFoolTargetLow) → D collapsed
     double      dRealTargetHigh    = 0.80;  // D(real) above this → D dominating
-    double      genFoolTargetLow   = 0.30;  // D(G(z)) below this (combined) → D dominating
+    double      genFoolTargetLow   = 0.30;  // D(G(z)) below this (combined) → D dominating or D collapsed
     double      genFoolTargetHigh  = 0.60;  // D(G(z)) above this → G dominating
     double      lrAdjustFactor     = 1.05;  // Multiplicative step per epoch (~5%)
     double      lrMin              = 1e-6;

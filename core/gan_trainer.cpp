@@ -89,7 +89,9 @@ void GanTrainer::train(
 
     double currentDLr = config.discriminatorLr;
     double currentGLr = config.generatorLr;
-    double emaReal = 0.5, emaGen = 0.5;  // neutral init
+    // Uninitialized sentinel: first epoch sets EMA to the raw value directly,
+    // avoiding the bias that comes from starting at an arbitrary 0.5.
+    double emaReal = -1.0, emaGen = -1.0;
 
     for (std::size_t epoch = 0; epoch < config.epochs; ++epoch) {
         std::shuffle(indices.begin(), indices.end(), rng);
@@ -127,12 +129,22 @@ void GanTrainer::train(
         const double avgGenFool  = steps > 0 ? totalGenScore / steps : 0.0;
 
         // Update EMA — always, so GUI always gets smoothed curves.
-        emaReal = config.lrEmaAlpha * emaReal + (1.0 - config.lrEmaAlpha) * avgDiscReal;
-        emaGen  = config.lrEmaAlpha * emaGen  + (1.0 - config.lrEmaAlpha) * avgGenFool;
+        // First epoch: seed from actual values to avoid bias toward the 0.5 init.
+        if (emaReal < 0.0) {
+            emaReal = avgDiscReal;
+            emaGen  = avgGenFool;
+        } else {
+            emaReal = config.lrEmaAlpha * emaReal + (1.0 - config.lrEmaAlpha) * avgDiscReal;
+            emaGen  = config.lrEmaAlpha * emaGen  + (1.0 - config.lrEmaAlpha) * avgGenFool;
+        }
 
         // Adaptive lr adjustment — gated on feature flag and warm-up.
         if (config.adaptiveLr && epoch >= config.lrWarmupEpochs) {
-            if (emaReal > config.dRealTargetHigh && emaGen < config.genFoolTargetLow) {
+            if (emaReal < config.dRealTargetLow && emaGen < config.genFoolTargetLow) {
+                // D collapsed: scoring everything near 0. Boost D, slow G.
+                currentDLr = std::clamp(currentDLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
+                currentGLr = std::clamp(currentGLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
+            } else if (emaReal > config.dRealTargetHigh && emaGen < config.genFoolTargetLow) {
                 // D dominating: slow D, speed G.
                 currentDLr = std::clamp(currentDLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
                 currentGLr = std::clamp(currentGLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
