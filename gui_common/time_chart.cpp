@@ -37,6 +37,10 @@ void TimeChart::setTitle(const QString& title)
     chart->setTitle(title);
 }
 
+QChart* TimeChart::getChart() {
+    return chart;
+}
+
 QValueAxis* TimeChart::getAxisX()
 {
     return axisX;

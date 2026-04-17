@@ -26,6 +26,8 @@ if (BUILD_GUI)
 
     find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
+
+    add_subdirectory(contrib/qt-dark-theme)
 endif()
 
 option(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
@@ -40,6 +42,7 @@ if(USE_EIGEN)
 endif(USE_EIGEN)
 
 set(GUI_SOURCES
+    gui/lib/theme.cpp
     gui/lib/mode_factory.cpp
     gui/lib/mode_settings.cpp
     gui/lib/mode_widget.cpp
@@ -111,7 +114,11 @@ if(BUILD_GUI)
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
+
+        QtDarkTheme
     )
+
+    target_include_directories(${PROJECT_NAME} PUBLIC contrib)
 
 endif()
 

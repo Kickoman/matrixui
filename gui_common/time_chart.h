@@ -16,6 +16,7 @@ public:
     TimeChart(QWidget* parent = nullptr);
 
     void setTitle(const QString& title);
+    QChart* getChart();
     QValueAxis* getAxisX();
     QValueAxis* getAxisY();
     void addPoint(double value, const QString& seriesName = {});

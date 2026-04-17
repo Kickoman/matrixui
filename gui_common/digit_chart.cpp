@@ -7,6 +7,7 @@
 #include <QHorizontalBarSeries>
 #include <QVBoxLayout>
 #include <QValueAxis>
+#include <qobject.h>
 
 
 DigitChart::DigitChart(QWidget* parent)
@@ -39,6 +40,10 @@ DigitChart::DigitChart(QWidget* parent)
     view = new QChartView(chart);
     auto* layout = new QVBoxLayout(this);
     layout->addWidget(view);
+}
+
+QChart* DigitChart::getChart() {
+    return chart;
 }
 
 void DigitChart::setTitle(const QString& title)

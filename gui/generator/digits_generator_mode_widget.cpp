@@ -6,6 +6,7 @@
 #include "gui/generator/digits_generator_controller.h"
 #include "gui/generator/gan_config_widget.h"
 
+#include "gui/lib/theme.h"
 #include "gui/lib/network_create_dialog.h"
 
 #include <QHBoxLayout>
@@ -16,6 +17,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QPixmap>
+#include <QChart>
 
 
 DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
@@ -26,6 +28,7 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
 
     lossChart = new TimeChart(this);
     lossChart->setTitle("Training scores");
+    AppTheme::ApplyTheme(lossChart->getChart());
 
     toggleTrainingButton   = new QPushButton("Start training", this);
     loadClassifierButton   = new QPushButton("Load classifier", this);

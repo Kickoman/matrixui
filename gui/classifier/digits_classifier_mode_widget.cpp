@@ -4,6 +4,7 @@
 #include "gui_common/time_chart.h"
 #include "gui_common/digit_chart.h"
 
+#include "gui/lib/theme.h"
 #include "gui/lib/network_create_dialog.h"
 #include "gui/classifier/learning_config_widget.h"
 #include "gui/classifier/digits_classifier_controller.h"
@@ -30,6 +31,9 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
     digitChart = new DigitChart(this);
     chart->setTitle("Test passing rate");
     digitChart->setTitle("Tests passing per digit");
+
+    AppTheme::ApplyTheme(chart->getChart());
+    AppTheme::ApplyTheme(digitChart->getChart());
 
     toggleLearningButton = new QPushButton("Start learning", this);
     openNetworkButton = new QPushButton("Open network", this);
