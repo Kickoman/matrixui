@@ -1,9 +1,12 @@
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFontDatabase>
 #include "main_window.h"
 #include "main_controller.h"
 
 #include "gui/lib/theme.h"
+
+extern void qInitResources_fonts();
 
 int main(int argc, char** argv) {
     QApplication a(argc, argv);
@@ -28,6 +31,16 @@ int main(int argc, char** argv) {
     ) {
         AppTheme::SetTheme(Theme::Dark);
         AppTheme::ApplyTheme(a);
+    }
+
+    constexpr char* fontPath = ":/fonts/ubuntu-sans.ttf";
+    const auto fontId = QFontDatabase::addApplicationFont(fontPath);
+    if (fontId != -1) {
+        qDebug() << "Font ID installed: " << fontId;
+        QFont font("ubuntu-sans");
+        a.setFont(font);
+    } else {
+        qDebug() << "Failed to load fonts...";
     }
 
     MainController controller;

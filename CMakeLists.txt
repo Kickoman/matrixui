@@ -101,6 +101,12 @@ set(
 include_directories(eigen)
 
 if(BUILD_GUI)
+    if(${QT_VERSION_MAJOR} EQUAL 5)
+        qt5_add_resources(FONTS gui/fonts/fonts.qrc)
+    else()
+        qt_add_resources(FONTS gui/fonts/fonts.qrc)
+    endif()
+
     add_executable(
         ${PROJECT_NAME}
         ${CORE_SOURCES}
@@ -108,6 +114,8 @@ if(BUILD_GUI)
         ${GUI_COMMON_SOURCES}
         gui/main.cpp
     )
+
+    target_sources(${PROJECT_NAME} PRIVATE ${FONTS})
 
     target_link_libraries(${PROJECT_NAME}
         Qt${QT_VERSION_MAJOR}::Gui
