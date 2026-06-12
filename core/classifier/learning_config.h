@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <nlohmann/json.hpp>
 
 
 namespace Neural {
@@ -15,8 +16,20 @@ struct LearningConfig {
     std::size_t innerEpochs = 1;
 
     std::size_t datasetLimitPerLabel = 100;
-    double dropoutRate;
+    double dropoutRate = 0.0;
 };
 
 } // namespace Classifier
 } // namespace Neural
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    Neural::Classifier::LearningConfig,
+    initialLearningRate,
+    minLearningRate,
+    learningRateDecay,
+    maxEpochs,
+    patience,
+    innerEpochs,
+    datasetLimitPerLabel,
+    dropoutRate
+);

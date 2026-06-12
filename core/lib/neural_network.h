@@ -3,6 +3,7 @@
 #include "core/lib/layers.h"
 
 #include <vector>
+#include <nlohmann/json.hpp>
 
 namespace Neural {
 
@@ -24,3 +25,10 @@ struct NeuralNetwork {
 };
 
 }
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    Neural::NeuralNetworkConfiguration,
+    hiddenActivation,
+    outputActivation,
+    layersSizes
+);

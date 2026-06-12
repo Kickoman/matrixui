@@ -1,14 +1,10 @@
-#include <cctype>
-#include <cstdlib>
+#include <filesystem>
 #include <iostream>
-#include <iterator>
+#include <map>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <filesystem>
 
 #include "core/classifier/trainer.h"
 #include "core/classifier/learning_config.h"
@@ -21,32 +17,7 @@
 #include "png/pngreader.h"
 #include "matrix/matrix.h"
 
-
-class InputParser {
-public:
-    InputParser() = default;
-    InputParser(const InputParser& other) : tokens(other.tokens) {}
-    explicit InputParser(int& argc, char** argv) {
-        for (int i = 1; i < argc; ++i) {
-            this->tokens.push_back(std::string(argv[i]));
-        }
-    }
-
-    const std::string& getCmdOption(const std::string& option, const std::string& defaultValue = {}) const {
-        const auto itr = std::find(this->tokens.cbegin(), this->tokens.cend(), option);
-        if (itr != this->tokens.cend() && std::next(itr) != this->tokens.cend()) {
-            return *std::next(itr);
-        }
-        return defaultValue;
-    }
-
-    bool cmdOptionExists(const std::string& option) const {
-        return std::find(this->tokens.begin(), this->tokens.end(), option) != this->tokens.end();
-    }
-
-private:
-    std::vector<std::string> tokens;
-};
+#include <CLI11/CLI11.hpp>
 
 
 namespace {
@@ -61,90 +32,6 @@ bool validateDataset(const std::filesystem::path& datasetPath) {
     return true;
 }
 
-std::vector<std::size_t> parseLayers(const std::string& layersParameter) {
-    try {
-        std::vector<std::size_t> layers;
-        if (layersParameter.empty()) {
-            return layers;
-        }
-        std::istringstream stream(layersParameter);
-        std::string token;
-        while (std::getline(stream, token, ',')) {
-            while (!token.empty() && std::isspace(static_cast<unsigned char>(token.front()))) {
-                token.erase(0, 1);
-            }
-            while (!token.empty() && std::isspace(static_cast<unsigned char>(token.back()))) {
-                token.pop_back();
-            }
-            if (token.empty()) {
-                continue;
-            }
-            layers.push_back(std::stoul(token));
-        }
-        return layers;
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to parse layers: " << e.what() << std::endl;
-        throw std::runtime_error("Failed to parse layers");
-    }
-}
-
-Neural::ActivationType parseActivation(const std::string& s) {
-    std::string lower;
-    lower.reserve(s.size());
-    for (char c : s) {
-        lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    }
-    if (lower == "sigmoid") {
-        return Neural::ActivationType::Sigmoid;
-    }
-    if (lower == "relu") {
-        return Neural::ActivationType::ReLU;
-    }
-    if (lower == "tanh") {
-        return Neural::ActivationType::Tanh;
-    }
-    if (lower == "softmax") {
-        return Neural::ActivationType::Softmax;
-    }
-    throw std::runtime_error("Unknown activation \"" + s + "\" (expected sigmoid, relu, tanh, or softmax)");
-}
-
-double parseDoubleOpt(const InputParser& cmd, const std::string& option, double defaultValue) {
-    if (!cmd.cmdOptionExists(option)) {
-        return defaultValue;
-    }
-    return std::stod(cmd.getCmdOption(option));
-}
-
-std::size_t parseSizeOpt(const InputParser& cmd, const std::string& option, std::size_t defaultValue) {
-    if (!cmd.cmdOptionExists(option)) {
-        return defaultValue;
-    }
-    const auto v = std::stoull(cmd.getCmdOption(option));
-    return static_cast<std::size_t>(v);
-}
-
-Neural::Classifier::LearningConfig parseLearningConfig(const InputParser& cmd) {
-    Neural::Classifier::LearningConfig d{};
-    std::size_t datasetLimitPerLabel = d.datasetLimitPerLabel;
-    if (cmd.cmdOptionExists("--dataset-file-limit")) {
-        datasetLimitPerLabel = parseSizeOpt(cmd, "--dataset-file-limit", datasetLimitPerLabel);
-    }
-    if (cmd.cmdOptionExists("--dataset-limit-per-label")) {
-        datasetLimitPerLabel = parseSizeOpt(cmd, "--dataset-limit-per-label", datasetLimitPerLabel);
-    }
-    return {
-        .initialLearningRate = parseDoubleOpt(cmd, "--initial-lr", d.initialLearningRate),
-        .minLearningRate = parseDoubleOpt(cmd, "--min-lr", d.minLearningRate),
-        .learningRateDecay = parseDoubleOpt(cmd, "--lr-decay", d.learningRateDecay),
-        .maxEpochs = parseSizeOpt(cmd, "--max-epochs", d.maxEpochs),
-        .patience = parseSizeOpt(cmd, "--patience", d.patience),
-        .innerEpochs = parseSizeOpt(cmd, "--inner-epochs", d.innerEpochs),
-        .datasetLimitPerLabel = datasetLimitPerLabel,
-        .dropoutRate = parseDoubleOpt(cmd, "--dropout", d.dropoutRate),
-    };
-}
-
 const char* activationName(Neural::ActivationType a) {
     switch (a) {
         case Neural::ActivationType::Sigmoid:
@@ -157,57 +44,6 @@ const char* activationName(Neural::ActivationType a) {
             return "softmax";
     }
     return "?";
-}
-
-Neural::NeuralNetworkConfiguration parseNetworkConfiguration(const InputParser& cmd) {
-    static const std::vector<std::size_t> kDefaultLayers = {28 * 28, 50, 20, 10};
-    Neural::NeuralNetworkConfiguration config;
-    if (cmd.cmdOptionExists("--layers")) {
-        config.layersSizes = parseLayers(cmd.getCmdOption("--layers"));
-    } else {
-        config.layersSizes = kDefaultLayers;
-    }
-    if (cmd.cmdOptionExists("--hidden-activation")) {
-        config.hiddenActivation = parseActivation(cmd.getCmdOption("--hidden-activation"));
-    }
-    if (cmd.cmdOptionExists("--output-activation")) {
-        config.outputActivation = parseActivation(cmd.getCmdOption("--output-activation"));
-    }
-    return config;
-}
-
-void printUsage(const char* argv0) {
-    const Neural::Classifier::LearningConfig d{};
-    std::cerr
-        << "Usage:\n  " << argv0 << " --network <path.wgt> (--dataset <dir> | --train-dataset ... --test-dataset ...)\n"
-        << "  " << argv0 << " --network <path.wgt> --predict-image <image.png>\n\n"
-        << "Single-image classification (no dataset required):\n"
-        << "  --predict-image <path>     Load the network and print the predicted digit (0-9) to stdout.\n\n"
-        << "Training mode — required:\n"
-        << "  --network <path>           Network save path (.wgt). Created if missing.\n"
-        << "  --dataset <dir>            Use the same root for training and testing (subdirs 0..9).\n"
-        << "  --train-dataset <dir>     Training data root; if omitted, uses --dataset.\n"
-        << "  --test-dataset <dir>      Testing data root; if omitted, uses --dataset.\n"
-        << "                             You must end up with both paths: e.g. only --dataset (same\n"
-        << "                             tree for train and test), or --train-dataset + --test-dataset,\n"
-        << "                             or --dataset plus one override flag.\n\n"
-        << "Network (used when creating a new network; ignored when loading existing):\n"
-        << "  --layers <n,n,...>         Layer sizes, comma-separated (default 784,50,20,10).\n"
-        << "  --hidden-activation <name>  sigmoid | relu | tanh | softmax (default relu).\n"
-        << "  --output-activation <name>  sigmoid | relu | tanh | softmax (default softmax).\n\n"
-        << "Training (Neural::Classifier::LearningConfig):\n"
-        << "  --initial-lr <x>           (default " << d.initialLearningRate << ").\n"
-        << "  --min-lr <x>               (default " << d.minLearningRate << ").\n"
-        << "  --lr-decay <x>             (default " << d.learningRateDecay << ").\n"
-        << "  --max-epochs <n>           (default " << d.maxEpochs << ").\n"
-        << "  --patience <n>             (default " << d.patience << ").\n"
-        << "  --inner-epochs <n>         Backprop passes per sample per epoch (default " << d.innerEpochs << ").\n"
-        << "  --dropout <x>              (default " << d.dropoutRate << ").\n"
-        << "  --dataset-limit-per-label <n>   Max training files per class (0 = all; default " << d.datasetLimitPerLabel << ").\n"
-        << "  --dataset-file-limit <n>   Same as --dataset-limit-per-label (deprecated alias).\n\n"
-        << "Testing:\n"
-        << "  --test-file-limit <n>      Max test files per class (0 = all). Runs evaluation after training.\n\n"
-        << "  -h, --help                 Show this text.\n";
 }
 
 std::size_t maxProbabilityClassIndex(const Matrix& output) {
@@ -227,10 +63,6 @@ std::size_t maxProbabilityClassIndex(const Matrix& output) {
 }
 
 int runPredictImage(const std::string& networkPath, const std::string& imagePath) {
-    if (!std::filesystem::exists(imagePath)) {
-        std::cerr << "Image not found: " << imagePath << "\n";
-        return 6;
-    }
     auto loaded = Neural::LoadNetwork(networkPath);
     if (!loaded) {
         std::cerr << "Failed to load network: " << networkPath << "\n";
@@ -250,62 +82,109 @@ int runPredictImage(const std::string& networkPath, const std::string& imagePath
 
 
 int main(int argc, char** argv) {
-    InputParser cmd(argc, argv);
+    CLI::App app{"MatrixGui headless classifier CLI"};
+    app.require_subcommand(1);
 
-    if (cmd.cmdOptionExists("--help") || cmd.cmdOptionExists("-h")) {
-        printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
-        return 0;
-    }
+    // ---- predict ----
+    CLI::App* predictCmd = app.add_subcommand("predict", "Classify a single PNG image using a trained network");
 
-    if (cmd.cmdOptionExists("--predict-image")) {
-        if (!cmd.cmdOptionExists("--network")) {
-            std::cerr << "--predict-image requires --network\n";
-            printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
-            return 1;
-        }
-        const std::string networkName = cmd.getCmdOption("--network");
-        const std::string imagePath = cmd.getCmdOption("--predict-image");
-        if (networkName.empty() || imagePath.empty()) {
-            std::cerr << "--network and --predict-image require values\n";
-            return 1;
-        }
+    std::string predictNetworkPath;
+    std::string imagePath;
+
+    predictCmd->add_option("--network", predictNetworkPath, "Trained network file (.wgt) to load")
+        ->required()
+        ->check(CLI::ExistingFile);
+    predictCmd->add_option("--image", imagePath, "PNG image to classify")
+        ->required()
+        ->check(CLI::ExistingFile);
+
+    // ---- train ----
+    CLI::App* trainCmd = app.add_subcommand("train", "Train (or continue training) a classifier network on a directory dataset");
+
+    std::string trainNetworkPath;
+    std::string datasetPath;
+    std::string trainDatasetPath;
+    std::string testDatasetPath;
+    Neural::Classifier::LearningConfig learningConfig{};
+    Neural::NeuralNetworkConfiguration netConfig{};
+    netConfig.layersSizes = {28 * 28, 50, 20, 10};
+    std::size_t testFileLimit = 0;
+
+    trainCmd->add_option("--network", trainNetworkPath, "Network save path (.wgt). Created if missing.")
+        ->required();
+
+    trainCmd->add_option("--dataset", datasetPath,
+            "Dataset root used for both training and testing (subdirs 0..9). "
+            "Overridden per-side by --train-dataset/--test-dataset.")
+        ->group("Dataset");
+    trainCmd->add_option("--train-dataset", trainDatasetPath,
+            "Training data root (subdirs 0..9); falls back to --dataset if not set.")
+        ->group("Dataset");
+    trainCmd->add_option("--test-dataset", testDatasetPath,
+            "Testing data root (subdirs 0..9); falls back to --dataset if not set.")
+        ->group("Dataset");
+    trainCmd->add_option("--test-file-limit", testFileLimit,
+            "Max test files per class (0 = all). Runs evaluation after training.")
+        ->group("Dataset")
+        ->capture_default_str();
+
+    trainCmd->add_option("--layers", netConfig.layersSizes,
+            "Layer sizes, comma-separated (used only when creating a new network)")
+        ->delimiter(',')
+        ->group("Network")
+        ->capture_default_str();
+
+    const std::map<std::string, Neural::ActivationType> activationMap{
+        {"sigmoid", Neural::ActivationType::Sigmoid}, {"relu", Neural::ActivationType::ReLU},
+        {"tanh", Neural::ActivationType::Tanh}, {"softmax", Neural::ActivationType::Softmax}};
+
+    trainCmd->add_option("--hidden-activation", netConfig.hiddenActivation,
+            "Hidden layer activation (used only when creating a new network)")
+        ->transform(CLI::CheckedTransformer(activationMap, CLI::ignore_case))
+        ->group("Network")
+        ->capture_default_str();
+    trainCmd->add_option("--output-activation", netConfig.outputActivation,
+            "Output layer activation (used only when creating a new network)")
+        ->transform(CLI::CheckedTransformer(activationMap, CLI::ignore_case))
+        ->group("Network")
+        ->capture_default_str();
+
+    trainCmd->add_option("--initial-lr", learningConfig.initialLearningRate, "Initial learning rate")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--min-lr", learningConfig.minLearningRate, "Minimum learning rate")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--lr-decay", learningConfig.learningRateDecay, "Learning rate decay factor")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--max-epochs", learningConfig.maxEpochs, "Maximum training epochs")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--patience", learningConfig.patience, "Early-stopping patience (epochs)")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--inner-epochs", learningConfig.innerEpochs, "Backprop passes per sample per epoch")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--dropout", learningConfig.dropoutRate, "Dropout rate")
+        ->group("Training")->capture_default_str();
+    trainCmd->add_option("--dataset-limit-per-label,--dataset-file-limit", learningConfig.datasetLimitPerLabel,
+            "Max training files per class (0 = all)")
+        ->group("Training")->capture_default_str();
+
+    CLI11_PARSE(app, argc, argv);
+
+    if (*predictCmd) {
         try {
-            return runPredictImage(networkName, imagePath);
+            return runPredictImage(predictNetworkPath, imagePath);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
             return 4;
         }
     }
 
-    if (!cmd.cmdOptionExists("--network")) {
-        std::cerr << "Specify network path with --network\n";
-        printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
-        return 1;
-    }
-
-    const std::string networkName = cmd.getCmdOption("--network");
-    if (networkName.empty()) {
-        std::cerr << "--network requires a value\n";
-        return 1;
-    }
-
-    std::string trainingPath;
-    std::string testingPath;
-    if (cmd.cmdOptionExists("--train-dataset")) {
-        trainingPath = cmd.getCmdOption("--train-dataset");
-    } else if (cmd.cmdOptionExists("--dataset")) {
-        trainingPath = cmd.getCmdOption("--dataset");
-    }
-    if (cmd.cmdOptionExists("--test-dataset")) {
-        testingPath = cmd.getCmdOption("--test-dataset");
-    } else if (cmd.cmdOptionExists("--dataset")) {
-        testingPath = cmd.getCmdOption("--dataset");
-    }
+    // *trainCmd
+    std::string trainingPath = !trainDatasetPath.empty() ? trainDatasetPath : datasetPath;
+    std::string testingPath  = !testDatasetPath.empty()  ? testDatasetPath  : datasetPath;
 
     if (trainingPath.empty() || testingPath.empty()) {
         std::cerr << "Specify data directories: use --dataset <dir> for both train and test, or set\n"
                      "  --train-dataset and/or --test-dataset (unspecified side falls back to --dataset).\n";
-        printUsage(argc > 0 ? argv[0] : "matrixgui_headless");
         return 2;
     }
 
@@ -318,28 +197,13 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    Neural::Classifier::LearningConfig learningConfig;
-    Neural::NeuralNetworkConfiguration netConfig;
-    std::size_t testFileLimit = 0;
-
-    try {
-        learningConfig = parseLearningConfig(cmd);
-        netConfig = parseNetworkConfiguration(cmd);
-        if (cmd.cmdOptionExists("--test-file-limit")) {
-            testFileLimit = parseSizeOpt(cmd, "--test-file-limit", 0);
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Invalid arguments: " << e.what() << std::endl;
-        return 4;
-    }
-
     if (netConfig.layersSizes.size() < 2) {
         std::cerr << "--layers must list at least input and output sizes (two or more integers).\n";
         return 4;
     }
 
     std::cout << "Starting with parameters:\n"
-              << "\tNetwork path: " << networkName << "\n"
+              << "\tNetwork path: " << trainNetworkPath << "\n"
               << "\tTraining dataset: " << trainingPath << "\n"
               << "\tTesting dataset: " << testingPath << "\n"
               << "\tLayers (for new network): ";
@@ -370,7 +234,7 @@ int main(int argc, char** argv) {
     trainingDataset->setFileReader(reader);
     testingDataset->setFileReader(reader);
 
-    std::optional<Neural::NeuralNetwork> loadedMaybe = Neural::LoadNetwork(networkName);
+    std::optional<Neural::NeuralNetwork> loadedMaybe = Neural::LoadNetwork(trainNetworkPath);
     if (!loadedMaybe) {
         loadedMaybe = Neural::CreateNetwork(netConfig);
     }
@@ -378,8 +242,8 @@ int main(int argc, char** argv) {
     recognizer.setNetwork(loadedMaybe.value());
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
-    recognizer.setEpochCallback([&recognizer, &networkName] {
-        Neural::SaveNetwork(recognizer.getNetwork(), networkName);
+    recognizer.setEpochCallback([&recognizer, &trainNetworkPath] {
+        Neural::SaveNetwork(recognizer.getNetwork(), trainNetworkPath);
     });
 
     recognizer.train(learningConfig);

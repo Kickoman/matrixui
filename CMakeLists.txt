@@ -142,4 +142,7 @@ if(BUILD_CLI)
         ${CORE_SOURCES}
         core/main_headless_gan.cpp
     )
+
+    target_include_directories(${PROJECT_NAME}_headless PUBLIC contrib)
+    target_include_directories(${PROJECT_NAME}_gan PUBLIC contrib)
 endif()

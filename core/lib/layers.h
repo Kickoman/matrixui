@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <variant>
 
+#include <nlohmann/json.hpp>
+
 
 namespace Neural {
 
@@ -101,3 +103,16 @@ using LayerData = std::variant<
 >;
 
 }
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Neural::LayerType, {
+    {Neural::LayerType::Dense, "dense"},
+    {Neural::LayerType::Activation, "activation"},
+});
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Neural::ActivationType, {
+    {Neural::ActivationType::Sigmoid, "sigmoid"},
+    {Neural::ActivationType::ReLU, "relu"},
+    {Neural::ActivationType::Tanh, "tanh"},
+    {Neural::ActivationType::Softmax, "softmax"},
+    {Neural::ActivationType::LeakyReLU, "leakyrelu"},
+});
