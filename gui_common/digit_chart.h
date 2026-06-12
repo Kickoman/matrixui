@@ -15,6 +15,7 @@ class DigitChart : public QWidget
 public:
     DigitChart(QWidget* parent = nullptr);
 
+    QChart* getChart();
     void setTitle(const QString& title);
     void setValue(const unsigned digit, const double value);
 

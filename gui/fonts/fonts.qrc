@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/fonts">
+        <file>ubuntu-sans.ttf</file>
+    </qresource>
+</RCC>

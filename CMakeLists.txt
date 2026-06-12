@@ -26,6 +26,8 @@ if (BUILD_GUI)
 
     find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
+
+    add_subdirectory(contrib/qt-dark-theme)
 endif()
 
 option(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
@@ -40,103 +42,104 @@ if(USE_EIGEN)
 endif(USE_EIGEN)
 
 set(GUI_SOURCES
-    gui/digits_runner.cpp
+    gui/lib/theme.cpp
+    gui/lib/mode_factory.cpp
+    gui/lib/mode_settings.cpp
+    gui/lib/mode_widget.cpp
+    gui/lib/mode_controller.cpp
+    gui/lib/network_create_dialog.cpp
+    gui/lib/new_mode_widget.cpp
+    gui/lib/mode_container_widget.cpp
+
+    gui/classifier/digits_classifier_controller.cpp
+    gui/classifier/digits_classifier_mode_widget.cpp
+    gui/classifier/learning_config_widget.cpp
+
+    gui/recognizer/digits_recognizer_mode_controller.cpp
+    gui/recognizer/digits_recognizer_mode_widget.cpp
+    gui/recognizer/digit_input_preprocess.cpp
+
+    gui/generator/digits_generator_controller.cpp
+    gui/generator/digits_generator_mode_widget.cpp
+    gui/generator/gan_config_widget.cpp
+
+    gui/main_controller.cpp
     gui/main_window.cpp
-    gui/network_create_dialog.cpp
-    gui/learning_config_widget.cpp
 )
 
 set(
     GUI_COMMON_SOURCES
+    gui_common/add_tab_bar.cpp
+    gui_common/add_tab_widget.cpp
     gui_common/advanced_terminal.cpp
     gui_common/time_chart.cpp
     gui_common/digit_chart.cpp
+    gui_common/paint_scene.cpp
 )
 
-set(SOURCES
+set(
+    CORE_SOURCES
+    core/lib/layers.cpp
+    core/lib/neural_network_loader.cpp
+    core/lib/neural_network_applier.cpp
+    core/lib/dataset.cpp
+    core/lib/directory_dataset.cpp
+
+    # Classifier
+    core/classifier/trainer.cpp
+
+    # Generator
+    core/generator/generator.cpp
+    core/generator/discriminator.cpp
+    core/generator/gan_trainer.cpp
+
+    # Other
     matrix/matrix.cpp
-    core/layers.cpp
-    core/neural_network_loader.cpp
-    core/neural_network_applier.cpp
     png/pngreader.cpp
-    core/dataset.cpp
-    core/directory_dataset.cpp
-    core/trainer.cpp
-)
-
-set(READER_SOURCES
-    reader/main_reader.cpp
-    reader/main_window.cpp
-    reader/paint_scene.cpp
-    reader/digits_tester.cpp
-    reader/digit_input_preprocess.cpp
 )
 
 include_directories(eigen)
 
 if(BUILD_GUI)
+    if(${QT_VERSION_MAJOR} EQUAL 5)
+        qt5_add_resources(FONTS gui/fonts/fonts.qrc)
+    else()
+        qt_add_resources(FONTS gui/fonts/fonts.qrc)
+    endif()
+
     add_executable(
         ${PROJECT_NAME}
+        ${CORE_SOURCES}
         ${GUI_SOURCES}
         ${GUI_COMMON_SOURCES}
-        ${MATRIX_SOURCES}
-        ${SOURCES}
         gui/main.cpp
     )
+
+    target_sources(${PROJECT_NAME} PRIVATE ${FONTS})
 
     target_link_libraries(${PROJECT_NAME}
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
         Qt${QT_VERSION_MAJOR}::Charts
+
+        QtDarkTheme
     )
 
-    target_include_directories(${PROJECT_NAME} PRIVATE
-        core/
-        gui/
-        gui_common/
-        matrix/
-        png/
-    )
+    target_include_directories(${PROJECT_NAME} PUBLIC contrib)
+
 endif()
 
 if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
-        ${MATRIX_SOURCES}
-        ${SOURCES}
+        ${CORE_SOURCES}
         core/main_headless.cpp
     )
 
-    target_include_directories(${PROJECT_NAME}_headless PRIVATE
-        core/
-        matrix/
-        png/
-    )
-endif()
-
-if(BUILD_READER)
     add_executable(
-        ${PROJECT_NAME}_reader
-        ${MATRIX_SOURCES}
-        ${SOURCES}
-        ${GUI_COMMON_SOURCES}
-        ${READER_SOURCES}
-    )
-
-    target_link_libraries(${PROJECT_NAME}_reader
-        Qt${QT_VERSION_MAJOR}::Gui
-        Qt${QT_VERSION_MAJOR}::Widgets
-        # Qt${QT_VERSION_MAJOR}::Concurrent
-        Qt${QT_VERSION_MAJOR}::Charts
-    )
-
-    target_include_directories(
-        ${PROJECT_NAME}_reader PRIVATE
-        core/
-        matrix/
-        png/
-        gui_common/
-        reader/
+        ${PROJECT_NAME}_gan
+        ${CORE_SOURCES}
+        core/main_headless_gan.cpp
     )
 endif()

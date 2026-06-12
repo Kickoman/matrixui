@@ -10,14 +10,16 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "trainer.h"
-#include "neural_network_loader.h"
-#include "neural_network_applier.h"
-#include "directory_dataset.h"
-#include "pngreader.h"
-#include "learning_config.h"
-#include "neural_network.h"
-#include "matrix.h"
+#include "core/classifier/trainer.h"
+#include "core/classifier/learning_config.h"
+
+#include "core/lib/neural_network_loader.h"
+#include "core/lib/neural_network_applier.h"
+#include "core/lib/directory_dataset.h"
+#include "core/lib/neural_network.h"
+
+#include "png/pngreader.h"
+#include "matrix/matrix.h"
 
 
 class InputParser {
@@ -122,8 +124,8 @@ std::size_t parseSizeOpt(const InputParser& cmd, const std::string& option, std:
     return static_cast<std::size_t>(v);
 }
 
-Neural::LearningConfig parseLearningConfig(const InputParser& cmd) {
-    Neural::LearningConfig d{};
+Neural::Classifier::LearningConfig parseLearningConfig(const InputParser& cmd) {
+    Neural::Classifier::LearningConfig d{};
     std::size_t datasetLimitPerLabel = d.datasetLimitPerLabel;
     if (cmd.cmdOptionExists("--dataset-file-limit")) {
         datasetLimitPerLabel = parseSizeOpt(cmd, "--dataset-file-limit", datasetLimitPerLabel);
@@ -175,7 +177,7 @@ Neural::NeuralNetworkConfiguration parseNetworkConfiguration(const InputParser& 
 }
 
 void printUsage(const char* argv0) {
-    const Neural::LearningConfig d{};
+    const Neural::Classifier::LearningConfig d{};
     std::cerr
         << "Usage:\n  " << argv0 << " --network <path.wgt> (--dataset <dir> | --train-dataset ... --test-dataset ...)\n"
         << "  " << argv0 << " --network <path.wgt> --predict-image <image.png>\n\n"
@@ -193,7 +195,7 @@ void printUsage(const char* argv0) {
         << "  --layers <n,n,...>         Layer sizes, comma-separated (default 784,50,20,10).\n"
         << "  --hidden-activation <name>  sigmoid | relu | tanh | softmax (default relu).\n"
         << "  --output-activation <name>  sigmoid | relu | tanh | softmax (default softmax).\n\n"
-        << "Training (Neural::LearningConfig):\n"
+        << "Training (Neural::Classifier::LearningConfig):\n"
         << "  --initial-lr <x>           (default " << d.initialLearningRate << ").\n"
         << "  --min-lr <x>               (default " << d.minLearningRate << ").\n"
         << "  --lr-decay <x>             (default " << d.learningRateDecay << ").\n"
@@ -316,7 +318,7 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-    Neural::LearningConfig learningConfig;
+    Neural::Classifier::LearningConfig learningConfig;
     Neural::NeuralNetworkConfiguration netConfig;
     std::size_t testFileLimit = 0;
 
@@ -358,7 +360,7 @@ int main(int argc, char** argv) {
               << "\tTest file limit per label: " << testFileLimit << "\n"
               << std::endl;
 
-    Neural::Trainer recognizer;
+    Neural::Classifier::Trainer recognizer;
     PngUtils::Cache pngCache;
     const auto reader = [&pngCache](const std::filesystem::path& path) {
         return PngUtils::fromImage(path.string(), 28, 28, pngCache).transform(1, 28 * 28);

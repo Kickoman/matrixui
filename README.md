@@ -1,145 +1,33 @@
 # MatrixGui
 
-Neural network tooling for digit recognition. This repository includes a Qt-based GUI and a **headless** command-line program for training and inference without a display.
+Neural network tooling for handwritten digit recognition and generation. The project ships a Qt-based GUI and headless CLI tools for training and inference without a display.
 
-## Building the headless CLI
+## Modes
 
-The headless target is enabled when `BUILD_CLI` is on (default). From the project root:
+| Mode | GUI tab | CLI binary | Description |
+|------|---------|------------|-------------|
+| Classifier | Classifier | `MatrixGui_headless` | Train a network to classify digits 0–9 |
+| Recognizer | Recognizer | `MatrixGui_headless --predict-image` | Draw or load a digit and classify it |
+| Generator (GAN) | Generator | `MatrixGui_gan` | Train a conditional GAN and generate synthetic digit images |
 
-```bash
-cmake -B build -DBUILD_GUI=OFF -DBUILD_READER=OFF
-cmake --build build
-```
+## Quick start
 
-The executable is named `MatrixGui_headless` (see `CMakeLists.txt` and the `PROJECT_NAME` value). With the default configuration that also builds the GUI, the same binary is produced alongside the main application:
+**Build everything:**
 
 ```bash
 cmake -B build
-cmake --build build --target MatrixGui_headless
+cmake --build build
 ```
 
-## Dataset layout
-
-Training and testing expect a **directory** whose **immediate subdirectories** are named `0` through `9`. Each subdirectory holds PNG images for that digit class (same convention as the GUI).
-
-Example:
-
-```text
-data/mnist_split/
-  0/   *.png
-  1/   *.png
-  ...
-  9/   *.png
-```
-
-Images are loaded at 28x28, converted to a single row of 784 values, and fed into the network.
-
-## Overview of modes
-
-| Mode | Purpose | Requires dataset |
-|------|---------|------------------|
-| Training | Fit or continue training; optional post-training evaluation | Yes |
-| Single image | Load a saved network and classify one PNG | No |
-
-Run `--help` for the full flag list as implemented in `core/main_headless.cpp`.
-
-```bash
-./build/MatrixGui_headless --help
-```
-
----
-
-## Training mode
-
-**Required**
-
-- `--network <path.wgt>` — Where to load weights from, and where to save after each epoch. If the file does not exist, a new network is created (see network options below).
-- A resolved **training** path and **testing** path for data:
-  - `--dataset <dir>` — Use the same tree for both train and test, or
-  - `--train-dataset <dir>` and/or `--test-dataset <dir>` — Each side falls back to `--dataset` when that flag is set; otherwise both train and test paths must be covered (for example only `--train-dataset` and `--test-dataset`, or `--dataset` plus one override).
-
-**Network (only when creating a new `.wgt`; ignored if the file loads successfully)**
-
-- `--layers <n,n,...>` — Comma-separated layer sizes. Default: `784,50,20,10`.
-- `--hidden-activation <name>` — `sigmoid`, `relu`, `tanh`, or `softmax`. Default: `relu`.
-- `--output-activation <name>` — Same set. Default: `softmax`.
-
-**Learning (defaults match `Neural::LearningConfig` in `core/learning_config.h`)**
-
-- `--initial-lr`, `--min-lr`, `--lr-decay`
-- `--max-epochs`, `--patience`, `--inner-epochs`
-- `--dropout`
-- `--dataset-limit-per-label <n>` — Cap training files per class; `0` means no cap.
-- `--dataset-file-limit <n>` — Deprecated alias for `--dataset-limit-per-label`.
-
-**After training**
-
-- `--test-file-limit <n>` — Cap evaluation files per class on the **test** dataset (`0` = all). Runs once after training and prints accuracy.
-
-### Training examples
-
-Minimal run: one dataset for train and test, new or existing weights at `models/digits.wgt`:
+**Train a classifier:**
 
 ```bash
 ./build/MatrixGui_headless \
   --network models/digits.wgt \
-  --dataset /path/to/data/mnist_split
+  --dataset /path/to/mnist_split
 ```
 
-Separate train and test roots:
-
-```bash
-./build/MatrixGui_headless \
-  --network models/digits.wgt \
-  --train-dataset /path/to/train \
-  --test-dataset /path/to/test
-```
-
-Train on a default “full” tree but evaluate on a smaller held-out copy:
-
-```bash
-./build/MatrixGui_headless \
-  --network models/digits.wgt \
-  --dataset /path/to/full \
-  --test-dataset /path/to/small_eval
-```
-
-Limit training samples per class and shorten the schedule (illustrative):
-
-```bash
-./build/MatrixGui_headless \
-  --network models/quick.wgt \
-  --dataset /path/to/data \
-  --dataset-limit-per-label 50 \
-  --max-epochs 100 \
-  --test-file-limit 200
-```
-
-Define a new architecture only when the weight file is missing:
-
-```bash
-./build/MatrixGui_headless \
-  --network models/custom.wgt \
-  --dataset /path/to/data \
-  --layers 784,128,64,10 \
-  --hidden-activation relu \
-  --output-activation softmax
-```
-
----
-
-## Single-image classification
-
-**Required**
-
-- `--network <path.wgt>` — Must exist and load successfully (no training, no dataset).
-- `--predict-image <path.png>` — One image file.
-
-**Output**
-
-- Prints a single digit `0`–`9` and a newline to **stdout** (suitable for scripts).
-
-**Example**
+**Classify a single image:**
 
 ```bash
 ./build/MatrixGui_headless \
@@ -147,35 +35,124 @@ Define a new architecture only when the weight file is missing:
   --predict-image samples/seven.png
 ```
 
-Capture the digit in a shell variable:
+**Train a GAN** (requires a trained classifier):
 
 ```bash
-digit=$(./build/MatrixGui_headless --network models/digits.wgt --predict-image photo.png)
-echo "Predicted class: $digit"
+./build/MatrixGui_gan \
+  --classifier models/digits.wgt \
+  --dataset /path/to/mnist_split
 ```
 
-Errors (missing file, failed load, invalid image or network output) are reported on **stderr** with a non-zero exit status.
+**Generate digit images:**
+
+```bash
+./build/MatrixGui_gan \
+  --generate --label 7 \
+  --generator models/generator.wgt \
+  --output samples/seven.png
+```
+
+## Dataset layout
+
+Training and testing expect a root directory whose immediate subdirectories are named `0` through `9`, each containing PNG images of that digit class:
+
+```
+data/mnist_split/
+  0/  *.png
+  1/  *.png
+  ...
+  9/  *.png
+```
+
+Images are loaded at 28×28 pixels and flattened to a 784-element input vector.
+
+## Documentation
+
+- [Building](docs/building.md) — CMake options, build targets, dependencies
+- [Classifier](docs/classifier.md) — Training and inference CLI reference
+- [GAN](docs/gan.md) — GAN training and image generation CLI reference
+- [Hyperparameters](docs/hyperparameters.md) — Learning rate schedules, architecture guidance, GAN stability tricks
 
 ---
 
-## Exit codes (typical)
+# MatrixGUI
 
-Exact codes are defined in `core/main_headless.cpp`. In practice:
+**Heta nie production rašeńnie!**
 
-| Code | Situation |
-|------|-----------|
-| 0 | Success |
-| 1 | Missing or invalid `--network` / predict arguments |
-| 2 | Missing dataset paths in training mode |
-| 3 | Dataset path does not match the expected `0`..`9` layout |
-| 4 | Invalid numeric or enum arguments, invalid `--layers`, or exception during predict |
-| 5 | Predict mode: failed to load `.wgt` |
-| 6 | Predict mode: image path not found |
+Heta prajekt pa vyvučeńni pryncypaŭ raboty neŭronnych sietak. Sproba stvaryć z nulia framework dlia stvareńnia roznaha kštaltu madeliaŭ, trenavańnia i inferensu.
+Tut jość nabor klasaŭ dlia vykarystańńia ŭ svaich pragramach, jość versii pragramy trenavańnia i inferensu z kamandnaha radku, versii z grafičnym interfejsam.
 
----
+## Režymy
 
-## See also
+| Režym | Kartka interfejsu | Binarnik CLI | Apisańnie |
+|------|---------|------------|-------------|
+| Klasifikatar | Classifier | `MatrixGui_headless` | Navučaje madeĺ dlia klasifikacyi ličbaŭ ad 1 da 9 |
+| Raspaznavaĺnik | Recognizer | `MatrixGui_headless --predict-image` | Klasifikuje zadadzienuju vyjavu (z fajlu) |
+| Generatar GAN | Generator | `MatrixGui_gan` | Navučaje cGAN-madeĺ i generuje syntetyčnyja vyjavy ličbaŭ |
 
-- `core/main_headless.cpp` — Argument parsing and behavior.
-- `core/learning_config.h` — Default training hyperparameters.
-- `gui/learning_config_widget.cpp` — GUI defaults aligned with the same `LearningConfig` structure.
+## Chutki start
+
+**Zborka ŭsiaho prajektu:**
+
+```bash
+cmake -B build
+cmake --build build
+```
+
+**Navučyć ulasny klasifikatar:**
+
+```bash
+./build/MatrixGui_headless \
+  --network models/digits.wgt \  # vaš šliach da novaj madeli
+  --dataset /path/to/dataset
+```
+
+Pra farmat datasetu hliadzi nižej.
+
+**Klasifikavać (raspaznać) vyjavu:**
+
+```bash
+./build/MatrixGui_headless \
+  --network models/digits.wgt \
+  --predict-image samples/seven.png
+```
+
+**Navučyć generatar (GAN)**:
+
+Patrabuje navučany klasifikatar!
+
+```bash
+./build/MatrixGui_gan \
+  --classifier models/digits.wgt \
+  --dataset /path/to/mnist_split
+```
+
+**Zgeneravać vyjavu ličby:**
+
+```bash
+./build/MatrixGui_gan \
+  --generate --label 7 \
+  --generator models/generator.wgt \
+  --output samples/seven.png
+```
+
+## Farmat datasetu
+
+Navučaĺny i testavy dataset musić być dyrektoryjaj, čyje niepasrednyja pad-dyrektoryi nazvanyja ad `0` da `9`, kožnaja ź jakich utrymoŭvaje PNG-vyjavy adpaviednaj ličby:
+
+```
+data/mnist_split/
+  0/  *.png
+  1/  *.png
+  ...
+  9/  *.png
+```
+
+Vyjavy čakajucca ŭ pamiery 28x28 pikseliaŭ, jakija potym transfarmujucca va ŭvachodny adnamierny vektar pamieram u 784 elementy.
+
+## Dakumentacyja (pa-angieĺsku)
+
+- [Zborka](docs/building.md) — opcyi CMake, mety zborki, zaliežnaści
+- [Klasifikatar](docs/classifier.md) — apisańnie navučańnia i inferensu ŭtylitaj kamandnaha radku
+- [GAN](docs/gan.md) — navučańnie GAN i generacyja vyjaŭ utylitaj kamandnaha radku
+- [Hiperparametry](docs/hyperparameters.md) — rasklad uzroŭniu navyčańnia (learning rate), dapamožnik pa architektury, parady dlia stabilizacyi GAN

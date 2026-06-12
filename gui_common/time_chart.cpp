@@ -1,4 +1,4 @@
-#include "time_chart.h"
+#include "gui_common/time_chart.h"
 
 #include <QChart>
 #include <QChartView>
@@ -13,10 +13,7 @@ TimeChart::TimeChart(QWidget* parent)
     chart->setAnimationOptions(QChart::SeriesAnimations);
     chart->legend()->hide();
 
-    series = new QLineSeries();
-    chart->addSeries(series);
     chart->setTheme(QChart::ChartThemeQt);
-    series->setPointsVisible(true);
 
     axisX = new QValueAxis();
     axisX->setRange(0, 20);
@@ -25,8 +22,6 @@ TimeChart::TimeChart(QWidget* parent)
 
     chart->addAxis(axisX, Qt::AlignBottom);
     chart->addAxis(axisY, Qt::AlignLeft);
-    series->attachAxis(axisX);
-    series->attachAxis(axisY);
 
     view = new QChartView(chart);
     view->setRenderHint(QPainter::Antialiasing);
@@ -42,6 +37,10 @@ void TimeChart::setTitle(const QString& title)
     chart->setTitle(title);
 }
 
+QChart* TimeChart::getChart() {
+    return chart;
+}
+
 QValueAxis* TimeChart::getAxisX()
 {
     return axisX;
@@ -52,9 +51,10 @@ QValueAxis* TimeChart::getAxisY()
     return axisY;
 }
 
-void TimeChart::addPoint(const double value)
+void TimeChart::addPoint(const double value, const QString& seriesName)
 {
     const double timeOffset = startTime.msecsTo(QDateTime::currentDateTime()) / 1000.0;
+    auto* series = getSeries(seriesName);
     series->append(timeOffset, value);
 
     const auto length = series->count();
@@ -66,19 +66,23 @@ void TimeChart::addPoint(const double value)
     };
 }
 
-void TimeChart::updateYAxisRange()
-{
-    if (series->count() == 0) return;
-
-    double minY = 100, maxY = 0;
-    for (int i = 0; i < series->count(); ++i) {
-        QPointF point = series->at(i);
-        if (point.y() < minY) minY = point.y();
-        if (point.y() > maxY) maxY = point.y();
+QLineSeries* TimeChart::getSeries(const QString& name) {
+    auto iter = allSeries.find(name);
+    if (iter != allSeries.end()) {
+        return iter->second;
     }
 
-    double padding = (maxY - minY) * 0.1;
-    if (padding == 0) padding = 5;
+    auto* series = new QLineSeries();
+    series->setName(name);
+    chart->addSeries(series);
+    series->setPointsVisible();
+    series->attachAxis(axisX);
+    series->attachAxis(axisY);
+    allSeries[name] = series;
 
-    axisY->setRange(minY - padding, maxY + padding);
+    if (allSeries.size() > 1) {
+        chart->legend()->show();
+    }
+
+    return series;
 }

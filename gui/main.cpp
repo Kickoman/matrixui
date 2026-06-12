@@ -1,10 +1,12 @@
 #include <QApplication>
-#include <QSettings>
+#include <QCommandLineParser>
+#include <QFontDatabase>
 #include "main_window.h"
-#include "trainer.h"
-#include "digits_runner.h"
-#include "advanced_terminal.h"
+#include "main_controller.h"
 
+#include "gui/lib/theme.h"
+
+extern void qInitResources_fonts();
 
 int main(int argc, char** argv) {
     QApplication a(argc, argv);
@@ -12,26 +14,39 @@ int main(int argc, char** argv) {
     a.setApplicationDisplayName("Neural Networks by Kastus");
     a.setOrganizationName("Kastus");
 
+    QCommandLineParser parser;
+    parser.setApplicationDescription("Neural networks playground");
+    parser.addHelpOption();
+
+    QCommandLineOption theme(
+        QStringList() << "t" << "theme",
+        "Set force application style (dark/light)",
+        "theme"
+    );
+    parser.addOption(theme);
+    parser.process(a);
+
+    if (!parser.isSet(theme) && AppTheme::IsSystemDarkMode()
+        || parser.isSet(theme) && parser.value(theme) == "dark"
+    ) {
+        AppTheme::SetTheme(Theme::Dark);
+        AppTheme::ApplyTheme(a);
+    }
+
+    constexpr char* fontPath = ":/fonts/ubuntu-sans.ttf";
+    const auto fontId = QFontDatabase::addApplicationFont(fontPath);
+    if (fontId != -1) {
+        qDebug() << "Font ID installed: " << fontId;
+        QFont font("ubuntu-sans");
+        a.setFont(font);
+    } else {
+        qDebug() << "Failed to load fonts...";
+    }
+
+    MainController controller;
     MainWindow window;
-    auto stream = createTerminalOStream(window.getTerminalWidget());
-
-    QSettings settings;
-    Neural::Trainer recognizer;
-    DigitsRecognizerController controller(&recognizer);
-    controller.loadNetwork(settings.value("last_network_name", QString("network.wgt")).toString());
-    controller.setTrainingDataset(settings.value(
-        "last_training_dataset_path",
-        QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
-    ).toString());
-    controller.setTestingDataset(settings.value(
-        "last_testing_dataset_path",
-        QString("/home/kanstancin/Documents/projects/digits-generator/digit_images/")
-    ).toString());
-
-    recognizer.setOutputStream(stream.get());
-    window.setLogger(stream.get());
     window.setController(&controller);
-
+    window.handleNewTabRequested();
     window.show();
     return a.exec();
 }
