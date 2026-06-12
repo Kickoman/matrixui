@@ -27,6 +27,9 @@ public:
 private:
     bool initialized = false;
     NeuralNetwork config;
+
+    // Activations storage for forward-pass
+    std::vector<Matrix> activations;
 };
 
 }

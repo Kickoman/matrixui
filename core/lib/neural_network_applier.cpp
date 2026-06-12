@@ -15,11 +15,15 @@ const NeuralNetwork& NeuralNetworkApplier::getNeuralNetworkConfig() const {
 void NeuralNetworkApplier::initializeNetwork(const NeuralNetwork& network) {
     config = network;
     initialized = true;
+
+    activations.resize(config.layerStack.size() + 1);
 }
 
 void NeuralNetworkApplier::initializeNetwork(NeuralNetwork&& network) {
     config = std::move(network);
     initialized = true;
+
+    activations.resize(config.layerStack.size() + 1);
 }
 
 NeuralNetworkApplier::NeuralNetworkApplier(const NeuralNetwork& network) {
@@ -37,7 +41,7 @@ Matrix NeuralNetworkApplier::predict(const Matrix& input) const {
     const ForwardContext ctx{false, 0.0};
     Matrix current = input;
     for (auto& layer : config.layerStack) {
-        current = std::visit([&](auto& l) { return l.forward(current); }, layer);
+        current = std::visit([&](auto& l) { return l.forward(current, ctx); }, layer);
     }
     return current;
 }
@@ -53,18 +57,24 @@ Matrix NeuralNetworkApplier::forward(const Matrix& input, const double dropoutRa
         throw std::runtime_error("Network must be initialized before forward pass");
     }
     const ForwardContext ctx{true, dropoutRate};
-    Matrix current = input;
-    for (auto& layer : config.layerStack) {
-        current = std::visit([&](auto& l) { return l.forward(current, ctx); }, layer);
+    activations[0] = input;
+
+    const auto layersCount = config.layerStack.size();
+    for (size_t i = 0; i < layersCount; ++i) {
+        const auto& layer = config.layerStack[i];
+        activations[i + 1] = std::visit([&](auto& l) { return l.forward(activations[i], ctx); }, layer);
     }
-    return current;
+
+    return activations.back();
 }
 
 Matrix NeuralNetworkApplier::backward(const Matrix& lossGradient) {
     Matrix grad = lossGradient;
-    for (int i = static_cast<int>(config.layerStack.size()) - 1; i >= 0; --i) {
-        grad = std::visit([&](auto& l) { return l.backward(grad); }, config.layerStack[i]);
+    std::int64_t layersSize = static_cast<int>(config.layerStack.size());
+    for (int i = layersSize - 1; i >= 0; --i) {
+        grad = std::visit([&](auto& l) { return l.backward(grad, activations[i], activations[i + 1]); }, config.layerStack[i]);
     }
+
     return grad;
 }
 

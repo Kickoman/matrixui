@@ -5,9 +5,8 @@
 
 Matrix::Matrix() : data(0, 0) {}
 
-Matrix::Matrix(size_t rows, size_t cols) : data(rows, cols) {
-    data.setZero();
-}
+Matrix::Matrix(size_t rows, size_t cols) : data(rows, cols)
+{ }
 
 Matrix::Matrix(size_t rows, size_t cols, double initialValue) : data(rows, cols) {
     data.setConstant(initialValue);
@@ -118,6 +117,31 @@ Matrix Matrix::ones(size_t rows, size_t cols) {
 
 Matrix Matrix::transpose() const {
     return Matrix(data.transpose());
+}
+
+Matrix Matrix::transposeMultiply(const Matrix& other) const {
+    return Matrix(data.transpose() * other.data);
+}
+
+Matrix Matrix::multiplyTranspose(const Matrix& other) const {
+    return Matrix(data * other.data.transpose());
+}
+
+Matrix& Matrix::addTransposeMultiply(const Matrix& a, const Matrix& b) {
+    data.noalias() += a.data.transpose() * b.data;
+    return *this;
+}
+
+Matrix Matrix::multiplyAdd(const Matrix& multiplier, const Matrix& addition) const {
+    Matrix result;
+    result.data.noalias() = data * multiplier.data;
+    result.data += addition.data;
+    return result;
+}
+
+Matrix& Matrix::substractScaled(const double alpha, const Matrix& other) {
+    data -= alpha * other.data;
+    return *this;
 }
 
 Matrix Matrix::transform(const size_t rows, const size_t cols) const {
