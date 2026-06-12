@@ -341,6 +341,7 @@ buildnogui
 experiments/*
 !experiments/analyze.py
 !experiments/run_experiments.py
+!experiments/run_experiments_parallel.py
 !experiments/requirements.txt
 
 .venv
