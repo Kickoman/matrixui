@@ -1,5 +1,6 @@
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <ios>
 #include <iostream>
 #include <map>
@@ -59,6 +60,30 @@ const char* activationName(Neural::ActivationType a) {
             return "softmax";
     }
     return "?";
+}
+
+// Loads `config` from a JSON file (as written by the "train" subcommand's config dump).
+// Leaves `config` untouched if `path` is empty. Returns false (after printing an error) on
+// a missing file or malformed JSON.
+template <typename Config>
+bool loadJsonConfig(const std::string& path, Config& config, const char* label) {
+    if (path.empty()) {
+        return true;
+    }
+    std::ifstream in(path);
+    if (!in) {
+        std::cerr << "Failed to open " << label << " config file: " << path << "\n";
+        return false;
+    }
+    try {
+        nlohmann::json j;
+        in >> j;
+        config = j.get<Config>();
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse " << label << " config (" << path << "): " << e.what() << "\n";
+        return false;
+    }
+    return true;
 }
 
 std::size_t maxProbabilityClassIndex(const Matrix& output) {
@@ -126,11 +151,49 @@ int main(int argc, char** argv) {
     netConfig.layersSizes = {28 * 28, 50, 20, 10};
     std::size_t testFileLimit = 0;
 
+    // --learning-config/--network-config load their respective structs from JSON files (as
+    // written by this command's own config dump) before the per-field options below are
+    // registered, so the loaded values become the new defaults: any per-field flag passed on
+    // the command line still overrides just that field.
+    const auto findOptionValue = [argc, argv](const std::string& flag) -> std::string {
+        const std::string eqPrefix = flag + "=";
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == flag && i + 1 < argc) {
+                return argv[i + 1];
+            }
+            if (arg.rfind(eqPrefix, 0) == 0) {
+                return arg.substr(eqPrefix.size());
+            }
+        }
+        return {};
+    };
+
+    std::string learningConfigPath = findOptionValue("--learning-config");
+    std::string networkConfigPath = findOptionValue("--network-config");
+    if (!loadJsonConfig(learningConfigPath, learningConfig, "learning")) {
+        return 4;
+    }
+    if (!loadJsonConfig(networkConfigPath, netConfig, "network")) {
+        return 4;
+    }
+
     trainCmd->add_option("--network", trainNetworkPath, "Network save path (.wgt). Created if missing.")
         ->required();
 
     trainCmd->add_option("--working-directory", workingDirectoryPath, "Working directory for training data.")
         ->capture_default_str();
+
+    trainCmd->add_option("--learning-config", learningConfigPath,
+            "Load training hyperparameters from a JSON file (as written to learning-config.json); "
+            "flags below override individual fields from the loaded config.")
+        ->group("Config")
+        ->check(CLI::ExistingFile);
+    trainCmd->add_option("--network-config", networkConfigPath,
+            "Load network topology from a JSON file (as written to network-config.json), used only "
+            "when creating a new network; flags below override individual fields from the loaded config.")
+        ->group("Config")
+        ->check(CLI::ExistingFile);
 
     trainCmd->add_option("--dataset", datasetPath,
             "Dataset root used for both training and testing (subdirs 0..9). "
