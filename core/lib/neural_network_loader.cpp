@@ -128,7 +128,7 @@ void PushActivationLayers(
 } // namespace
 
 
-void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
+void SaveNetwork(const NeuralNetwork& network, const std::filesystem::path& filename) {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file for writing");
@@ -167,13 +167,13 @@ void SaveNetwork(const NeuralNetwork& network, const std::string& filename) {
     }
 }
 
-std::optional<NeuralNetworkConfiguration> LoadConfig(const std::string& filename) {
+std::optional<NeuralNetworkConfiguration> LoadConfig(const std::filesystem::path& filename) {
     if (!std::filesystem::exists(filename)) {
         return std::nullopt;
     }
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for reading: " + filename);
+        throw std::runtime_error("Cannot open file for reading: " + filename.string());
     }
 
     file.seekg(sizeof(std::uint32_t)); // skip version
@@ -200,7 +200,7 @@ std::optional<NeuralNetworkConfiguration> LoadConfig(const std::string& filename
     }
 }
 
-std::optional<NeuralNetwork> LoadNetwork(const std::string& filename) {
+std::optional<NeuralNetwork> LoadNetwork(const std::filesystem::path& filename) {
     if (!std::filesystem::exists(filename)) {
         return std::nullopt;
     }

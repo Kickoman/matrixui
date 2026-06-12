@@ -45,7 +45,7 @@ DigitsClassifierController::DigitsClassifierController(QObject* parent)
     : ModeController(parent)
     , settings("digits_classifier")
 {
-    recognizer.setEpochCallback([this]{
+    recognizer.setEpochCallback([this](const Neural::Classifier::EpochLog&){
         this->testOnce();
         Neural::SaveNetwork(this->recognizer.getNetwork(), this->networkName.toStdString());
     });

@@ -24,11 +24,11 @@ struct NeuralNetwork {
     ActivationType outputActivation() const { return config.outputActivation; }
 };
 
-}
-
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    Neural::NeuralNetworkConfiguration,
+    NeuralNetworkConfiguration,
     hiddenActivation,
     outputActivation,
     layersSizes
 );
+
+}

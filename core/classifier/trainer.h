@@ -43,6 +43,13 @@ struct TestResult {
     }
 };
 
+struct EpochLog {
+    std::size_t epochNumber;
+    double learningRate;
+    double trainAccuracy;
+    double bestTrainAccuracy;
+    std::size_t stagnateEpochsCount;
+};
 
 class Trainer {
 public:
@@ -50,7 +57,7 @@ public:
     void setNetwork(const NeuralNetwork& network);
     void setTrainingDataset(std::unique_ptr<Neural::Dataset>&& dataset);
     void setTestingDataset(std::unique_ptr<Neural::Dataset>&& dataset);
-    void setEpochCallback(const std::function<void()> callback);
+    void setEpochCallback(const std::function<void(const EpochLog&)> callback);
     void setVerbose(const bool verbose);
     void setOutputStream(std::ostream* stream);
 
@@ -76,7 +83,7 @@ private:
     std::atomic<bool> running{false};
     bool verbose = true;
 
-    std::function<void()> epochCallback;
+    std::function<void(const EpochLog&)> epochCallback;
     std::ostream* stream = nullptr;
 };
 

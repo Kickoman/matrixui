@@ -19,11 +19,8 @@ struct LearningConfig {
     double dropoutRate = 0.0;
 };
 
-} // namespace Classifier
-} // namespace Neural
-
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    Neural::Classifier::LearningConfig,
+    LearningConfig,
     initialLearningRate,
     minLearningRate,
     learningRateDecay,
@@ -33,3 +30,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
     datasetLimitPerLabel,
     dropoutRate
 );
+
+
+} // namespace Classifier
+} // namespace Neural

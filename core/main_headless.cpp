@@ -1,4 +1,6 @@
+#include <chrono>
 #include <filesystem>
+#include <ios>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -18,6 +20,19 @@
 #include "matrix/matrix.h"
 
 #include <CLI11/CLI11.hpp>
+#include <nlohmann/json.hpp>
+
+namespace Neural {
+namespace Classifier {
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EpochLog,
+    epochNumber,
+    learningRate,
+    trainAccuracy,
+    bestTrainAccuracy,
+    stagnateEpochsCount
+)
+}
+}
 
 
 namespace {
@@ -102,6 +117,7 @@ int main(int argc, char** argv) {
     CLI::App* trainCmd = app.add_subcommand("train", "Train (or continue training) a classifier network on a directory dataset");
 
     std::string trainNetworkPath;
+    std::string workingDirectoryPath = "training-data";
     std::string datasetPath;
     std::string trainDatasetPath;
     std::string testDatasetPath;
@@ -112,6 +128,9 @@ int main(int argc, char** argv) {
 
     trainCmd->add_option("--network", trainNetworkPath, "Network save path (.wgt). Created if missing.")
         ->required();
+
+    trainCmd->add_option("--working-directory", workingDirectoryPath, "Working directory for training data.")
+        ->capture_default_str();
 
     trainCmd->add_option("--dataset", datasetPath,
             "Dataset root used for both training and testing (subdirs 0..9). "
@@ -239,11 +258,34 @@ int main(int argc, char** argv) {
         loadedMaybe = Neural::CreateNetwork(netConfig);
     }
 
+    const std::string currentRunDirectoryName
+        = std::filesystem::path(trainNetworkPath).filename().string() + "_"
+        + std::to_string(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::high_resolution_clock::now().time_since_epoch()
+            ).count()
+        );
+    const auto currentWorkingPath = std::filesystem::path(workingDirectoryPath) / currentRunDirectoryName;
+    std::filesystem::create_directories(currentWorkingPath);
+
+    // Save configs
+    {
+        std::ofstream learningConfigDump(currentWorkingPath / "learning-config.json");
+        std::ofstream neuralNetworkConfigDump(currentWorkingPath / "network-config.json");
+        nlohmann::json learningConfigSerialized = learningConfig;
+        nlohmann::json networkConfigSerialized = loadedMaybe->config;
+        learningConfigDump << learningConfigSerialized.dump(2);
+        neuralNetworkConfigDump << networkConfigSerialized.dump(2);
+    }
+
     recognizer.setNetwork(loadedMaybe.value());
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
-    recognizer.setEpochCallback([&recognizer, &trainNetworkPath] {
+    std::ofstream learningLog(currentWorkingPath / "log.jsonl", std::ios_base::app);
+    recognizer.setEpochCallback([&recognizer, &trainNetworkPath, &currentWorkingPath, &learningLog] (const Neural::Classifier::EpochLog& log) {
         Neural::SaveNetwork(recognizer.getNetwork(), trainNetworkPath);
+        Neural::SaveNetwork(recognizer.getNetwork(), currentWorkingPath / (std::string("backup-") + std::to_string(log.epochNumber)));
+        learningLog << nlohmann::json(log).dump() << std::endl;
     });
 
     recognizer.train(learningConfig);

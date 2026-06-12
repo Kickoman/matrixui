@@ -102,17 +102,18 @@ using LayerData = std::variant<
     SoftmaxLayer
 >;
 
+NLOHMANN_JSON_SERIALIZE_ENUM(LayerType, {
+    {LayerType::Dense, "dense"},
+    {LayerType::Activation, "activation"},
+});
+
+NLOHMANN_JSON_SERIALIZE_ENUM(ActivationType, {
+    {ActivationType::Sigmoid, "sigmoid"},
+    {ActivationType::ReLU, "relu"},
+    {ActivationType::Tanh, "tanh"},
+    {ActivationType::Softmax, "softmax"},
+    {ActivationType::LeakyReLU, "leakyrelu"},
+});
+
+
 }
-
-NLOHMANN_JSON_SERIALIZE_ENUM(Neural::LayerType, {
-    {Neural::LayerType::Dense, "dense"},
-    {Neural::LayerType::Activation, "activation"},
-});
-
-NLOHMANN_JSON_SERIALIZE_ENUM(Neural::ActivationType, {
-    {Neural::ActivationType::Sigmoid, "sigmoid"},
-    {Neural::ActivationType::ReLU, "relu"},
-    {Neural::ActivationType::Tanh, "tanh"},
-    {Neural::ActivationType::Softmax, "softmax"},
-    {Neural::ActivationType::LeakyReLU, "leakyrelu"},
-});
