@@ -47,11 +47,11 @@ PARAM_GRID = {
         "784,512,128,10",
         "784,256,128,64,10"
     ],
-    "initialLearningRate": [0.005, 0.01, 0.001, 0.002],
+    "initialLearningRate": [0.005, 0.01, 0.001],
     "dropoutRate": [0.0, 0.1, 0.2],
-    "patience": [3, 5, 10],
-    "learningRateDecay": [0.25, 0.5, 0.8, 0.9],
-    "datasetLimitPerLabel": [100, 500, 1000, 2000, 4000]
+    "patience": [5, 10],
+    "learningRateDecay": [0.5, 0.8, 0.9],
+    "datasetLimitPerLabel": [100, 500, 1000, 4000]
 }
 
 # Output summary
@@ -174,6 +174,10 @@ def run_single_experiment(params, run_id):
         dest = LOGS_DIR / f"{run_id}.json"
         shutil.copy2(log_path, dest)
         print(f"[{run_id}] Log saved to {dest}")
+
+    test_src = run_dir / "testing-log.jsonl"
+    if test_src.exists():
+        shutil.copy2(test_src, LOGS_DIR / f"{run_id}.test.json")
 
     elapsed = t1 - t0
     print(f"[{run_id}] Best accuracy: {best_acc:.4f} at epoch {best_ep}   ({elapsed:.1f}s)")

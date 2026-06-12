@@ -337,3 +337,11 @@ build_compare/
 compare/
 .compare_cache/
 buildnogui
+
+experiments/*
+!experiments/analyze.py
+!experiments/run_experiments.py
+!experiments/requirements.txt
+
+.venv
+.vscode

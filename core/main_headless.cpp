@@ -25,13 +25,18 @@
 
 namespace Neural {
 namespace Classifier {
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EpochLog,
+
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EpochLog,
     epochNumber,
     learningRate,
     trainAccuracy,
     bestTrainAccuracy,
     stagnateEpochsCount
-)
+);
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestStatistics, passedTests, totalTests);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestResult, stats);
+
 }
 }
 
@@ -345,10 +350,17 @@ int main(int argc, char** argv) {
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
     std::ofstream learningLog(currentWorkingPath / "log.jsonl", std::ios_base::app);
-    recognizer.setEpochCallback([&recognizer, &trainNetworkPath, &currentWorkingPath, &learningLog] (const Neural::Classifier::EpochLog& log) {
+    std::ofstream testingLog(currentWorkingPath / "testing-log.jsonl", std::ios_base::app);
+    recognizer.setEpochCallback([&] (const Neural::Classifier::EpochLog& log) {
         Neural::SaveNetwork(recognizer.getNetwork(), trainNetworkPath);
         Neural::SaveNetwork(recognizer.getNetwork(), currentWorkingPath / (std::string("backup-") + std::to_string(log.epochNumber)));
         learningLog << nlohmann::json(log).dump() << std::endl;
+
+        if ((log.epochNumber + 1) % 20 == 0) {
+            nlohmann::json testResult = recognizer.test(testFileLimit);
+            testResult["epoch"] = log.epochNumber;
+            testingLog << testResult.dump() << std::endl;
+        }
     });
 
     recognizer.train(learningConfig);
@@ -359,6 +371,10 @@ int main(int argc, char** argv) {
         std::cout << "Final test accuracy: " << 100.0 * total.passedTests / total.totalTests << "% ("
                   << total.passedTests << "/" << total.totalTests << ")\n";
     }
+
+    nlohmann::json json = testResult;
+    json["epoch"] = -1;
+    testingLog << json.dump() << std::endl;
 
     return 0;
 }
