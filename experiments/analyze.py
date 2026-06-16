@@ -470,6 +470,88 @@ def plot_architecture(df, target, plot_dir):
     _save(fig, plot_dir, f"architecture_{target}.png")
 
 
+def _arch_order_by_capacity(df):
+    """Architectures ordered small -> large (by parameter count), so the x-axis
+    means the same thing in every facet. Falls back to alphabetical."""
+    if "n_params" in df.columns and df["n_params"].notna().any():
+        return (df.dropna(subset=["n_params"])
+                  .groupby("layers")["n_params"].first()
+                  .sort_values().index.tolist())
+    return sorted(df["layers"].dropna().unique())
+
+
+def plot_architecture_faceted(df, target, plot_dir, facet_by="datasetLimitPerLabel"):
+    """One architecture boxplot panel per `facet_by` level (default: dataset size).
+
+    Plotting `target` by architecture while averaging over every other setting hides
+    the fact that a confound (usually how much data each run saw) drives most of the
+    variance. Faceting holds that confound fixed inside each panel, so the *true*
+    architecture effect is what's left. The x-axis is ordered by capacity (small ->
+    large) and the y-axis is shared, so panels are directly comparable.
+    """
+    if "layers" not in df.columns or facet_by not in df.columns:
+        return
+    levels = sorted(df[facet_by].dropna().unique())
+    if len(levels) < 2:
+        return  # nothing to separate
+    arch_order = _arch_order_by_capacity(df)
+
+    n = len(levels)
+    cols = min(3, n)
+    rows = -(-n // cols)
+    fig, axes = plt.subplots(rows, cols, sharey=True,
+                             figsize=(cols * (0.7 * len(arch_order) + 2.5), rows * 4.6),
+                             squeeze=False)
+    axes = axes.flatten()
+    for i, lvl in enumerate(levels):
+        ax = axes[i]
+        sub = df[df[facet_by] == lvl]
+        sns.boxplot(data=sub, x="layers", y=target, order=arch_order,
+                    ax=ax, color="#B2DF8A", fliersize=2)
+        means = sub.groupby("layers")[target].mean().reindex(arch_order)
+        ax.plot(range(len(arch_order)), means.values, "o-", color="crimson",
+                lw=1.4, markersize=4, label="mean")
+        ax.set_title(f"{facet_by} = {lvl}   (n={len(sub)})")
+        ax.set_xlabel("")
+        ax.tick_params(axis="x", rotation=45)
+        for lbl in ax.get_xticklabels():
+            lbl.set_ha("right")
+        ax.legend(fontsize=8)
+    for j in range(n, len(axes)):
+        fig.delaxes(axes[j])
+    fig.suptitle(f"{target} by architecture, held within each {facet_by} level "
+                 f"(x-axis: smaller \u2192 larger network)", fontsize=13)
+    _save(fig, plot_dir, f"architecture_faceted_by_{facet_by}.png")
+
+
+def plot_arch_vs_facet_heatmap(df, target, plot_dir, facet_by="datasetLimitPerLabel"):
+    """Mean `target` for every architecture x `facet_by` cell on one heatmap.
+
+    Reading across a row (architecture fixed, data varying) vs down a column
+    (data fixed, architecture varying) shows at a glance which lever actually moves
+    the score. Row range and column range are annotated for exactly that comparison.
+    """
+    if "layers" not in df.columns or facet_by not in df.columns:
+        return
+    if df[facet_by].nunique(dropna=True) < 2:
+        return
+    arch_order = _arch_order_by_capacity(df)
+    piv = (df.pivot_table(index="layers", columns=facet_by, values=target,
+                          aggfunc="mean").reindex(arch_order))
+    # how much each lever moves the mean, on average
+    row_span = (piv.max(axis=1) - piv.min(axis=1)).mean()   # vary data, fix arch
+    col_span = (piv.max(axis=0) - piv.min(axis=0)).mean()   # vary arch, fix data
+    fig, ax = plt.subplots(figsize=(1.1 * piv.shape[1] + 4, 0.6 * piv.shape[0] + 2))
+    sns.heatmap(piv, annot=True, fmt=".3f", cmap="viridis", ax=ax,
+                cbar_kws={"label": f"mean {target}"})
+    ax.set_title(f"mean {target}: architecture (rows) x {facet_by} (cols)\n"
+                 f"avg swing from {facet_by}: {row_span:.3f}   |   "
+                 f"avg swing from architecture: {col_span:.3f}")
+    ax.set_ylabel("architecture (small \u2192 large, top \u2192 bottom)")
+    _save(fig, plot_dir, f"architecture_vs_{facet_by}_heatmap.png")
+    return row_span, col_span
+
+
 def plot_interactions(df, factors, target, plot_dir, k=3):
     pairs = []
     for i in range(len(factors)):
@@ -746,6 +828,8 @@ def main():
     safe(plot_marginal_effects, df, factors, target, plot_dir)
     safe(plot_overfitting, df, plot_dir)
     safe(plot_architecture, df, target, plot_dir)
+    safe(plot_architecture_faceted, df, target, plot_dir)
+    safe(plot_arch_vs_facet_heatmap, df, target, plot_dir)
     interactions = safe(plot_interactions, df, factors, target, plot_dir) or []
     cd = safe(plot_class_difficulty, df, plot_dir)
     cd = cd if cd is not None else pd.DataFrame()

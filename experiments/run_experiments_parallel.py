@@ -55,8 +55,8 @@ BASE_ARGS = [
 # Default values for the learning config JSON (overridden where listed in PARAM_GRID)
 BASE_CONFIG = {
     "datasetLimitPerLabel": 1000,
-    "dropoutRate": 0.1,
-    "initialLearningRate": 0.005,
+    "dropoutRate": 0.0,
+    "initialLearningRate": 0.001,
     "innerEpochs": 1,
     "learningRateDecay": 0.8,
     "maxEpochs": 500,           # kept constant (as requested)
@@ -75,10 +75,10 @@ PARAM_GRID = {
         "784,512,128,10",
         "784,256,128,64,10"
     ],
-    "initialLearningRate": [0.005, 0.01, 0.001],
-    "dropoutRate": [0.0, 0.1, 0.2],
-    "patience": [5, 10],
-    "learningRateDecay": [0.5, 0.8, 0.9],
+    # "initialLearningRate": [0.005, 0.01, 0.001],
+    # "dropoutRate": [0.0, 0.1, 0.2],
+    # "patience": [5, 10],
+    # "learningRateDecay": [0.5, 0.8, 0.9],
     "datasetLimitPerLabel": [100, 500, 1000, 4000]
 }
 
@@ -175,8 +175,10 @@ def run_single_experiment(params, run_id):
 
     config_path = generate_config_file(params, run_id)
     cmd, network_name = build_command(params, config_path, run_id)
-    print(f"[{run_id}] start  ({params['layers']}, lr={params['initialLearningRate']}, "
-          f"drop={params['dropoutRate']})")
+    layers = params.get('layers')
+    initialLr = params.get('initialLearningRate', BASE_CONFIG['initialLearningRate'])
+    drop = params.get('dropoutRate', BASE_CONFIG['dropoutRate'])
+    print(f"[{run_id}] start  ({layers}, lr={initialLr}, drop={drop})")
 
     # Each run's stdout/stderr goes to its own file so parallel output isn't interleaved.
     out_path = LOGS_DIR / f"{run_id}.out"

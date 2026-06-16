@@ -21,6 +21,7 @@ public:
 
     void setCurrentNetworkPath(const QString& path);
     void setDefaultLayersText(const QString& layers);
+    void setDefaultLayersText(const std::vector<std::size_t>& layers);
     void setDefaultActivations(Neural::ActivationType hidden, Neural::ActivationType output);
 
 private slots:

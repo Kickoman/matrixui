@@ -51,6 +51,8 @@ public slots:
     bool loadDataset(const QString& path);
     void loadGenerator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
     void loadDiscriminator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
+    void setImageWidth(std::size_t width) { imageWidth = width; }
+    void setImageHeight(std::size_t height) { imageHeight = height; }
 
 signals:
     void infoUpdated();
@@ -58,6 +60,8 @@ signals:
 
 private:
     bool canRunTraining() const;
+    Matrix readCached(const std::filesystem::path& path) const;
+    std::function<Matrix(const std::filesystem::path& path)> reader;
 
     QPointer<QThread> internalRunner;
     std::atomic<Neural::GAN::GanTrainer*> activeTrainer{nullptr};
@@ -70,6 +74,9 @@ private:
     QString datasetPath;
     QString generatorPath{"generator.wgt"};
     QString discriminatorPath{"discriminator.wgt"};
+
+    std::size_t imageWidth;
+    std::size_t imageHeight;
 
     std::optional<Neural::NeuralNetwork> classifierNet;
     std::optional<Neural::NeuralNetwork> generatorNet;

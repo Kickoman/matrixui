@@ -10,6 +10,7 @@
 
 #include <QThread>
 #include <QPointer>
+#include <filesystem>
 
 Q_DECLARE_METATYPE(Neural::Classifier::TestResult);
 Q_DECLARE_METATYPE(Neural::Classifier::LearningConfig);
@@ -26,6 +27,8 @@ public:
         std::string pathToTrainingDataset;
         std::string pathToTestingDataset;
         std::string networkName;
+        std::size_t imageWidth;
+        std::size_t imageHeight;
         std::vector<std::size_t> layersConfiguration;
         Neural::Classifier::LearningConfig learningConfig;
     };
@@ -47,6 +50,8 @@ public slots:
     void loadNetwork(const QString& networkName, Neural::NeuralNetworkConfiguration config = {});
     bool setTrainingDataset(const QString& pathToDataset);
     bool setTestingDataset(const QString& pathToDataset);
+    void setImageWidth(std::size_t width) { imageWidth = width; }
+    void setImageHeight(std::size_t height) { imageHeight = height; }
 
 
 signals:
@@ -55,6 +60,8 @@ signals:
 
 private:
     void updateStatistic(const Neural::Classifier::TestResult& result) const;
+    Matrix readCached(const std::filesystem::path& path) const;
+    std::vector<std::size_t> getDefaultLayers() const;
 
     QPointer<QThread> internalRunner;
 
@@ -62,6 +69,8 @@ private:
     QString networkName;
     QString pathToTrainingDataset;
     QString pathToTestingDataset;
+    std::size_t imageWidth;
+    std::size_t imageHeight;
     Neural::Classifier::LearningConfig learningConfig;
     Neural::Classifier::Trainer recognizer;
 };

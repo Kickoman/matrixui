@@ -10,6 +10,7 @@ class DigitsClassifierController;
 class QThread;
 class QPushButton;
 class QLabel;
+class QSpinBox;
 class LearningConfigWidget;
 namespace Neural { namespace Classifier { class TestResult; } }
 
@@ -46,6 +47,9 @@ private:
     QLabel* currentTestingDatasetLabel = nullptr;
     QLabel* currentTrainingDatasetLabel = nullptr;
     LearningConfigWidget* learningConfigWidget = nullptr;
+
+    QSpinBox* imageWidth = nullptr;
+    QSpinBox* imageHeight = nullptr;
 
     DigitsClassifierController* controller = nullptr;
 };

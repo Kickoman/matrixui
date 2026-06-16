@@ -56,13 +56,3 @@ void PngUtils::toImage(const Matrix& image, const std::string& filename) {
         throw std::runtime_error("Failed to write image: " + filename);
     }
 }
-
-Matrix PngUtils::fromImage(const std::string &filename, const unsigned int targetHeight, const unsigned int targetWidth, Cache &cache) {
-    const auto cacheHit = cache.get(filename);
-    if (cacheHit.has_value()) {
-        return *cacheHit;
-    }
-    const auto result = fromImage(filename, targetHeight, targetWidth);
-    cache.put(filename, result);
-    return result;
-}

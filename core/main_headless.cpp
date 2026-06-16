@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -12,6 +13,8 @@
 #include "core/classifier/trainer.h"
 #include "core/classifier/learning_config.h"
 
+#include "core/lib/cache.h"
+#include "core/lib/matrix_cache.h"
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/directory_dataset.h"
@@ -43,8 +46,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestResult, stats);
 
 namespace {
 
-bool validateDataset(const std::filesystem::path& datasetPath) {
-    for (int i = 0; i < 10; ++i) {
+bool validateDataset(const std::filesystem::path& datasetPath, const Neural::NeuralNetwork& network) {
+    const auto classCount = network.outputSize();
+    for (int i = 0; i < classCount; ++i) {
         const auto subdirectory = datasetPath / std::to_string(i);
         if (!std::filesystem::exists(subdirectory) || !std::filesystem::is_directory(subdirectory)) {
             return false;
@@ -107,15 +111,20 @@ std::size_t maxProbabilityClassIndex(const Matrix& output) {
     return best;
 }
 
-int runPredictImage(const std::string& networkPath, const std::string& imagePath) {
+int runPredictImage(
+    const std::string& networkPath,
+    const std::string& imagePath,
+    const std::size_t imageHeight,
+    const std::size_t imageWidth
+) {
     auto loaded = Neural::LoadNetwork(networkPath);
     if (!loaded) {
         std::cerr << "Failed to load network: " << networkPath << "\n";
         return 5;
     }
 
-    PngUtils::Cache cache;
-    Matrix input = PngUtils::fromImage(imagePath, 28, 28, cache).transform(1, 28 * 28);
+    Matrix input = PngUtils::fromImage(imagePath, imageHeight, imageWidth)
+        .transform(1, imageHeight * imageWidth);
     Neural::NeuralNetworkApplier applier(std::move(loaded.value()));
     const Matrix out = applier.predict(input);
     const std::size_t digit = maxProbabilityClassIndex(out);
@@ -135,6 +144,8 @@ int main(int argc, char** argv) {
 
     std::string predictNetworkPath;
     std::string imagePath;
+    std::size_t imageWidth = 28;
+    std::size_t imageHeight = 28;
 
     predictCmd->add_option("--network", predictNetworkPath, "Trained network file (.wgt) to load")
         ->required()
@@ -142,6 +153,12 @@ int main(int argc, char** argv) {
     predictCmd->add_option("--image", imagePath, "PNG image to classify")
         ->required()
         ->check(CLI::ExistingFile);
+    predictCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->capture_default_str();
+    predictCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->group("Dataset")
+        ->capture_default_str();
+
 
     // ---- train ----
     CLI::App* trainCmd = app.add_subcommand("train", "Train (or continue training) a classifier network on a directory dataset");
@@ -214,6 +231,12 @@ int main(int argc, char** argv) {
             "Max test files per class (0 = all). Runs evaluation after training.")
         ->group("Dataset")
         ->capture_default_str();
+    trainCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->group("Dataset")
+        ->capture_default_str();
+    trainCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->group("Dataset")
+        ->capture_default_str();
 
     trainCmd->add_option("--layers", netConfig.layersSizes,
             "Layer sizes, comma-separated (used only when creating a new network)")
@@ -258,7 +281,7 @@ int main(int argc, char** argv) {
 
     if (*predictCmd) {
         try {
-            return runPredictImage(predictNetworkPath, imagePath);
+            return runPredictImage(predictNetworkPath, imagePath, imageHeight, imageWidth);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
             return 4;
@@ -273,15 +296,6 @@ int main(int argc, char** argv) {
         std::cerr << "Specify data directories: use --dataset <dir> for both train and test, or set\n"
                      "  --train-dataset and/or --test-dataset (unspecified side falls back to --dataset).\n";
         return 2;
-    }
-
-    if (!validateDataset(trainingPath)) {
-        std::cerr << "Invalid training dataset (expected subdirectories 0..9): " << trainingPath << "\n";
-        return 3;
-    }
-    if (!validateDataset(testingPath)) {
-        std::cerr << "Invalid testing dataset (expected subdirectories 0..9): " << testingPath << "\n";
-        return 3;
     }
 
     if (netConfig.layersSizes.size() < 2) {
@@ -312,19 +326,45 @@ int main(int argc, char** argv) {
               << std::endl;
 
     Neural::Classifier::Trainer recognizer;
-    PngUtils::Cache pngCache;
-    const auto reader = [&pngCache](const std::filesystem::path& path) {
-        return PngUtils::fromImage(path.string(), 28, 28, pngCache).transform(1, 28 * 28);
+
+    Neural::NeuralNetwork network;
+    if (auto loadedMaybe = Neural::LoadNetwork(trainNetworkPath); loadedMaybe.has_value()) {
+        network = *loadedMaybe;
+    } else {
+        network = Neural::CreateNetwork(netConfig);
+    }
+
+    if (network.inputSize() != imageWidth * imageHeight) {
+        std::cerr << "Invalid image sizes: " << imageWidth << "x" << imageHeight
+            << " = " << imageWidth * imageHeight << ", while network input layer is " << network.inputSize() << "\n";
+        return 5;
+    }
+
+    if (!validateDataset(trainingPath, network)) {
+        std::cerr << "Invalid training dataset (expected subdirectories 0..9): " << trainingPath << "\n";
+        return 3;
+    }
+    if (!validateDataset(testingPath, network)) {
+        std::cerr << "Invalid testing dataset (expected subdirectories 0..9): " << testingPath << "\n";
+        return 3;
+    }
+
+    cache::LRUCache<std::filesystem::path, Matrix> pngCache;
+    const auto reader = [&pngCache, imageWidth, imageHeight](const std::filesystem::path& path) {
+        if (const auto cached = pngCache.get(path); cached.has_value()) {
+            return *cached;
+        }
+
+        const auto result = PngUtils::fromImage(path.string(), imageHeight, imageWidth)
+            .transform(1, imageHeight * imageWidth);
+        pngCache.put(path, result);
+        return result;
     };
     auto trainingDataset = std::make_unique<Neural::DirectoryDataset>(trainingPath);
     auto testingDataset = std::make_unique<Neural::DirectoryDataset>(testingPath);
     trainingDataset->setFileReader(reader);
     testingDataset->setFileReader(reader);
 
-    std::optional<Neural::NeuralNetwork> loadedMaybe = Neural::LoadNetwork(trainNetworkPath);
-    if (!loadedMaybe) {
-        loadedMaybe = Neural::CreateNetwork(netConfig);
-    }
 
     const std::string currentRunDirectoryName
         = std::filesystem::path(trainNetworkPath).filename().string() + "_"
@@ -341,12 +381,12 @@ int main(int argc, char** argv) {
         std::ofstream learningConfigDump(currentWorkingPath / "learning-config.json");
         std::ofstream neuralNetworkConfigDump(currentWorkingPath / "network-config.json");
         nlohmann::json learningConfigSerialized = learningConfig;
-        nlohmann::json networkConfigSerialized = loadedMaybe->config;
+        nlohmann::json networkConfigSerialized = network.config;
         learningConfigDump << learningConfigSerialized.dump(2);
         neuralNetworkConfigDump << networkConfigSerialized.dump(2);
     }
 
-    recognizer.setNetwork(loadedMaybe.value());
+    recognizer.setNetwork(network);
     recognizer.setTrainingDataset(std::move(trainingDataset));
     recognizer.setTestingDataset(std::move(testingDataset));
     std::ofstream learningLog(currentWorkingPath / "log.jsonl", std::ios_base::app);

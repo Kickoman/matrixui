@@ -7,6 +7,7 @@
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/directory_dataset.h"
 #include "core/lib/dataset.h"
+#include "core/lib/cache.h"
 
 #include "core/generator/gan_config.h"
 #include "core/generator/gan_trainer.h"
@@ -116,6 +117,8 @@ int main(int argc, char** argv) {
     std::string generatorPathArg = "generator.wgt";
     std::string outputPath = "generated.png";
     std::string classifierPathArg;
+    std::size_t imageWidth = 28;
+    std::size_t imageHeight = 28;
 
     generateCmd->add_option("--label", genLabel, "Digit to generate")->required();
     generateCmd->add_option("--num-classes", genNumClasses, "Number of digit classes")->capture_default_str();
@@ -129,6 +132,10 @@ int main(int argc, char** argv) {
     generateCmd->add_option("--classifier", classifierPathArg,
             "Optional: print this classifier's predicted label alongside each image")
         ->check(CLI::ExistingFile);
+    generateCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->capture_default_str();
+    generateCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->capture_default_str();
 
     // ---- train ----
     CLI::App* trainCmd = app.add_subcommand("train", "Train generator+discriminator against a frozen classifier");
@@ -159,6 +166,12 @@ int main(int argc, char** argv) {
         ->delimiter(',')->group("Topology")->capture_default_str();
     trainCmd->add_option("--num-classes", ganConfig.numClasses, "Number of digit classes")
         ->group("Topology")->capture_default_str();
+    trainCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->group("Topology")
+        ->capture_default_str();
+    trainCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->group("Topology")
+        ->capture_default_str();
 
     trainCmd->add_option("--gen-lr", ganConfig.generatorLr, "Generator learning rate")
         ->group("GAN training")->capture_default_str();
@@ -228,18 +241,18 @@ int main(int argc, char** argv) {
     }
 
     // *trainCmd
-    constexpr std::size_t kImageSize = 28 * 28;
+    // constexpr std::size_t kImageSize = 28 * 28;
 
     auto buildGenLayers = [&]() {
         // Input = noise (latentDim) concatenated with one-hot label (numClasses).
         std::vector<std::size_t> layers = {ganConfig.latentDim + ganConfig.numClasses};
         layers.insert(layers.end(), genHidden.begin(), genHidden.end());
-        layers.push_back(kImageSize);
+        layers.push_back(imageHeight * imageWidth);
         return layers;
     };
 
     auto buildDiscLayers = [&]() {
-        std::vector<std::size_t> layers = {kImageSize};
+        std::vector<std::size_t> layers = {imageHeight * imageWidth};
         layers.insert(layers.end(), discHidden.begin(), discHidden.end());
         layers.push_back(1);
         return layers;
@@ -268,9 +281,16 @@ int main(int argc, char** argv) {
     Neural::GAN::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
 
     // Load real training samples
-    PngUtils::Cache pngCache;
-    const auto reader = [&pngCache](const std::filesystem::path& path) {
-        return PngUtils::fromImage(path.string(), 28, 28, pngCache).transform(1, kImageSize);
+    cache::LRUCache<std::filesystem::path, Matrix> pngCache;
+    const auto reader = [&pngCache, imageWidth, imageHeight](const std::filesystem::path& path) {
+        if (const auto cached = pngCache.get(path); cached.has_value()) {
+            return *cached;
+        }
+
+        const auto result = PngUtils::fromImage(path.string(), imageHeight, imageWidth)
+            .transform(1, imageHeight * imageWidth);
+        pngCache.put(path, result);
+        return result;
     };
     Neural::DirectoryDataset dataset(datasetPath);
     dataset.setFileReader(reader);

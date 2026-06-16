@@ -8,6 +8,8 @@
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network.h"
 #include "core/lib/directory_dataset.h"
+#include "core/lib/cache.h"
+#include "core/lib/matrix_cache.h"
 
 #include "png/pngreader.h"
 
@@ -34,12 +36,11 @@ bool datasetPathValid(const QString& path) {
     return true;
 }
 
-std::vector<Matrix> loadDatasetSamples(const QString& path, std::size_t limitPerLabel = 0) {
-    static PngUtils::Cache pngCache;
-    const auto reader = [](const std::filesystem::path& p) {
-        return PngUtils::fromImage(p, 28, 28, pngCache).transform(1, IMAGE_SIZE);
-    };
-
+std::vector<Matrix> loadDatasetSamples(
+    const QString& path,
+    const std::function<Matrix(const std::filesystem::path& path)>& reader,
+    std::size_t limitPerLabel = 0
+) {
     Neural::DirectoryDataset dataset(path.toStdString());
     dataset.setFileReader(reader);
 
@@ -89,7 +90,9 @@ QImage matrixToQImage(const Matrix& flat) {
 DigitsGeneratorController::DigitsGeneratorController(QObject* parent)
     : ModeController(parent)
     , settings("digits_generator")
-{}
+{
+    reader = [this](const std::filesystem::path& path) { return readCached(path); };
+}
 
 DigitsGeneratorController::~DigitsGeneratorController() {
     qDebug() << "Digits generator controller destructor";
@@ -101,6 +104,8 @@ void DigitsGeneratorController::loadSettings() {
     const QString discPath = settings.getValue("discriminator_path", "discriminator.wgt").toString();
     const QString clsPath  = settings.getValue("classifier_path",    {}).toString();
     const QString dsPath   = settings.getValue("dataset_path",       {}).toString();
+    imageHeight            = settings.getValue("image_height",       28).toULongLong();
+    imageWidth             = settings.getValue("image_width",        28).toULongLong();
 
     loadGenerator(genPath);
     loadDiscriminator(discPath);
@@ -114,6 +119,8 @@ void DigitsGeneratorController::saveSettings() {
     settings.setValue("discriminator_path", discriminatorPath);
     settings.setValue("classifier_path",    classifierPath);
     settings.setValue("dataset_path",       datasetPath);
+    settings.setValue("imageWidth",         static_cast<quint64>(imageWidth));
+    settings.setValue("imageHeight",        static_cast<quint64>(imageHeight));
 }
 
 void DigitsGeneratorController::setLogger(std::ostream* stream) {
@@ -178,7 +185,7 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
         // Reload with per-run limit if specified, otherwise use pre-loaded samples
         const std::vector<Matrix> samples = config.datasetLimitPerLabel > 0
-            ? ::loadDatasetSamples(datasetPath, config.datasetLimitPerLabel)
+            ? ::loadDatasetSamples(datasetPath, reader, config.datasetLimitPerLabel)
             : realSamples;
 
         trainer.train(samples, config, logger);
@@ -223,7 +230,7 @@ bool DigitsGeneratorController::loadDataset(const QString& path) {
     if (internalRunner && internalRunner->isRunning()) return false;
     if (!::datasetPathValid(path)) return false;
     datasetPath = path;
-    realSamples = ::loadDatasetSamples(path);
+    realSamples = ::loadDatasetSamples(path, reader);
     emit infoUpdated();
     return true;
 }
@@ -254,4 +261,15 @@ void DigitsGeneratorController::loadDiscriminator(const QString& path, Neural::N
         discriminatorNet = std::nullopt;
     }
     emit infoUpdated();
+}
+
+Matrix DigitsGeneratorController::readCached(const std::filesystem::path& path) const {
+    static cache::LRUCache<std::tuple<std::filesystem::path, std::size_t, std::size_t>, Matrix, ArbitraryCache::TupleHash> pngCache;
+    return ArbitraryCache::DoCached(
+        pngCache,
+        [](const std::filesystem::path& path, std::size_t height, std::size_t width) -> Matrix {
+            return PngUtils::fromImage(path.string(), height, width).transform(1, height * width);
+        },
+        path, imageHeight, imageWidth
+    );
 }
