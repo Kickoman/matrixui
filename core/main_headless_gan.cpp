@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iostream>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -11,8 +12,6 @@
 
 #include "core/generator/gan_config.h"
 #include "core/generator/gan_trainer.h"
-#include "core/generator/generator.h"
-#include "core/generator/discriminator.h"
 
 #include "png/pngreader.h"
 #include "matrix/matrix.h"
@@ -70,13 +69,12 @@ int runGenerate(
         classifier.emplace(std::move(*net));
     }
 
-    // Input size = latentDim + numClasses; infer latentDim from the saved network.
-    const std::size_t inputSize = generatorNet->config.layersSizes.front();
-    const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::GAN::Generator generator(std::move(*generatorNet), latentDim, numClasses);
+    const std::size_t latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, numClasses);
+    std::mt19937 rng{std::random_device{}()};
+    Neural::NeuralNetworkApplier generator(std::move(*generatorNet));
 
     for (std::size_t i = 0; i < numSamples; ++i) {
-        const Matrix flat = generator.generate(label);   // 1 x 784
+        const auto flat = Neural::GAN::Generate(generator, numClasses, label, latentDim, rng);
 
         // Reshape flat 1x784 row into a 28x28 matrix for saving.
         const Matrix image(28, 28, [&](std::size_t row, std::size_t col) {
@@ -145,7 +143,7 @@ int main(int argc, char** argv) {
     std::string datasetPath;
     std::string generatorPath = "generator.wgt";
     std::string discriminatorPath = "discriminator.wgt";
-    Neural::GAN::GanConfig ganConfig{};
+    Neural::GAN::LearningConfig ganConfig{};
     std::vector<std::size_t> genHidden = {256, 512};
     std::vector<std::size_t> discHidden = {512, 256};
 
@@ -268,14 +266,14 @@ int main(int argc, char** argv) {
     genConfig.layersSizes      = buildGenLayers();
     genConfig.hiddenActivation = Neural::ActivationType::ReLU;
     genConfig.outputActivation = Neural::ActivationType::Sigmoid;
-    Neural::GAN::Generator generator(loadOrCreate(generatorPath, genConfig), ganConfig.latentDim, classifier.getNeuralNetworkConfig().outputSize());
+    Neural::NeuralNetworkApplier generator(loadOrCreate(generatorPath, genConfig));
 
     // Load or create discriminator
     Neural::NeuralNetworkConfiguration discConfig;
     discConfig.layersSizes      = buildDiscLayers();
     discConfig.hiddenActivation = Neural::ActivationType::LeakyReLU;
     discConfig.outputActivation = Neural::ActivationType::Sigmoid;
-    Neural::GAN::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
+    Neural::NeuralNetworkApplier discriminator(loadOrCreate(discriminatorPath, discConfig));
 
     // Load real training samples
     cache::LRUCache<std::filesystem::path, Matrix> pngCache;
@@ -317,8 +315,8 @@ int main(int argc, char** argv) {
     trainer.train(realImages, ganConfig, &std::cout);
 
     // Save
-    Neural::SaveNetwork(trainer.getGenerator().getNetwork(), generatorPath);
-    Neural::SaveNetwork(trainer.getDiscriminator().getNetwork(), discriminatorPath);
+    Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(), generatorPath);
+    Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath);
     std::cout << "Saved generator to " << generatorPath << "\n";
     std::cout << "Saved discriminator to " << discriminatorPath << "\n";
 

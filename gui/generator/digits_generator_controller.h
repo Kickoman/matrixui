@@ -11,12 +11,13 @@
 #include <QPointer>
 #include <QImage>
 #include <optional>
+#include <random>
 #include <vector>
 #include <atomic>
 
 namespace Neural { namespace GAN { class GanTrainer; } }
 
-Q_DECLARE_METATYPE(Neural::GAN::GanConfig)
+Q_DECLARE_METATYPE(Neural::GAN::LearningConfig)
 
 class DigitsGeneratorController final : public ModeController
 {
@@ -47,7 +48,7 @@ public:
     void setLogger(std::ostream* stream);
 
 public slots:
-    void run(const Neural::GAN::GanConfig& config);
+    void run(const Neural::GAN::LearningConfig& config);
     void requestStop() override;
     void setImageWidth(std::size_t width) { imageWidth = width; }
     void setImageHeight(std::size_t height) { imageHeight = height; }
@@ -93,6 +94,9 @@ private:
 
     std::size_t imageWidth;
     std::size_t imageHeight;
+    std::size_t latentDim = 0;
+
+    mutable std::mt19937 rng{std::random_device{}()};
 
     std::optional<Neural::NeuralNetwork> classifierNet;
     std::optional<Neural::NeuralNetwork> generatorNet;

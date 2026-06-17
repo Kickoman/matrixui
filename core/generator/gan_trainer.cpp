@@ -1,18 +1,61 @@
 #include "core/generator/gan_trainer.h"
+#include "core/generator/gan_config.h"
 #include "core/lib/loss_functions.h"
+#include "core/lib/neural_network.h"
+#include "core/lib/neural_network_applier.h"
 
 #include <algorithm>
 #include <numeric>
 #include <random>
 #include <cmath>
 
+
 namespace Neural {
 
 namespace GAN {
 
+Matrix SampleNoise(const std::size_t latentDim, std::mt19937& rng) {
+    std::normal_distribution<double> dist(0.0, 1.0);
+    return Matrix(1, latentDim, [&](std::size_t, std::size_t) {
+        return dist(rng);
+    });
+}
+
+Matrix ConditionedInput(
+    const Matrix& noise,
+    const std::size_t label,
+    const std::size_t latentDim,
+    const std::size_t numClasses
+) {
+    return Matrix(1, latentDim + numClasses, [&](std::size_t, std::size_t col) -> double {
+        if (col < latentDim)
+            return noise(0, col);
+        const std::size_t classIdx = col - latentDim;
+        return (classIdx == label) ? 1.0 : 0.0;
+    });
+}
+
+Matrix Generate(
+    Neural::NeuralNetworkApplier& generator,
+    const std::size_t numClasses,
+    const std::size_t label,
+    const std::size_t latentDim,
+    std::mt19937& rng
+) {
+    return generator.forward(
+        ConditionedInput(
+            SampleNoise(latentDim, rng),
+            label,
+            latentDim,
+            numClasses
+        )
+    );
+}
+
+
 GanTrainer::GanTrainer(
-    Generator generator,
-    Discriminator discriminator,
+    NeuralNetworkApplier generator,
+    NeuralNetworkApplier discriminator,
     NeuralNetworkApplier classifier
 )
     : generator(std::move(generator))
@@ -40,11 +83,7 @@ void GanTrainer::trainDiscriminatorStep(
     discriminator.applyGradients(lr);
 }
 
-double GanTrainer::trainGeneratorStep(
-    const std::size_t label,
-    const double classifierLossWeight,
-    const double lr
-) {
+double GanTrainer::trainGeneratorStep(const std::size_t label, const LearningConfig& config, double currentGeneratorLr) {
     generator.zeroGradients();
     // Zero D and C gradients so their backward passes give clean input-space
     // gradients. Their accumulated weight gradients are discarded: D's are
@@ -53,7 +92,7 @@ double GanTrainer::trainGeneratorStep(
     discriminator.zeroGradients();
     classifier.zeroGradients();
 
-    const Matrix fake = generator.generate(label);
+    const auto fake = Generate(generator, classifier.getNeuralNetworkConfig().outputSize(), label, config.latentDim, rng);
 
     // --- Discriminator loss: fool D into scoring fake as real ---
     const Matrix fakeScore = discriminator.forward(fake, 0.0);
@@ -69,17 +108,17 @@ double GanTrainer::trainGeneratorStep(
     const Matrix inputGradFromC = classifier.backward(classifierOut - oneHot);
 
     // Combine: both gradients point toward improving the generator.
-    const Matrix combinedGrad = inputGradFromD + inputGradFromC * classifierLossWeight;
+    const Matrix combinedGrad = inputGradFromD + inputGradFromC * config.classifierLossWeight;
 
     generator.backward(combinedGrad);
-    generator.applyGradients(lr);
+    generator.applyGradients(currentGeneratorLr);
 
     return fakeScore(0, 0);
 }
 
 void GanTrainer::train(
     const std::vector<Matrix>& realSamples,
-    const GanConfig& config,
+    const LearningConfig& config,
     std::ostream* log
 ) {
     if (realSamples.empty()) return;
@@ -121,18 +160,16 @@ void GanTrainer::train(
             // Train discriminator for discriminatorStepsPerGenStep steps.
             for (std::size_t d = 0; d < config.discriminatorStepsPerGenStep; ++d) {
                 const std::size_t idx = indices[i + (d % config.batchSize)];
-                const Matrix fake = generator.generate(label);
+                const Matrix fake = Generate(generator, numberOfClasses, label, config.latentDim, rng);
                 trainDiscriminatorStep(
                     realSamples[idx], fake,
                     currentDLr, effectiveDropout
                 );
-                totalDiscScore += discriminator.score(realSamples[idx])(0, 0);
+                totalDiscScore += discriminator.predict(realSamples[idx])(0, 0);
             }
 
             // Train generator one step conditioned on the chosen label.
-            totalGenScore += trainGeneratorStep(
-                label, config.classifierLossWeight, currentGLr
-            );
+            totalGenScore += trainGeneratorStep(label, config, currentGLr);
             ++steps;
 
             if (stopFlag.load(std::memory_order_relaxed)) break;
@@ -201,7 +238,7 @@ void GanTrainer::train(
         if (log && steps > 0) {
             // Sample a generated image for each class and log what the classifier thinks.
             const std::size_t logLabel = epoch % numberOfClasses;
-            const Matrix sample = generator.generate(logLabel);
+            const Matrix sample = Generate(generator, numberOfClasses, logLabel, config.latentDim, rng);
             const Matrix classifierOut = classifier.predict(sample);
             std::size_t predictedLabel = 0;
             for (std::size_t c = 1; c < classifierOut.getCols(); ++c)
@@ -236,8 +273,8 @@ void GanTrainer::requestStop() {
     stopFlag.store(true, std::memory_order_relaxed);
 }
 
-const Generator& GanTrainer::getGenerator() const { return generator; }
-const Discriminator& GanTrainer::getDiscriminator() const { return discriminator; }
+const NeuralNetworkApplier& GanTrainer::getGenerator() const { return generator; }
+const NeuralNetworkApplier& GanTrainer::getDiscriminator() const { return discriminator; }
 
 } // namespace GAN
 } // namespace Neural

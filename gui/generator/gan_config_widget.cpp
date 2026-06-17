@@ -147,7 +147,7 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     setConfig({});
 }
 
-void GanConfigWidget::setConfig(const Neural::GAN::GanConfig& config) {
+void GanConfigWidget::setConfig(const Neural::GAN::LearningConfig& config) {
     epochs->setValue(static_cast<int>(config.epochs));
     batchSize->setValue(static_cast<int>(config.batchSize));
     generatorLr->setValue(config.generatorLr);
@@ -169,7 +169,7 @@ void GanConfigWidget::setConfig(const Neural::GAN::GanConfig& config) {
     flatnessGenLrBoost->setValue(config.flatnessGenLrBoost);
 }
 
-Neural::GAN::GanConfig GanConfigWidget::getConfig() const {
+Neural::GAN::LearningConfig GanConfigWidget::getConfig() const {
     return {
         .latentDim = static_cast<std::size_t>(latentDim->value()),
         .generatorLr = generatorLr->value(),

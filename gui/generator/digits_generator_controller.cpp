@@ -1,8 +1,6 @@
 #include "gui/generator/digits_generator_controller.h"
 
 #include "core/generator/gan_trainer.h"
-#include "core/generator/generator.h"
-#include "core/generator/discriminator.h"
 
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/neural_network_loader.h"
@@ -142,13 +140,14 @@ DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
 QImage DigitsGeneratorController::generateSample(std::size_t label) const {
     if (!generatorNet || !classifierNet) return {};
     const std::size_t numClasses = classifierNet->outputSize();
-    const std::size_t inputSize = generatorNet->config.layersSizes.front();
-    const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::GAN::Generator gen(*generatorNet, latentDim, numClasses);
-    return matrixToQImage(gen.generate(label), imageHeight, imageWidth);
+    Neural::NeuralNetworkApplier gen(*generatorNet);
+    return matrixToQImage(
+        Neural::GAN::Generate(gen, numClasses, label, latentDim, rng),
+        imageHeight, imageWidth
+    );
 }
 
-void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
+void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
     if (trainingRunning.load(std::memory_order_relaxed)) return;
 
     if (!loadProject()) {
@@ -170,8 +169,8 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
             = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, numberOfClasses, imageHeight, imageWidth));
         const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork(imageHeight, imageWidth));
 
-        Neural::GAN::Generator     gen (genNet,  config.latentDim, numberOfClasses);
-        Neural::GAN::Discriminator disc(discNet);
+        Neural::NeuralNetworkApplier gen (genNet);
+        Neural::NeuralNetworkApplier disc(discNet);
         Neural::NeuralNetworkApplier cls(*classifierNet);
 
         Neural::GAN::GanTrainer trainer(std::move(gen), std::move(disc), std::move(cls));
@@ -180,8 +179,8 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
         trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {
             // Save after each epoch (same pattern as classifier)
-            Neural::SaveNetwork(trainer.getGenerator().getNetwork(),     generatorPath.toStdString());
-            Neural::SaveNetwork(trainer.getDiscriminator().getNetwork(), discriminatorPath.toStdString());
+            Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(),     generatorPath.toStdString());
+            Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath.toStdString());
 
             QMetaObject::invokeMethod(this, [this, epoch, dScore, gScore, emaReal, emaGen] {
                 emit epochCompleted(epoch, dScore, gScore, emaReal, emaGen);
@@ -199,8 +198,8 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
         out() << "Training finished." << std::endl;
 
         // Store updated weights back so generateSample works after training
-        generatorNet     = trainer.getGenerator().getNetwork();
-        discriminatorNet = trainer.getDiscriminator().getNetwork();
+        generatorNet     = trainer.getGenerator().getNeuralNetworkConfig();
+        discriminatorNet = trainer.getDiscriminator().getNeuralNetworkConfig();
 
         activeTrainer.store(nullptr, std::memory_order_release);
         trainingRunning.store(false, std::memory_order_relaxed);
@@ -309,10 +308,12 @@ bool DigitsGeneratorController::loadGenerator() {
         out() << nlohmann::json(generatorConfiguration).dump(2) << std::endl;
 
         generatorNet = Neural::CreateNetwork(generatorConfiguration);
+        latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         return true;
     }
     if (auto network = Neural::LoadNetwork(generatorPath.toStdString())) {
         generatorNet = std::move(network);
+        latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         out() << "Successfully loaded generator." << std::endl;
         return true;
     }

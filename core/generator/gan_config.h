@@ -6,7 +6,7 @@
 namespace Neural {
 namespace GAN {
 
-struct GanConfig {
+struct LearningConfig {
     std::size_t latentDim = 100;
     double generatorLr = 0.0002;
     double discriminatorLr = 0.0001;  // Lower than G: D converges faster
@@ -53,7 +53,7 @@ struct GanConfig {
 
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    Neural::GAN::GanConfig,
+    Neural::GAN::LearningConfig,
     latentDim,
     generatorLr,
     discriminatorLr,
