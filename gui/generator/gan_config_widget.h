@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QWidget>
-#include "core/generator/gan_config.h"
+#include "core/generator/learning_config.h"
 
 class QCheckBox;
 class QDoubleSpinBox;

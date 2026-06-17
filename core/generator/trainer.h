@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/generator/gan_config.h"
+#include "core/generator/learning_config.h"
 
 #include "core/lib/neural_network_applier.h"
 #include "matrix/matrix.h"

@@ -1,6 +1,6 @@
 #include "gui/generator/digits_generator_controller.h"
 
-#include "core/generator/gan_trainer.h"
+#include "core/generator/trainer.h"
 
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/neural_network_loader.h"

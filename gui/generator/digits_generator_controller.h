@@ -3,7 +3,7 @@
 #include "gui/lib/mode_controller.h"
 #include "gui/lib/mode_settings.h"
 
-#include "core/generator/gan_config.h"
+#include "core/generator/learning_config.h"
 #include "core/lib/neural_network.h"
 #include "matrix/matrix.h"
 

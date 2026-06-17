@@ -1,5 +1,5 @@
-#include "core/generator/gan_trainer.h"
-#include "core/generator/gan_config.h"
+#include "core/generator/trainer.h"
+#include "core/generator/learning_config.h"
 #include "core/lib/loss_functions.h"
 #include "core/lib/neural_network.h"
 #include "core/lib/neural_network_applier.h"

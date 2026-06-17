@@ -10,8 +10,8 @@
 #include "core/lib/dataset.h"
 #include "core/lib/cache.h"
 
-#include "core/generator/gan_config.h"
-#include "core/generator/gan_trainer.h"
+#include "core/generator/learning_config.h"
+#include "core/generator/trainer.h"
 
 #include "png/pngreader.h"
 #include "matrix/matrix.h"
