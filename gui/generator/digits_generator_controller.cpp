@@ -25,7 +25,6 @@ namespace {
 
 static const std::vector<std::size_t> DEFAULT_GEN_HIDDEN  = {256, 512};
 static const std::vector<std::size_t> DEFAULT_DISC_HIDDEN = {512, 256};
-constexpr std::size_t IMAGE_SIZE = 28 * 28;
 
 bool datasetPathValid(const QString& path) {
     const QDir dir(path);
@@ -52,19 +51,27 @@ std::vector<Matrix> loadDatasetSamples(
     return images;
 }
 
-Neural::NeuralNetwork makeGeneratorNetwork(std::size_t latentDim, std::size_t numClasses) {
+Neural::NeuralNetwork makeGeneratorNetwork(
+    const std::size_t latentDim,
+    const std::size_t numClasses,
+    const std::size_t imageHeight,
+    const std::size_t imageWidth
+) {
     Neural::NeuralNetworkConfiguration cfg;
     cfg.layersSizes = {latentDim + numClasses};
     cfg.layersSizes.insert(cfg.layersSizes.end(), DEFAULT_GEN_HIDDEN.begin(), DEFAULT_GEN_HIDDEN.end());
-    cfg.layersSizes.push_back(IMAGE_SIZE);
+    cfg.layersSizes.push_back(imageHeight * imageWidth);
     cfg.hiddenActivation = Neural::ActivationType::ReLU;
     cfg.outputActivation = Neural::ActivationType::Sigmoid;
     return Neural::CreateNetwork(cfg);
 }
 
-Neural::NeuralNetwork makeDiscriminatorNetwork() {
+Neural::NeuralNetwork makeDiscriminatorNetwork(
+    const std::size_t imageHeight,
+    const std::size_t imageWidth
+) {
     Neural::NeuralNetworkConfiguration cfg;
-    cfg.layersSizes = {IMAGE_SIZE};
+    cfg.layersSizes = {imageHeight * imageWidth};
     cfg.layersSizes.insert(cfg.layersSizes.end(), DEFAULT_DISC_HIDDEN.begin(), DEFAULT_DISC_HIDDEN.end());
     cfg.layersSizes.push_back(1);
     cfg.hiddenActivation = Neural::ActivationType::LeakyReLU;
@@ -72,11 +79,11 @@ Neural::NeuralNetwork makeDiscriminatorNetwork() {
     return Neural::CreateNetwork(cfg);
 }
 
-QImage matrixToQImage(const Matrix& flat) {
-    QImage img(28, 28, QImage::Format_Grayscale8);
-    for (int r = 0; r < 28; ++r) {
-        for (int c = 0; c < 28; ++c) {
-            const double val = flat(0, r * 28 + c);
+QImage matrixToQImage(const Matrix& flat, const std::size_t height, const std::size_t width) {
+    QImage img(width, height, QImage::Format_Grayscale8);
+    for (int r = 0; r < height; ++r) {
+        for (int c = 0; c < width; ++c) {
+            const double val = flat(0, r * width + c);
             const int gray = static_cast<int>(std::clamp(val, 0.0, 1.0) * 255.0);
             img.setPixel(c, r, qRgb(gray, gray, gray));
         }
@@ -140,6 +147,8 @@ DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
         .datasetPath       = datasetPath.toStdString(),
         .generatorPath     = generatorPath.toStdString(),
         .discriminatorPath = discriminatorPath.toStdString(),
+        .imageWidth        = imageWidth,
+        .imageHeight       = imageHeight,
     };
 }
 
@@ -149,7 +158,7 @@ QImage DigitsGeneratorController::generateSample(std::size_t label) const {
     const std::size_t numClasses = 10;
     const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
     Neural::GAN::Generator gen(*generatorNet, latentDim, numClasses);
-    return matrixToQImage(gen.generate(label));
+    return matrixToQImage(gen.generate(label), imageHeight, imageWidth);
 }
 
 void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
@@ -163,8 +172,9 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
         trainingRunning.store(true, std::memory_order_relaxed);
         QMetaObject::invokeMethod(this, &DigitsGeneratorController::infoUpdated);
 
-        const Neural::NeuralNetwork genNet  = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, config.numClasses));
-        const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork());
+        const Neural::NeuralNetwork genNet
+            = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, config.numClasses, imageHeight, imageWidth));
+        const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork(imageHeight, imageWidth));
 
         Neural::GAN::Generator     gen (genNet,  config.latentDim, config.numClasses);
         Neural::GAN::Discriminator disc(discNet);

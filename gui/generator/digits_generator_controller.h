@@ -29,6 +29,8 @@ public:
         std::string datasetPath;
         std::string generatorPath;
         std::string discriminatorPath;
+        std::size_t imageWidth;
+        std::size_t imageHeight;
     };
 
     explicit DigitsGeneratorController(QObject* parent = nullptr);
