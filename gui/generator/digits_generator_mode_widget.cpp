@@ -32,15 +32,15 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     lossChart->setTitle("Training scores");
     AppTheme::ApplyTheme(lossChart->getChart());
 
-    toggleTrainingButton   = new QPushButton("Start training", this);
-    loadClassifierButton   = new QPushButton("Load classifier", this);
-    loadDatasetButton      = new QPushButton("Load dataset", this);
-    loadGeneratorButton    = new QPushButton("Set generator file", this);
+    toggleTrainingButton = new QPushButton("Start training", this);
+    loadClassifierButton = new QPushButton("Load classifier", this);
+    loadDatasetButton = new QPushButton("Load dataset", this);
+    loadGeneratorButton = new QPushButton("Set generator file", this);
     loadDiscriminatorButton = new QPushButton("Set discriminator file", this);
 
-    classifierLabel    = new QLabel("No classifier", this);
-    datasetLabel       = new QLabel("No dataset", this);
-    generatorLabel     = new QLabel("Generator: generator.wgt", this);
+    classifierLabel = new QLabel("No classifier", this);
+    datasetLabel = new QLabel("No dataset", this);
+    generatorLabel = new QLabel("Generator: generator.wgt", this);
     discriminatorLabel = new QLabel("Discriminator: discriminator.wgt", this);
 
     imageWidth = new QSpinBox(this);
@@ -51,20 +51,16 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     imageHeight->setValue(28);
 
     ganConfigWidget = new GanConfigWidget(this);
-
     previewLabel = new QLabel(this);
     previewLabel->setFixedSize(140, 140);
     previewLabel->setAlignment(Qt::AlignCenter);
     previewLabel->setStyleSheet("border: 1px solid gray;");
 
     digitSelector = new QComboBox(this);
-
     generateButton = new QPushButton("Generate", this);
 
-    // --- Layout ---
     auto* root = new QVBoxLayout();
 
-    // Button bar
     auto* buttonBar = new QHBoxLayout();
     buttonBar->addWidget(toggleTrainingButton);
     buttonBar->addWidget(loadClassifierButton);
@@ -73,7 +69,6 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     buttonBar->addWidget(loadDiscriminatorButton);
     root->addLayout(buttonBar);
 
-    // Info labels
     auto* infoRow = new QHBoxLayout();
     auto* infoLeft = new QVBoxLayout();
     infoLeft->addWidget(classifierLabel);
@@ -90,7 +85,6 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     imagePropertiesLayout->addRow("Image height", imageHeight);
     infoLeft->addLayout(imagePropertiesLayout);
 
-    // Chart + preview
     auto* midRow = new QHBoxLayout();
     midRow->addWidget(lossChart, 1);
 
@@ -161,8 +155,9 @@ DigitsGeneratorModeWidget::~DigitsGeneratorModeWidget() {
 }
 
 std::ostream* DigitsGeneratorModeWidget::getTerminalStream() {
-    if (!terminalStream)
+    if (!terminalStream) {
         terminalStream = createTerminalOStream(terminal);
+    }
     return terminalStream.get();
 }
 
@@ -229,17 +224,18 @@ void DigitsGeneratorModeWidget::updateInfo() {
     if (info.numClasses > 0 && static_cast<std::size_t>(digitSelector->count()) != info.numClasses) {
         const int prev = digitSelector->currentIndex();
         digitSelector->clear();
-        for (std::size_t i = 0; i < info.numClasses; ++i)
+        for (std::size_t i = 0; i < info.numClasses; ++i) {
             digitSelector->addItem(QString::number(i));
+        }
         digitSelector->setCurrentIndex(std::min(prev, digitSelector->count() - 1));
     }
 }
 
 void DigitsGeneratorModeWidget::handleEpochCompleted(std::size_t /*epoch*/, double dScore, double gScore, double emaReal, double emaGen) {
-    lossChart->addPoint(dScore * 100,  "D(real)");
-    lossChart->addPoint(gScore * 100,  "D(G(z))");
+    lossChart->addPoint(dScore * 100, "D(real)");
+    lossChart->addPoint(gScore * 100, "D(G(z))");
     lossChart->addPoint(emaReal * 100, "EMA D(real)");
-    lossChart->addPoint(emaGen  * 100, "EMA D(G(z))");
+    lossChart->addPoint(emaGen * 100, "EMA D(G(z))");
 }
 
 void DigitsGeneratorModeWidget::handleGenerateClicked() {

@@ -27,17 +27,17 @@ private:
     QSpinBox* latentDim = nullptr;
     QSpinBox* datasetLimitPerLabel = nullptr;
 
-    // Adaptive lr controls
-    QCheckBox*      adaptiveLrCheck   = nullptr;
-    QDoubleSpinBox* lrEmaAlpha        = nullptr;
-    QDoubleSpinBox* lrAdjustFactor    = nullptr;
-    QSpinBox*       lrWarmupEpochs    = nullptr;
+    // Adaptive lr
+    QCheckBox* adaptiveLrCheck = nullptr;
+    QDoubleSpinBox* lrEmaAlpha = nullptr;
+    QDoubleSpinBox* lrAdjustFactor = nullptr;
+    QSpinBox* lrWarmupEpochs = nullptr;
 
-    // Flatness detection controls
-    QCheckBox*      flatnessCheck        = nullptr;
-    QDoubleSpinBox* flatnessThreshold    = nullptr;
-    QSpinBox*       flatnessWindow       = nullptr;
-    QSpinBox*       flatnessKickDuration = nullptr;
+    // Flatness detection
+    QCheckBox* flatnessCheck = nullptr;
+    QDoubleSpinBox* flatnessThreshold = nullptr;
+    QSpinBox* flatnessWindow = nullptr;
+    QSpinBox* flatnessKickDuration = nullptr;
     QDoubleSpinBox* flatnessDropoutBoost = nullptr;
-    QDoubleSpinBox* flatnessGenLrBoost   = nullptr;
+    QDoubleSpinBox* flatnessGenLrBoost = nullptr;
 };

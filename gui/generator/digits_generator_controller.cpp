@@ -40,8 +40,9 @@ std::vector<Matrix> loadDatasetSamples(
     Neural::Dataset::FilterSamples(samples, classesCount);
     std::vector<Matrix> images;
     images.reserve(samples.size());
-    for (const auto& s : samples)
+    for (const auto& s : samples) {
         images.push_back(s.input);
+    }
     return images;
 }
 
@@ -101,22 +102,22 @@ DigitsGeneratorController::~DigitsGeneratorController() {
 }
 
 void DigitsGeneratorController::loadSettings() {
-    generatorPath       = settings.getValue("generator_path",     "generator.wgt").toString();
-    discriminatorPath   = settings.getValue("discriminator_path", "discriminator.wgt").toString();
-    classifierPath      = settings.getValue("classifier_path",    {}).toString();
-    datasetPath         = settings.getValue("dataset_path",       {}).toString();
-    imageHeight         = settings.getValue("image_height",       28).toULongLong();
-    imageWidth          = settings.getValue("image_width",        28).toULongLong();
+    generatorPath = settings.getValue("generator_path", "generator.wgt").toString();
+    discriminatorPath = settings.getValue("discriminator_path", "discriminator.wgt").toString();
+    classifierPath = settings.getValue("classifier_path", {}).toString();
+    datasetPath = settings.getValue("dataset_path", {}).toString();
+    imageHeight = settings.getValue("image_height", 28).toULongLong();
+    imageWidth = settings.getValue("image_width", 28).toULongLong();
     emit infoUpdated();
 }
 
 void DigitsGeneratorController::saveSettings() {
-    settings.setValue("generator_path",     generatorPath);
+    settings.setValue("generator_path", generatorPath);
     settings.setValue("discriminator_path", discriminatorPath);
-    settings.setValue("classifier_path",    classifierPath);
-    settings.setValue("dataset_path",       datasetPath);
-    settings.setValue("imageWidth",         static_cast<quint64>(imageWidth));
-    settings.setValue("imageHeight",        static_cast<quint64>(imageHeight));
+    settings.setValue("classifier_path", classifierPath);
+    settings.setValue("dataset_path", datasetPath);
+    settings.setValue("imageWidth", static_cast<quint64>(imageWidth));
+    settings.setValue("imageHeight", static_cast<quint64>(imageHeight));
 }
 
 void DigitsGeneratorController::setLogger(std::ostream* stream) {
@@ -127,18 +128,20 @@ DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
     return {
         .running = trainingRunning.load(std::memory_order_relaxed),
         .canRun  = !trainingRunning.load(std::memory_order_relaxed),
-        .classifierPath    = classifierPath.toStdString(),
-        .datasetPath       = datasetPath.toStdString(),
-        .generatorPath     = generatorPath.toStdString(),
+        .classifierPath = classifierPath.toStdString(),
+        .datasetPath = datasetPath.toStdString(),
+        .generatorPath = generatorPath.toStdString(),
         .discriminatorPath = discriminatorPath.toStdString(),
-        .imageWidth        = imageWidth,
-        .imageHeight       = imageHeight,
-        .numClasses        = classifierNet ? classifierNet->outputSize() : 0,
+        .imageWidth = imageWidth,
+        .imageHeight = imageHeight,
+        .numClasses = classifierNet ? classifierNet->outputSize() : 0,
     };
 }
 
 QImage DigitsGeneratorController::generateSample(std::size_t label) const {
-    if (!generatorNet || !classifierNet) return {};
+    if (!generatorNet || !classifierNet) {
+        return {};
+    }
     const std::size_t numClasses = classifierNet->outputSize();
     Neural::NeuralNetworkApplier gen(*generatorNet);
     return matrixToQImage(
@@ -148,7 +151,9 @@ QImage DigitsGeneratorController::generateSample(std::size_t label) const {
 }
 
 void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
-    if (trainingRunning.load(std::memory_order_relaxed)) return;
+    if (trainingRunning.load(std::memory_order_relaxed)) {
+        return;
+    }
 
     if (!loadProject()) {
         return;
@@ -169,7 +174,7 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
             = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, numberOfClasses, imageHeight, imageWidth));
         const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork(imageHeight, imageWidth));
 
-        Neural::NeuralNetworkApplier gen (genNet);
+        Neural::NeuralNetworkApplier gen(genNet);
         Neural::NeuralNetworkApplier disc(discNet);
         Neural::NeuralNetworkApplier cls(*classifierNet);
 
@@ -189,7 +194,7 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
 
         // Reload with per-run limit if specified, otherwise use pre-loaded samples
         out() << "Loading dataset if necessary..." << std::endl;
-        const std::vector<Matrix> samples = config.datasetLimitPerLabel > 0
+        const auto samples = config.datasetLimitPerLabel > 0
             ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, config.datasetLimitPerLabel)
             : realSamples;
 
@@ -198,7 +203,7 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
         out() << "Training finished." << std::endl;
 
         // Store updated weights back so generateSample works after training
-        generatorNet     = trainer.getGenerator().getNeuralNetworkConfig();
+        generatorNet = trainer.getGenerator().getNeuralNetworkConfig();
         discriminatorNet = trainer.getDiscriminator().getNeuralNetworkConfig();
 
         activeTrainer.store(nullptr, std::memory_order_release);
@@ -212,13 +217,17 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
 
 void DigitsGeneratorController::requestStop() {
     qDebug() << "Digits generator controller: Requesting stop";
-    auto* t = activeTrainer.load(std::memory_order_acquire);
-    if (t) t->requestStop();
+    auto* trainer = activeTrainer.load(std::memory_order_acquire);
+    if (trainer) {
+        trainer->requestStop();
+    }
 }
 
 void DigitsGeneratorController::waitUntilFinished() {
     qDebug() << "Digits generator controller: Gracefully waiting";
-    if (!internalRunner || !internalRunner->isRunning()) return;
+    if (!internalRunner || !internalRunner->isRunning()) {
+        return;
+    }
     internalRunner->quit();
     internalRunner->wait();
     qDebug() << "Digits generator controller: Finished";
