@@ -1,8 +1,7 @@
 #include "gui/generator/digits_generator_controller.h"
 
-#include "core/generator/gan_trainer.h"
-#include "core/generator/generator.h"
-#include "core/generator/discriminator.h"
+#include "core/generator/learning_config.h"
+#include "core/generator/trainer.h"
 
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/neural_network_loader.h"
@@ -42,8 +41,9 @@ std::vector<Matrix> loadDatasetSamples(
     Neural::Dataset::FilterSamples(samples, classesCount);
     std::vector<Matrix> images;
     images.reserve(samples.size());
-    for (const auto& s : samples)
+    for (const auto& s : samples) {
         images.push_back(s.input);
+    }
     return images;
 }
 
@@ -103,53 +103,68 @@ DigitsGeneratorController::~DigitsGeneratorController() {
 }
 
 void DigitsGeneratorController::loadSettings() {
-    generatorPath       = settings.getValue("generator_path",     "generator.wgt").toString();
-    discriminatorPath   = settings.getValue("discriminator_path", "discriminator.wgt").toString();
-    classifierPath      = settings.getValue("classifier_path",    {}).toString();
-    datasetPath         = settings.getValue("dataset_path",       {}).toString();
-    imageHeight         = settings.getValue("image_height",       28).toULongLong();
-    imageWidth          = settings.getValue("image_width",        28).toULongLong();
+    generatorPath = settings.getValue("generator_path", "generator.wgt").toString();
+    discriminatorPath = settings.getValue("discriminator_path", "discriminator.wgt").toString();
+    classifierPath = settings.getValue("classifier_path", {}).toString();
+    datasetPath = settings.getValue("dataset_path", {}).toString();
+    imageHeight = settings.getValue("image_height", 28).toULongLong();
+    imageWidth = settings.getValue("image_width", 28).toULongLong();
+    if (const auto rawConfig = settings.getValue("learning_config"); !rawConfig.isNull()) {
+        nlohmann::json parsed = nlohmann::json::parse(rawConfig.toString().toStdString());
+        learningConfig = parsed.get<Neural::GAN::LearningConfig>();
+    }
     emit infoUpdated();
 }
 
 void DigitsGeneratorController::saveSettings() {
-    settings.setValue("generator_path",     generatorPath);
+    settings.setValue("generator_path", generatorPath);
     settings.setValue("discriminator_path", discriminatorPath);
-    settings.setValue("classifier_path",    classifierPath);
-    settings.setValue("dataset_path",       datasetPath);
-    settings.setValue("imageWidth",         static_cast<quint64>(imageWidth));
-    settings.setValue("imageHeight",        static_cast<quint64>(imageHeight));
+    settings.setValue("classifier_path", classifierPath);
+    settings.setValue("dataset_path", datasetPath);
+    settings.setValue("imageWidth", static_cast<quint64>(imageWidth));
+    settings.setValue("imageHeight", static_cast<quint64>(imageHeight));
+    settings.setValue("learning_config", QString::fromStdString(nlohmann::json(learningConfig).dump()));
 }
 
 void DigitsGeneratorController::setLogger(std::ostream* stream) {
     logger = stream;
 }
 
+void DigitsGeneratorController::setConfig(const Neural::GAN::LearningConfig& config) {
+    learningConfig = config;
+}
+
 DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
     return {
         .running = trainingRunning.load(std::memory_order_relaxed),
         .canRun  = !trainingRunning.load(std::memory_order_relaxed),
-        .classifierPath    = classifierPath.toStdString(),
-        .datasetPath       = datasetPath.toStdString(),
-        .generatorPath     = generatorPath.toStdString(),
+        .classifierPath = classifierPath.toStdString(),
+        .datasetPath = datasetPath.toStdString(),
+        .generatorPath = generatorPath.toStdString(),
         .discriminatorPath = discriminatorPath.toStdString(),
-        .imageWidth        = imageWidth,
-        .imageHeight       = imageHeight,
-        .numClasses        = classifierNet ? classifierNet->outputSize() : 0,
+        .imageWidth = imageWidth,
+        .imageHeight = imageHeight,
+        .numClasses = classifierNet ? classifierNet->outputSize() : 0,
+        .config = learningConfig,
     };
 }
 
 QImage DigitsGeneratorController::generateSample(std::size_t label) const {
-    if (!generatorNet || !classifierNet) return {};
+    if (!generatorNet || !classifierNet) {
+        return {};
+    }
     const std::size_t numClasses = classifierNet->outputSize();
-    const std::size_t inputSize = generatorNet->config.layersSizes.front();
-    const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::GAN::Generator gen(*generatorNet, latentDim, numClasses);
-    return matrixToQImage(gen.generate(label), imageHeight, imageWidth);
+    Neural::NeuralNetworkApplier gen(*generatorNet);
+    return matrixToQImage(
+        Neural::GAN::Generate(gen, numClasses, label, latentDim, rng),
+        imageHeight, imageWidth
+    );
 }
 
-void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
-    if (trainingRunning.load(std::memory_order_relaxed)) return;
+void DigitsGeneratorController::run() {
+    if (trainingRunning.load(std::memory_order_relaxed)) {
+        return;
+    }
 
     if (!loadProject()) {
         return;
@@ -159,7 +174,7 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
     connect(internalRunner, &QThread::finished, internalRunner, &QObject::deleteLater);
     connect(internalRunner, &QThread::finished, this, &DigitsGeneratorController::infoUpdated);
 
-    connect(internalRunner, &QThread::started, [this, config] {
+    connect(internalRunner, &QThread::started, [this] {
         out() << "Internal runner started..." << std::endl;
         trainingRunning.store(true, std::memory_order_relaxed);
         QMetaObject::invokeMethod(this, &DigitsGeneratorController::infoUpdated);
@@ -167,11 +182,11 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
         const auto numberOfClasses = classifierNet->outputSize();
 
         const Neural::NeuralNetwork genNet
-            = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, numberOfClasses, imageHeight, imageWidth));
+            = generatorNet.value_or(makeGeneratorNetwork(learningConfig.latentDim, numberOfClasses, imageHeight, imageWidth));
         const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork(imageHeight, imageWidth));
 
-        Neural::GAN::Generator     gen (genNet,  config.latentDim, numberOfClasses);
-        Neural::GAN::Discriminator disc(discNet);
+        Neural::NeuralNetworkApplier gen(genNet);
+        Neural::NeuralNetworkApplier disc(discNet);
         Neural::NeuralNetworkApplier cls(*classifierNet);
 
         Neural::GAN::GanTrainer trainer(std::move(gen), std::move(disc), std::move(cls));
@@ -180,8 +195,8 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
         trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {
             // Save after each epoch (same pattern as classifier)
-            Neural::SaveNetwork(trainer.getGenerator().getNetwork(),     generatorPath.toStdString());
-            Neural::SaveNetwork(trainer.getDiscriminator().getNetwork(), discriminatorPath.toStdString());
+            Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(),     generatorPath.toStdString());
+            Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath.toStdString());
 
             QMetaObject::invokeMethod(this, [this, epoch, dScore, gScore, emaReal, emaGen] {
                 emit epochCompleted(epoch, dScore, gScore, emaReal, emaGen);
@@ -190,17 +205,17 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
         // Reload with per-run limit if specified, otherwise use pre-loaded samples
         out() << "Loading dataset if necessary..." << std::endl;
-        const std::vector<Matrix> samples = config.datasetLimitPerLabel > 0
-            ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, config.datasetLimitPerLabel)
+        const auto samples = learningConfig.datasetLimitPerLabel > 0
+            ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, learningConfig.datasetLimitPerLabel)
             : realSamples;
 
         out() << "Starting training..." << std::endl;
-        trainer.train(samples, config, logger);
+        trainer.train(samples, learningConfig, logger);
         out() << "Training finished." << std::endl;
 
         // Store updated weights back so generateSample works after training
-        generatorNet     = trainer.getGenerator().getNetwork();
-        discriminatorNet = trainer.getDiscriminator().getNetwork();
+        generatorNet = trainer.getGenerator().getNeuralNetworkConfig();
+        discriminatorNet = trainer.getDiscriminator().getNeuralNetworkConfig();
 
         activeTrainer.store(nullptr, std::memory_order_release);
         trainingRunning.store(false, std::memory_order_relaxed);
@@ -213,13 +228,17 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
 void DigitsGeneratorController::requestStop() {
     qDebug() << "Digits generator controller: Requesting stop";
-    auto* t = activeTrainer.load(std::memory_order_acquire);
-    if (t) t->requestStop();
+    auto* trainer = activeTrainer.load(std::memory_order_acquire);
+    if (trainer) {
+        trainer->requestStop();
+    }
 }
 
 void DigitsGeneratorController::waitUntilFinished() {
     qDebug() << "Digits generator controller: Gracefully waiting";
-    if (!internalRunner || !internalRunner->isRunning()) return;
+    if (!internalRunner || !internalRunner->isRunning()) {
+        return;
+    }
     internalRunner->quit();
     internalRunner->wait();
     qDebug() << "Digits generator controller: Finished";
@@ -309,10 +328,12 @@ bool DigitsGeneratorController::loadGenerator() {
         out() << nlohmann::json(generatorConfiguration).dump(2) << std::endl;
 
         generatorNet = Neural::CreateNetwork(generatorConfiguration);
+        latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         return true;
     }
     if (auto network = Neural::LoadNetwork(generatorPath.toStdString())) {
         generatorNet = std::move(network);
+        latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         out() << "Successfully loaded generator." << std::endl;
         return true;
     }

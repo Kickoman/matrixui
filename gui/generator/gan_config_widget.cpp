@@ -147,48 +147,52 @@ GanConfigWidget::GanConfigWidget(QWidget* parent)
     setConfig({});
 }
 
-void GanConfigWidget::setConfig(const Neural::GAN::GanConfig& config) {
+void GanConfigWidget::setConfig(const Neural::GAN::LearningConfig& config) {
     epochs->setValue(static_cast<int>(config.epochs));
     batchSize->setValue(static_cast<int>(config.batchSize));
-    generatorLr->setValue(config.generatorLr);
-    discriminatorLr->setValue(config.discriminatorLr);
+    generatorLr->setValue(config.generatorLearningRate);
+    discriminatorLr->setValue(config.discriminatorLearningRate);
     discriminatorSteps->setValue(static_cast<int>(config.discriminatorStepsPerGenStep));
     dropoutRate->setValue(config.dropoutRate);
     classifierLossWeight->setValue(config.classifierLossWeight);
     latentDim->setValue(static_cast<int>(config.latentDim));
     datasetLimitPerLabel->setValue(static_cast<int>(config.datasetLimitPerLabel));
-    adaptiveLrCheck->setChecked(config.adaptiveLr);
-    lrEmaAlpha->setValue(config.lrEmaAlpha);
-    lrAdjustFactor->setValue(config.lrAdjustFactor);
-    lrWarmupEpochs->setValue(static_cast<int>(config.lrWarmupEpochs));
-    flatnessCheck->setChecked(config.flatnessDetection);
-    flatnessThreshold->setValue(config.flatnessThreshold);
-    flatnessWindow->setValue(static_cast<int>(config.flatnessWindow));
-    flatnessKickDuration->setValue(static_cast<int>(config.flatnessKickDuration));
-    flatnessDropoutBoost->setValue(config.flatnessDropoutBoost);
-    flatnessGenLrBoost->setValue(config.flatnessGenLrBoost);
+    adaptiveLrCheck->setChecked(config.adaptiveLr.enabled);
+    lrEmaAlpha->setValue(config.adaptiveLr.lrEmaAlpha);
+    lrAdjustFactor->setValue(config.adaptiveLr.lrAdjustFactor);
+    lrWarmupEpochs->setValue(static_cast<int>(config.adaptiveLr.lrWarmupEpochs));
+    flatnessCheck->setChecked(config.flatnessDetection.enabled);
+    flatnessThreshold->setValue(config.flatnessDetection.threshold);
+    flatnessWindow->setValue(static_cast<int>(config.flatnessDetection.window));
+    flatnessKickDuration->setValue(static_cast<int>(config.flatnessDetection.kickDuration));
+    flatnessDropoutBoost->setValue(config.flatnessDetection.discriminatorDropoutBoost);
+    flatnessGenLrBoost->setValue(config.flatnessDetection.generatorLrBoost);
 }
 
-Neural::GAN::GanConfig GanConfigWidget::getConfig() const {
+Neural::GAN::LearningConfig GanConfigWidget::getConfig() const {
     return {
         .latentDim = static_cast<std::size_t>(latentDim->value()),
-        .generatorLr = generatorLr->value(),
-        .discriminatorLr = discriminatorLr->value(),
+        .generatorLearningRate = generatorLr->value(),
+        .discriminatorLearningRate = discriminatorLr->value(),
         .epochs = static_cast<std::size_t>(epochs->value()),
         .batchSize = static_cast<std::size_t>(batchSize->value()),
         .discriminatorStepsPerGenStep = static_cast<std::size_t>(discriminatorSteps->value()),
         .dropoutRate = dropoutRate->value(),
         .classifierLossWeight = classifierLossWeight->value(),
         .datasetLimitPerLabel = static_cast<std::size_t>(datasetLimitPerLabel->value()),
-        .adaptiveLr = adaptiveLrCheck->isChecked(),
-        .lrEmaAlpha = lrEmaAlpha->value(),
-        .lrAdjustFactor = lrAdjustFactor->value(),
-        .lrWarmupEpochs = static_cast<std::size_t>(lrWarmupEpochs->value()),
-        .flatnessDetection = flatnessCheck->isChecked(),
-        .flatnessThreshold = flatnessThreshold->value(),
-        .flatnessWindow = static_cast<std::size_t>(flatnessWindow->value()),
-        .flatnessKickDuration = static_cast<std::size_t>(flatnessKickDuration->value()),
-        .flatnessDropoutBoost = flatnessDropoutBoost->value(),
-        .flatnessGenLrBoost = flatnessGenLrBoost->value(),
+        .adaptiveLr = {
+            .enabled = adaptiveLrCheck->isChecked(),
+            .lrEmaAlpha = lrEmaAlpha->value(),
+            .lrAdjustFactor = lrAdjustFactor->value(),
+            .lrWarmupEpochs = static_cast<std::size_t>(lrWarmupEpochs->value()),
+        },
+        .flatnessDetection = {
+            .enabled = flatnessCheck->isChecked(),
+            .threshold = flatnessThreshold->value(),
+            .window = static_cast<std::size_t>(flatnessWindow->value()),
+            .kickDuration = static_cast<std::size_t>(flatnessKickDuration->value()),
+            .discriminatorDropoutBoost = flatnessDropoutBoost->value(),
+            .generatorLrBoost = flatnessGenLrBoost->value(),
+        }
     };
 }

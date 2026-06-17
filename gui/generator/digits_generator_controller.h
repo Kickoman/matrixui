@@ -3,7 +3,7 @@
 #include "gui/lib/mode_controller.h"
 #include "gui/lib/mode_settings.h"
 
-#include "core/generator/gan_config.h"
+#include "core/generator/learning_config.h"
 #include "core/lib/neural_network.h"
 #include "matrix/matrix.h"
 
@@ -11,12 +11,13 @@
 #include <QPointer>
 #include <QImage>
 #include <optional>
+#include <random>
 #include <vector>
 #include <atomic>
 
 namespace Neural { namespace GAN { class GanTrainer; } }
 
-Q_DECLARE_METATYPE(Neural::GAN::GanConfig)
+Q_DECLARE_METATYPE(Neural::GAN::LearningConfig)
 
 class DigitsGeneratorController final : public ModeController
 {
@@ -33,6 +34,7 @@ public:
         std::size_t imageWidth;
         std::size_t imageHeight;
         std::size_t numClasses = 0;  // 0 = classifier not loaded yet
+        Neural::GAN::LearningConfig config;
     };
 
     explicit DigitsGeneratorController(QObject* parent = nullptr);
@@ -45,9 +47,10 @@ public:
     void loadSettings();
     void saveSettings();
     void setLogger(std::ostream* stream);
+    void setConfig(const Neural::GAN::LearningConfig& config);
 
 public slots:
-    void run(const Neural::GAN::GanConfig& config);
+    void run();
     void requestStop() override;
     void setImageWidth(std::size_t width) { imageWidth = width; }
     void setImageHeight(std::size_t height) { imageHeight = height; }
@@ -93,6 +96,10 @@ private:
 
     std::size_t imageWidth;
     std::size_t imageHeight;
+    std::size_t latentDim = 0;
+    Neural::GAN::LearningConfig learningConfig;
+
+    mutable std::mt19937 rng{std::random_device{}()};
 
     std::optional<Neural::NeuralNetwork> classifierNet;
     std::optional<Neural::NeuralNetwork> generatorNet;

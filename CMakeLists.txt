@@ -90,9 +90,7 @@ set(
     core/classifier/trainer.cpp
 
     # Generator
-    core/generator/generator.cpp
-    core/generator/discriminator.cpp
-    core/generator/gan_trainer.cpp
+    core/generator/trainer.cpp
 
     # Other
     matrix/matrix.cpp
