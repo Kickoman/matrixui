@@ -165,6 +165,8 @@ void DigitsGeneratorModeWidget::setController(DigitsGeneratorController* ctrl) {
     controller = ctrl;
     controller->loadSettings();
 
+    ganConfigWidget->setConfig(controller->getInfo().config);
+
     connect(controller, &DigitsGeneratorController::infoUpdated,
             this, &DigitsGeneratorModeWidget::updateInfo);
     connect(controller, &DigitsGeneratorController::epochCompleted,
@@ -174,7 +176,8 @@ void DigitsGeneratorModeWidget::setController(DigitsGeneratorController* ctrl) {
         if (controller->getInfo().running) {
             controller->requestStop();
         } else {
-            controller->run(ganConfigWidget->getConfig());
+            controller->setConfig(ganConfigWidget->getConfig());
+            controller->run();
         }
     });
 

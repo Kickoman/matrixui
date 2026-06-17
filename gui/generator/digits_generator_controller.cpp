@@ -1,5 +1,6 @@
 #include "gui/generator/digits_generator_controller.h"
 
+#include "core/generator/learning_config.h"
 #include "core/generator/trainer.h"
 
 #include "core/lib/neural_network_applier.h"
@@ -108,6 +109,10 @@ void DigitsGeneratorController::loadSettings() {
     datasetPath = settings.getValue("dataset_path", {}).toString();
     imageHeight = settings.getValue("image_height", 28).toULongLong();
     imageWidth = settings.getValue("image_width", 28).toULongLong();
+    if (const auto rawConfig = settings.getValue("learning_config"); !rawConfig.isNull()) {
+        nlohmann::json parsed = nlohmann::json::parse(rawConfig.toString().toStdString());
+        learningConfig = parsed.get<Neural::GAN::LearningConfig>();
+    }
     emit infoUpdated();
 }
 
@@ -118,10 +123,15 @@ void DigitsGeneratorController::saveSettings() {
     settings.setValue("dataset_path", datasetPath);
     settings.setValue("imageWidth", static_cast<quint64>(imageWidth));
     settings.setValue("imageHeight", static_cast<quint64>(imageHeight));
+    settings.setValue("learning_config", QString::fromStdString(nlohmann::json(learningConfig).dump()));
 }
 
 void DigitsGeneratorController::setLogger(std::ostream* stream) {
     logger = stream;
+}
+
+void DigitsGeneratorController::setConfig(const Neural::GAN::LearningConfig& config) {
+    learningConfig = config;
 }
 
 DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
@@ -135,6 +145,7 @@ DigitsGeneratorController::Info DigitsGeneratorController::getInfo() const {
         .imageWidth = imageWidth,
         .imageHeight = imageHeight,
         .numClasses = classifierNet ? classifierNet->outputSize() : 0,
+        .config = learningConfig,
     };
 }
 
@@ -150,7 +161,7 @@ QImage DigitsGeneratorController::generateSample(std::size_t label) const {
     );
 }
 
-void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
+void DigitsGeneratorController::run() {
     if (trainingRunning.load(std::memory_order_relaxed)) {
         return;
     }
@@ -163,7 +174,7 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
     connect(internalRunner, &QThread::finished, internalRunner, &QObject::deleteLater);
     connect(internalRunner, &QThread::finished, this, &DigitsGeneratorController::infoUpdated);
 
-    connect(internalRunner, &QThread::started, [this, config] {
+    connect(internalRunner, &QThread::started, [this] {
         out() << "Internal runner started..." << std::endl;
         trainingRunning.store(true, std::memory_order_relaxed);
         QMetaObject::invokeMethod(this, &DigitsGeneratorController::infoUpdated);
@@ -171,7 +182,7 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
         const auto numberOfClasses = classifierNet->outputSize();
 
         const Neural::NeuralNetwork genNet
-            = generatorNet.value_or(makeGeneratorNetwork(config.latentDim, numberOfClasses, imageHeight, imageWidth));
+            = generatorNet.value_or(makeGeneratorNetwork(learningConfig.latentDim, numberOfClasses, imageHeight, imageWidth));
         const Neural::NeuralNetwork discNet = discriminatorNet.value_or(makeDiscriminatorNetwork(imageHeight, imageWidth));
 
         Neural::NeuralNetworkApplier gen(genNet);
@@ -194,12 +205,12 @@ void DigitsGeneratorController::run(const Neural::GAN::LearningConfig& config) {
 
         // Reload with per-run limit if specified, otherwise use pre-loaded samples
         out() << "Loading dataset if necessary..." << std::endl;
-        const auto samples = config.datasetLimitPerLabel > 0
-            ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, config.datasetLimitPerLabel)
+        const auto samples = learningConfig.datasetLimitPerLabel > 0
+            ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, learningConfig.datasetLimitPerLabel)
             : realSamples;
 
         out() << "Starting training..." << std::endl;
-        trainer.train(samples, config, logger);
+        trainer.train(samples, learningConfig, logger);
         out() << "Training finished." << std::endl;
 
         // Store updated weights back so generateSample works after training
