@@ -14,7 +14,6 @@
 #include "core/classifier/learning_config.h"
 
 #include "core/lib/cache.h"
-#include "core/lib/matrix_cache.h"
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/directory_dataset.h"
@@ -222,10 +221,10 @@ int main(int argc, char** argv) {
             "Overridden per-side by --train-dataset/--test-dataset.")
         ->group("Dataset");
     trainCmd->add_option("--train-dataset", trainDatasetPath,
-            "Training data root (subdirs 0..9); falls back to --dataset if not set.")
+            "Training data root (subdirs 0..<num_of_classes-1>); falls back to --dataset if not set.")
         ->group("Dataset");
     trainCmd->add_option("--test-dataset", testDatasetPath,
-            "Testing data root (subdirs 0..9); falls back to --dataset if not set.")
+            "Testing data root (subdirs 0..<num_of_classes-1>); falls back to --dataset if not set.")
         ->group("Dataset");
     trainCmd->add_option("--test-file-limit", testFileLimit,
             "Max test files per class (0 = all). Runs evaluation after training.")
@@ -341,11 +340,11 @@ int main(int argc, char** argv) {
     }
 
     if (!validateDataset(trainingPath, network)) {
-        std::cerr << "Invalid training dataset (expected subdirectories 0..9): " << trainingPath << "\n";
+        std::cerr << "Invalid training dataset (expected subdirectories 0.." << network.outputSize() - 1 << "): " << trainingPath << "\n";
         return 3;
     }
     if (!validateDataset(testingPath, network)) {
-        std::cerr << "Invalid testing dataset (expected subdirectories 0..9): " << testingPath << "\n";
+        std::cerr << "Invalid testing dataset (expected subdirectories 0.." << network.outputSize() - 1 << "): " << testingPath << "\n";
         return 3;
     }
 
