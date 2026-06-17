@@ -172,7 +172,6 @@ void GanConfigWidget::setConfig(const Neural::GAN::GanConfig& config) {
 Neural::GAN::GanConfig GanConfigWidget::getConfig() const {
     return {
         .latentDim = static_cast<std::size_t>(latentDim->value()),
-        .numClasses = 10,
         .generatorLr = generatorLr->value(),
         .discriminatorLr = discriminatorLr->value(),
         .epochs = static_cast<std::size_t>(epochs->value()),

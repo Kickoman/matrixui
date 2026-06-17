@@ -91,6 +91,7 @@ void Trainer::train(const LearningConfig& config) {
 
     log() << "========== Loading dataset ==========" << std::endl;
     auto allSamples = trainingDataset->getAllSamples(config.datasetLimitPerLabel);
+    Dataset::FilterSamples(allSamples, network.getNeuralNetworkConfig().outputSize());
     if (allSamples.empty()) {
         log() << "No training data available." << std::endl;
         running.store(false);

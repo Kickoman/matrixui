@@ -80,6 +80,7 @@ set(
 set(
     CORE_SOURCES
     core/lib/layers.cpp
+    core/lib/neural_network.cpp
     core/lib/neural_network_loader.cpp
     core/lib/neural_network_applier.cpp
     core/lib/dataset.cpp

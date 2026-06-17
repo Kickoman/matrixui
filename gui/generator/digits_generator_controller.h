@@ -18,10 +18,11 @@ namespace Neural { namespace GAN { class GanTrainer; } }
 
 Q_DECLARE_METATYPE(Neural::GAN::GanConfig)
 
-class DigitsGeneratorController : public ModeController
+class DigitsGeneratorController final : public ModeController
 {
     Q_OBJECT
 public:
+
     struct Info {
         bool running = false;
         bool canRun = false;
@@ -31,14 +32,13 @@ public:
         std::string discriminatorPath;
         std::size_t imageWidth;
         std::size_t imageHeight;
+        std::size_t numClasses = 0;  // 0 = classifier not loaded yet
     };
 
     explicit DigitsGeneratorController(QObject* parent = nullptr);
     ~DigitsGeneratorController();
 
     Info getInfo() const;
-
-    // Generate a sample using the current generator weights (not during training).
     QImage generateSample(std::size_t label) const;
 
     void waitUntilFinished() override;
@@ -49,19 +49,30 @@ public:
 public slots:
     void run(const Neural::GAN::GanConfig& config);
     void requestStop() override;
-    bool loadClassifier(const QString& path);
-    bool loadDataset(const QString& path);
-    void loadGenerator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
-    void loadDiscriminator(const QString& path, Neural::NeuralNetworkConfiguration config = {});
     void setImageWidth(std::size_t width) { imageWidth = width; }
     void setImageHeight(std::size_t height) { imageHeight = height; }
+
+    void setClassifierPath(const QString& path);
+    void setGeneratorPath(const QString& path, Neural::NeuralNetworkConfiguration config = {});
+    void setDiscriminatorPath(const QString& path, Neural::NeuralNetworkConfiguration config = {});
+    void setDatasetPath(const QString& path);
 
 signals:
     void infoUpdated();
     void epochCompleted(std::size_t epoch, double avgDiscScore, double avgGenScore, double emaReal, double emaGen);
 
 private:
-    bool canRunTraining() const;
+    std::ostream& out();
+
+    bool loadClassifier();
+    bool loadDataset();
+    bool loadGenerator();
+    bool loadDiscriminator();
+
+    void resetProject();
+    bool loadProject();
+
+
     Matrix readCached(const std::filesystem::path& path) const;
     std::function<Matrix(const std::filesystem::path& path)> reader;
 
@@ -76,6 +87,9 @@ private:
     QString datasetPath;
     QString generatorPath{"generator.wgt"};
     QString discriminatorPath{"discriminator.wgt"};
+
+    Neural::NeuralNetworkConfiguration generatorConfiguration;
+    Neural::NeuralNetworkConfiguration discriminatorConfiguration;
 
     std::size_t imageWidth;
     std::size_t imageHeight;

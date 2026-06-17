@@ -138,7 +138,8 @@ void DigitsClassifierModeWidget::handleStatistics(const Neural::Classifier::Test
     const double rate = total.totalTests > 0 ? 100.0 * total.passedTests / total.totalTests : 0;
     chart->addPoint(rate);
 
-    for (unsigned i = 0; i < 10; ++i) {
+    assert(result.size() == digitChart->getCount());
+    for (unsigned i = 0; i < result.size(); ++i) {
         const auto& res = result.stats[i];
         const double rate = res.totalTests > 0 ? 100.0 * res.passedTests / res.totalTests : 0;
         digitChart->setValue(i, rate);
@@ -160,6 +161,8 @@ void DigitsClassifierModeWidget::updateInfo() {
     learningConfigWidget->setDisabled(info.running);
     imageWidth->setValue(info.imageWidth);
     imageHeight->setValue(info.imageHeight);
+
+    digitChart->setCount(info.layersConfiguration.back());
 }
 
 void DigitsClassifierModeWidget::handleOpenNetworkClicked() {

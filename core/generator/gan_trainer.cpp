@@ -85,8 +85,9 @@ void GanTrainer::train(
     if (realSamples.empty()) return;
     stopFlag.store(false, std::memory_order_relaxed);
 
+    const auto numberOfClasses = classifier.getNeuralNetworkConfig().outputSize();
     std::mt19937 rng{std::random_device{}()};
-    std::uniform_int_distribution<std::size_t> labelDist(0, config.numClasses - 1);
+    std::uniform_int_distribution<std::size_t> labelDist(0, numberOfClasses - 1);
     std::vector<std::size_t> indices(realSamples.size());
     std::iota(indices.begin(), indices.end(), 0);
 
@@ -199,7 +200,7 @@ void GanTrainer::train(
 
         if (log && steps > 0) {
             // Sample a generated image for each class and log what the classifier thinks.
-            const std::size_t logLabel = epoch % config.numClasses;
+            const std::size_t logLabel = epoch % numberOfClasses;
             const Matrix sample = generator.generate(logLabel);
             const Matrix classifierOut = classifier.predict(sample);
             std::size_t predictedLabel = 0;

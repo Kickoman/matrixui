@@ -128,10 +128,6 @@ void DigitsClassifierController::loadNetwork(const QString& network, Neural::Neu
     recognizer.setNetwork(loadedNetwork.value());
     networkName = network;
 
-    if (recognizer.getTestingDataset()) {
-        testOnce();
-    }
-
     emit infoUpdated();
 }
 

@@ -15,28 +15,6 @@
 #include <QComboBox>
 
 
-namespace {
-
-QString LayersToTextRepresentation(const std::vector<std::size_t>& sizes) {
-    QStringList layers;
-    std::transform(sizes.begin(), sizes.end(), std::back_inserter(layers), [](std::size_t size) {
-        return QString::number(size);
-    });
-    return layers.join(", ");
-}
-
-std::vector<std::size_t> TextRepresentationToLayers(const QString& text) {
-    const auto sizes = text.split(',', Qt::SkipEmptyParts);
-    std::vector<std::size_t> result;
-    result.reserve(sizes.size());
-    std::transform(sizes.begin(), sizes.end(), std::back_inserter(result), [](const QString& size) {
-        return static_cast<std::size_t>(size.toUInt());
-    });
-    return result;
-}
-
-}
-
 
 NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
     : QDialog(parent)
@@ -92,7 +70,7 @@ Neural::NeuralNetworkConfiguration NetworkCreateDialog::getConfiguration() const
     return {
         .hiddenActivation = static_cast<Neural::ActivationType>(hiddenActivation->currentData().toUInt()),
         .outputActivation = static_cast<Neural::ActivationType>(outputActivation->currentData().toUInt()),
-        .layersSizes = TextRepresentationToLayers(networkLayersInput->text()),
+        .layersSizes = Neural::TextRepresentationToLayers(networkLayersInput->text().toStdString()),
     };
 }
 
@@ -105,7 +83,7 @@ void NetworkCreateDialog::setDefaultLayersText(const QString& layers) {
 }
 
 void NetworkCreateDialog::setDefaultLayersText(const std::vector<std::size_t>& layers) {
-    defaultLayersText = LayersToTextRepresentation(layers);
+    defaultLayersText = QString::fromStdString(Neural::LayersToTextRepresentation(layers));
 }
 
 void NetworkCreateDialog::setDefaultActivations(Neural::ActivationType hidden, Neural::ActivationType output) {
@@ -137,7 +115,7 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     if (QFile::exists(text)) {
         try {
             const auto config = Neural::LoadConfig(text.toStdString()).value();
-            networkLayersInput->setText(LayersToTextRepresentation(config.layersSizes));
+            networkLayersInput->setText(QString::fromStdString(Neural::LayersToTextRepresentation(config.layersSizes)));
 
             const auto hiddenIndex = hiddenActivation->findData(static_cast<std::uint8_t>(config.hiddenActivation));
             const auto outputIndex = outputActivation->findData(static_cast<std::uint8_t>(config.outputActivation));
