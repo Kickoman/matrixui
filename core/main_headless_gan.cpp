@@ -58,12 +58,7 @@ int runGenerate(
         return 2;
     }
 
-    // Input size = latentDim + numClasses; infer latentDim from the saved network.
-    const std::size_t inputSize = generatorNet->config.layersSizes.front();
-    const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
-    Neural::GAN::Generator generator(std::move(*generatorNet), latentDim, numClasses);
-
-    // Optional classifier for printing the predicted label alongside the output.
+    // Optional classifier: if provided, derive numClasses from it (authoritative).
     std::optional<Neural::NeuralNetworkApplier> classifier;
     if (!classifierPath.empty()) {
         auto net = Neural::LoadNetwork(classifierPath);
@@ -71,8 +66,14 @@ int runGenerate(
             std::cerr << "Failed to load classifier: " << classifierPath << "\n";
             return 2;
         }
+        numClasses = net->outputSize();
         classifier.emplace(std::move(*net));
     }
+
+    // Input size = latentDim + numClasses; infer latentDim from the saved network.
+    const std::size_t inputSize = generatorNet->config.layersSizes.front();
+    const std::size_t latentDim = inputSize > numClasses ? inputSize - numClasses : inputSize;
+    Neural::GAN::Generator generator(std::move(*generatorNet), latentDim, numClasses);
 
     for (std::size_t i = 0; i < numSamples; ++i) {
         const Matrix flat = generator.generate(label);   // 1 x 784
@@ -164,8 +165,6 @@ int main(int argc, char** argv) {
         ->delimiter(',')->group("Topology")->capture_default_str();
     trainCmd->add_option("--disc-layers", discHidden, "Discriminator hidden layer sizes (new network only)")
         ->delimiter(',')->group("Topology")->capture_default_str();
-    trainCmd->add_option("--num-classes", ganConfig.numClasses, "Number of digit classes")
-        ->group("Topology")->capture_default_str();
     trainCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
         ->group("Topology")
         ->capture_default_str();
@@ -240,12 +239,18 @@ int main(int argc, char** argv) {
         }
     }
 
-    // *trainCmd
-    // constexpr std::size_t kImageSize = 28 * 28;
+    // Load classifier (frozen)
+    auto classifierNet = Neural::LoadNetwork(classifierPath);
+    if (!classifierNet) {
+        std::cerr << "Failed to load classifier: " << classifierPath << "\n";
+        return 2;
+    }
+    const auto classesCount = classifierNet->outputSize();
+    Neural::NeuralNetworkApplier classifier(std::move(*classifierNet));
 
     auto buildGenLayers = [&]() {
-        // Input = noise (latentDim) concatenated with one-hot label (numClasses).
-        std::vector<std::size_t> layers = {ganConfig.latentDim + ganConfig.numClasses};
+        // Input = noise (latentDim) concatenated with one-hot label (classesCount).
+        std::vector<std::size_t> layers = {ganConfig.latentDim + classesCount};
         layers.insert(layers.end(), genHidden.begin(), genHidden.end());
         layers.push_back(imageHeight * imageWidth);
         return layers;
@@ -258,21 +263,12 @@ int main(int argc, char** argv) {
         return layers;
     };
 
-    // Load classifier (frozen)
-    auto classifierNet = Neural::LoadNetwork(classifierPath);
-    if (!classifierNet) {
-        std::cerr << "Failed to load classifier: " << classifierPath << "\n";
-        return 2;
-    }
-    const auto classesCount = classifierNet->outputSize();
-    Neural::NeuralNetworkApplier classifier(std::move(*classifierNet));
-
     // Load or create generator
     Neural::NeuralNetworkConfiguration genConfig;
     genConfig.layersSizes      = buildGenLayers();
     genConfig.hiddenActivation = Neural::ActivationType::ReLU;
     genConfig.outputActivation = Neural::ActivationType::Sigmoid;
-    Neural::GAN::Generator generator(loadOrCreate(generatorPath, genConfig), ganConfig.latentDim, ganConfig.numClasses);
+    Neural::GAN::Generator generator(loadOrCreate(generatorPath, genConfig), ganConfig.latentDim, classifier.getNeuralNetworkConfig().outputSize());
 
     // Load or create discriminator
     Neural::NeuralNetworkConfiguration discConfig;

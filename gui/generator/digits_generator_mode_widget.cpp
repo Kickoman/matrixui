@@ -58,8 +58,6 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     previewLabel->setStyleSheet("border: 1px solid gray;");
 
     digitSelector = new QComboBox(this);
-    for (int i = 0; i < 10; ++i)
-        digitSelector->addItem(QString::number(i));
 
     generateButton = new QPushButton("Generate", this);
 
@@ -108,35 +106,39 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
 
     setLayout(root);
 
-    // Connections (controller not yet set, connected in setController)
     connect(loadClassifierButton, &QPushButton::clicked, [this] {
         const QString path = QFileDialog::getOpenFileName(this, "Load classifier weights", {}, "Network weights (*.wgt)");
-        if (path.isEmpty()) return;
-        if (!controller->loadClassifier(path))
-            QMessageBox::critical(this, "Load failed", "Could not load classifier network from:\n" + path);
+        if (!path.isEmpty()) {
+            controller->setClassifierPath(path);
+        }
     });
 
     connect(loadDatasetButton, &QPushButton::clicked, [this] {
         QFileDialog dlg(this);
         dlg.setFileMode(QFileDialog::Directory);
-        if (!dlg.exec()) return;
+        if (!dlg.exec()) {
+            return;
+        }
+
         const auto selected = dlg.selectedFiles();
-        if (selected.size() != 1) return;
-        if (!controller->loadDataset(selected.front()))
-            QMessageBox::critical(this, "Invalid dataset",
-                "The dataset directory must contain subdirectories 0–9 with PNG images.");
+        if (selected.size() != 1) {
+            return;
+        }
+        controller->setDatasetPath(selected.front());
     });
 
     connect(loadGeneratorButton, &QPushButton::clicked, [this] {
         const auto ganConfig = ganConfigWidget->getConfig();
-        const std::size_t inputSize = ganConfig.latentDim + ganConfig.numClasses;
+        const std::size_t numClasses = controller->getInfo().numClasses;
+        const std::size_t inputSize = ganConfig.latentDim + (numClasses > 0 ? numClasses : 10);
         NetworkCreateDialog dialog(this);
         dialog.setWindowTitle("Open generator network");
         dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().generatorPath));
         dialog.setDefaultLayersText(QString("%1, 256, 512, 784").arg(inputSize));
         dialog.setDefaultActivations(Neural::ActivationType::LeakyReLU, Neural::ActivationType::Sigmoid);
-        if (dialog.exec() == QDialog::Accepted)
-            controller->loadGenerator(dialog.getNetworkName(), dialog.getConfiguration());
+        if (dialog.exec() == QDialog::Accepted) {
+            controller->setGeneratorPath(dialog.getNetworkName(), dialog.getConfiguration());
+        }
     });
 
     connect(loadDiscriminatorButton, &QPushButton::clicked, [this] {
@@ -145,8 +147,9 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
         dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().discriminatorPath));
         dialog.setDefaultLayersText("784, 512, 256, 1");
         dialog.setDefaultActivations(Neural::ActivationType::LeakyReLU, Neural::ActivationType::Sigmoid);
-        if (dialog.exec() == QDialog::Accepted)
-            controller->loadDiscriminator(dialog.getNetworkName(), dialog.getConfiguration());
+        if (dialog.exec() == QDialog::Accepted) {
+            controller->setDiscriminatorPath(dialog.getNetworkName(), dialog.getConfiguration());
+        }
     });
 
     connect(generateButton, &QPushButton::clicked, this, &DigitsGeneratorModeWidget::handleGenerateClicked);
@@ -210,7 +213,6 @@ void DigitsGeneratorModeWidget::updateInfo() {
     generatorLabel->setText("Generator: " + QString::fromStdString(info.generatorPath));
     discriminatorLabel->setText("Discriminator: " + QString::fromStdString(info.discriminatorPath));
 
-    toggleTrainingButton->setEnabled(info.canRun);
     toggleTrainingButton->setText(info.running ? "Stop training" : "Start training");
 
     const bool idle = !info.running;
@@ -223,6 +225,14 @@ void DigitsGeneratorModeWidget::updateInfo() {
 
     imageWidth->setValue(info.imageWidth);
     imageHeight->setValue(info.imageHeight);
+
+    if (info.numClasses > 0 && static_cast<std::size_t>(digitSelector->count()) != info.numClasses) {
+        const int prev = digitSelector->currentIndex();
+        digitSelector->clear();
+        for (std::size_t i = 0; i < info.numClasses; ++i)
+            digitSelector->addItem(QString::number(i));
+        digitSelector->setCurrentIndex(std::min(prev, digitSelector->count() - 1));
+    }
 }
 
 void DigitsGeneratorModeWidget::handleEpochCompleted(std::size_t /*epoch*/, double dScore, double gScore, double emaReal, double emaGen) {

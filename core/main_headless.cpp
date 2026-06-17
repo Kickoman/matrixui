@@ -28,7 +28,7 @@
 namespace Neural {
 namespace Classifier {
 
-    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EpochLog,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EpochLog,
     epochNumber,
     learningRate,
     trainAccuracy,
@@ -46,14 +46,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TestResult, stats);
 namespace {
 
 bool validateDataset(const std::filesystem::path& datasetPath, const Neural::NeuralNetwork& network) {
-    const auto classCount = network.outputSize();
-    for (int i = 0; i < classCount; ++i) {
-        const auto subdirectory = datasetPath / std::to_string(i);
-        if (!std::filesystem::exists(subdirectory) || !std::filesystem::is_directory(subdirectory)) {
-            return false;
-        }
-    }
-    return true;
+    return Neural::DirectoryDataset::IsDirectoryValid(datasetPath, network.outputSize());
 }
 
 const char* activationName(Neural::ActivationType a) {

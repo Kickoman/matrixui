@@ -31,4 +31,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
     layersSizes
 );
 
+std::string LayersToTextRepresentation(const std::vector<std::size_t>& layers);
+std::vector<std::size_t> TextRepresentationToLayers(const std::string& repr);
+
 }

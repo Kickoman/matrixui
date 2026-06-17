@@ -110,5 +110,4 @@ NLOHMANN_JSON_SERIALIZE_ENUM(ActivationType, {
     {ActivationType::LeakyReLU, "leakyrelu"},
 });
 
-
 }

@@ -6,6 +6,16 @@
 
 namespace Neural {
 
+bool DirectoryDataset::IsDirectoryValid(const std::filesystem::path& path, const std::size_t classCount) {
+    for (std::size_t i = 0; i < classCount; ++i) {
+        const auto subdirectory = path / std::to_string(i);
+        if (!std::filesystem::exists(subdirectory) || !std::filesystem::is_directory(subdirectory)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 DirectoryDataset::DirectoryDataset(const std::string& directoryPath)
     : datasetDirectory(directoryPath)
 { }
