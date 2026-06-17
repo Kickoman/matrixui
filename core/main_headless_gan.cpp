@@ -264,6 +264,7 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to load classifier: " << classifierPath << "\n";
         return 2;
     }
+    const auto classesCount = classifierNet->outputSize();
     Neural::NeuralNetworkApplier classifier(std::move(*classifierNet));
 
     // Load or create generator
@@ -295,7 +296,8 @@ int main(int argc, char** argv) {
     Neural::DirectoryDataset dataset(datasetPath);
     dataset.setFileReader(reader);
 
-    const auto allSamples = dataset.getAllSamples(ganConfig.datasetLimitPerLabel);
+    auto allSamples = dataset.getAllSamples(ganConfig.datasetLimitPerLabel);
+    Neural::Dataset::FilterSamples(allSamples, classesCount);
     std::vector<Matrix> realImages;
     realImages.reserve(allSamples.size());
     for (const auto& s : allSamples)

@@ -46,12 +46,26 @@ QChart* DigitChart::getChart() {
     return chart;
 }
 
-void DigitChart::setTitle(const QString& title)
-{
+void DigitChart::setTitle(const QString& title) {
     chart->setTitle(title);
 }
 
-void DigitChart::setValue(const unsigned digit, const double value)
-{
+void DigitChart::setValue(const unsigned digit, const double value) {
     barSet->replace(digit, value);
+}
+
+void DigitChart::setCount(const unsigned count) {
+    axisY->clear();
+    for (unsigned i = 0; i < count; ++i) {
+        axisY->append(QString::number(i));
+    }
+    if (barSet->count() < count) {
+        for (unsigned i = 0; i < count - barSet->count(); ++i) {
+            *barSet << 0;
+        }
+    }
+}
+
+unsigned DigitChart::getCount() const {
+    return axisY->count();
 }

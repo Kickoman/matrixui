@@ -37,13 +37,15 @@ bool datasetPathValid(const QString& path) {
 
 std::vector<Matrix> loadDatasetSamples(
     const QString& path,
+    const std::size_t classesCount,
     const std::function<Matrix(const std::filesystem::path& path)>& reader,
     std::size_t limitPerLabel = 0
 ) {
     Neural::DirectoryDataset dataset(path.toStdString());
     dataset.setFileReader(reader);
 
-    const auto samples = dataset.getAllSamples(limitPerLabel);
+    auto samples = dataset.getAllSamples(limitPerLabel);
+    Neural::Dataset::FilterSamples(samples, classesCount);
     std::vector<Matrix> images;
     images.reserve(samples.size());
     for (const auto& s : samples)
@@ -195,7 +197,7 @@ void DigitsGeneratorController::run(const Neural::GAN::GanConfig& config) {
 
         // Reload with per-run limit if specified, otherwise use pre-loaded samples
         const std::vector<Matrix> samples = config.datasetLimitPerLabel > 0
-            ? ::loadDatasetSamples(datasetPath, reader, config.datasetLimitPerLabel)
+            ? ::loadDatasetSamples(datasetPath, classifierNet->outputSize(), reader, config.datasetLimitPerLabel)
             : realSamples;
 
         trainer.train(samples, config, logger);
@@ -239,8 +241,9 @@ bool DigitsGeneratorController::loadClassifier(const QString& path) {
 bool DigitsGeneratorController::loadDataset(const QString& path) {
     if (internalRunner && internalRunner->isRunning()) return false;
     if (!::datasetPathValid(path)) return false;
+    if (!classifierNet.has_value()) return false;
     datasetPath = path;
-    realSamples = ::loadDatasetSamples(path, reader);
+    realSamples = ::loadDatasetSamples(path, classifierNet->outputSize(), reader);
     emit infoUpdated();
     return true;
 }

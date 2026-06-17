@@ -16,8 +16,11 @@ public:
     DigitChart(QWidget* parent = nullptr);
 
     QChart* getChart();
+    unsigned getCount() const;
+
     void setTitle(const QString& title);
     void setValue(const unsigned digit, const double value);
+    void setCount(unsigned count);
 
 private:
     QChart* chart = nullptr;
