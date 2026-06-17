@@ -3,6 +3,7 @@
 #include "core/lib/layers.h"
 
 #include <vector>
+#include <nlohmann/json.hpp>
 
 namespace Neural {
 
@@ -22,5 +23,12 @@ struct NeuralNetwork {
     ActivationType hiddenActivation() const { return config.hiddenActivation; }
     ActivationType outputActivation() const { return config.outputActivation; }
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    NeuralNetworkConfiguration,
+    hiddenActivation,
+    outputActivation,
+    layersSizes
+);
 
 }

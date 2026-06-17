@@ -11,12 +11,14 @@
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QFormLayout>
 #include <QPushButton>
 #include <QLabel>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QPixmap>
+#include <QSpinBox>
 #include <QChart>
 
 
@@ -40,6 +42,13 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     datasetLabel       = new QLabel("No dataset", this);
     generatorLabel     = new QLabel("Generator: generator.wgt", this);
     discriminatorLabel = new QLabel("Discriminator: discriminator.wgt", this);
+
+    imageWidth = new QSpinBox(this);
+    imageHeight = new QSpinBox(this);
+    imageWidth->setRange(1, 1000);
+    imageHeight->setRange(1, 1000);
+    imageWidth->setValue(28);
+    imageHeight->setValue(28);
 
     ganConfigWidget = new GanConfigWidget(this);
 
@@ -77,6 +86,11 @@ DigitsGeneratorModeWidget::DigitsGeneratorModeWidget(QWidget* parent)
     infoRow->addLayout(infoLeft);
     infoRow->addWidget(ganConfigWidget);
     root->addLayout(infoRow);
+
+    auto* imagePropertiesLayout = new QFormLayout();
+    imagePropertiesLayout->addRow("Image width", imageWidth);
+    imagePropertiesLayout->addRow("Image height", imageHeight);
+    infoLeft->addLayout(imagePropertiesLayout);
 
     // Chart + preview
     auto* midRow = new QHBoxLayout();
@@ -166,6 +180,14 @@ void DigitsGeneratorModeWidget::setController(DigitsGeneratorController* ctrl) {
         }
     });
 
+    const auto updateImageProperties = [this](){
+        this->controller->setImageHeight(imageHeight->value());
+        this->controller->setImageWidth(imageWidth->value());
+    };
+    connect(imageWidth, &QSpinBox::valueChanged, updateImageProperties);
+    connect(imageHeight, &QSpinBox::valueChanged, updateImageProperties);
+
+
     updateInfo();
 }
 
@@ -198,6 +220,9 @@ void DigitsGeneratorModeWidget::updateInfo() {
     loadGeneratorButton->setDisabled(!idle);
     loadDiscriminatorButton->setDisabled(!idle);
     generateButton->setEnabled(idle);
+
+    imageWidth->setValue(info.imageWidth);
+    imageHeight->setValue(info.imageHeight);
 }
 
 void DigitsGeneratorModeWidget::handleEpochCompleted(std::size_t /*epoch*/, double dScore, double gScore, double emaReal, double emaGen) {

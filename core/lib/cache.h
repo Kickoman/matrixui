@@ -79,7 +79,7 @@ std::size_t default_memory_calculator(const Key& key, const Value& value) {
     return size;
 }
 
-template<typename Key, typename Value>
+template<typename Key, typename Value, typename Hash = std::hash<Key>>
 class LRUCache {
 private:
     using ListIterator = typename std::list<Key>::iterator;
@@ -236,7 +236,7 @@ public:
     const auto& get_map() const { return cache_map_; }
 
 private:
-    std::unordered_map<Key, CacheEntry> cache_map_;
+    std::unordered_map<Key, CacheEntry, Hash> cache_map_;
     std::list<Key> cache_list_;
     CacheConfig<Key, Value> config_;
     CacheStats stats_;

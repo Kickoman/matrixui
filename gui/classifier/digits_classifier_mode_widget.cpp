@@ -42,6 +42,14 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
     currentNetworkLabel = new QLabel("No network", this);
     currentTestingDatasetLabel = new QLabel("No testing dataset", this);
     currentTrainingDatasetLabel = new QLabel("No training dataset", this);
+    imageWidth = new QSpinBox(this);
+    imageHeight = new QSpinBox(this);
+    imageWidth->setMinimum(1);
+    imageWidth->setMaximum(1000);
+    imageHeight->setMinimum(1);
+    imageWidth->setMaximum(1000);
+    imageWidth->setValue(28);
+    imageHeight->setValue(28);
     learningConfigWidget = new LearningConfigWidget(this);
     learningConfigWidget->setConfig({});
 
@@ -51,6 +59,7 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
     auto* infoLayout = new QHBoxLayout();
     auto* networkInfoLayout = new QVBoxLayout();
     auto* configInfoLayout = new QVBoxLayout();
+    auto* imagePropertiesLayout = new QFormLayout();
     buttonLayout->addWidget(toggleLearningButton);
     buttonLayout->addWidget(openNetworkButton);
     buttonLayout->addWidget(openTrainingDatasetButton);
@@ -58,10 +67,15 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
 
     infoLayout->addLayout(networkInfoLayout);
     infoLayout->addWidget(learningConfigWidget);
+
     networkInfoLayout->addWidget(currentNetworkLabel);
     networkInfoLayout->addWidget(currentTestingDatasetLabel);
     networkInfoLayout->addWidget(currentTrainingDatasetLabel);
+    networkInfoLayout->addLayout(imagePropertiesLayout);
     networkInfoLayout->setAlignment(Qt::AlignTop);
+
+    imagePropertiesLayout->addRow("Image width", imageWidth);
+    imagePropertiesLayout->addRow("Image height", imageHeight);
 
     vLayout->addLayout(buttonLayout);
     vLayout->addLayout(infoLayout);
@@ -102,6 +116,14 @@ void DigitsClassifierModeWidget::setController(DigitsClassifierController* contr
             controller->run(learningConfigWidget->getConfig());
         }
     });
+
+    const auto updateImageProperties = [this](){
+        this->controller->setImageHeight(imageHeight->value());
+        this->controller->setImageWidth(imageWidth->value());
+    };
+    connect(imageWidth, &QSpinBox::valueChanged, updateImageProperties);
+    connect(imageHeight, &QSpinBox::valueChanged, updateImageProperties);
+
     updateInfo();
 }
 
@@ -136,11 +158,14 @@ void DigitsClassifierModeWidget::updateInfo() {
         info.running ? "Stop learning" : "Start learning"
     );
     learningConfigWidget->setDisabled(info.running);
+    imageWidth->setValue(info.imageWidth);
+    imageHeight->setValue(info.imageHeight);
 }
 
 void DigitsClassifierModeWidget::handleOpenNetworkClicked() {
     NetworkCreateDialog dialog(this);
     dialog.setCurrentNetworkPath(QString::fromStdString(controller->getInfo().networkName));
+    dialog.setDefaultLayersText(controller->getInfo().layersConfiguration);
     if (dialog.exec() == QDialog::Accepted) {
         const QString name = dialog.getNetworkName();
         const auto config = dialog.getConfiguration();

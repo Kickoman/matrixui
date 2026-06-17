@@ -9,6 +9,7 @@ class DigitsGeneratorController;
 class QPushButton;
 class QLabel;
 class QComboBox;
+class QSpinBox;
 
 class DigitsGeneratorModeWidget : public ModeWidget
 {
@@ -42,6 +43,8 @@ private:
     QLabel* datasetLabel = nullptr;
     QLabel* generatorLabel = nullptr;
     QLabel* discriminatorLabel = nullptr;
+    QSpinBox* imageWidth = nullptr;
+    QSpinBox* imageHeight = nullptr;
 
     GanConfigWidget* ganConfigWidget = nullptr;
 

@@ -49,7 +49,7 @@ void Trainer::setTestingDataset(std::unique_ptr<Neural::Dataset>&& dataset) {
     testingDataset = std::move(dataset);
 }
 
-void Trainer::setEpochCallback(const std::function<void()> callback) {
+void Trainer::setEpochCallback(const std::function<void(const EpochLog&)> callback) {
     epochCallback = callback;
 }
 
@@ -102,7 +102,8 @@ void Trainer::train(const LearningConfig& config) {
     double bestTrainAccuracy = 0;
     double learningRate = config.initialLearningRate;
 
-    for (std::size_t epoch = 0; epoch < config.maxEpochs && !stopRequested; ++epoch) {
+    std::size_t epoch;
+    for (epoch = 0; epoch < config.maxEpochs && !stopRequested; ++epoch) {
         log() << "========== Epoch " << (epoch + 1) << "/" << config.maxEpochs
               << " (lr=" << learningRate << ") ==========" << std::endl;
 
@@ -121,7 +122,13 @@ void Trainer::train(const LearningConfig& config) {
         }
 
         if (epochCallback) {
-            epochCallback();
+            epochCallback({
+                .epochNumber = epoch,
+                .learningRate = learningRate,
+                .trainAccuracy = trainAccuracy,
+                .bestTrainAccuracy = bestTrainAccuracy,
+                .stagnateEpochsCount = stagnateEpochsCount,
+            });
         }
 
         if (trainAccuracy > 0.99) {
@@ -146,7 +153,13 @@ void Trainer::train(const LearningConfig& config) {
     network.initializeNetwork(bestNetwork);
     log() << "Restored best model with accuracy " << bestTrainAccuracy * 100 << "%" << std::endl;
     if (epochCallback) {
-        epochCallback();
+        epochCallback({
+            .epochNumber = epoch,
+            .learningRate = learningRate,
+            .trainAccuracy = bestTrainAccuracy,
+            .bestTrainAccuracy = bestTrainAccuracy,
+            .stagnateEpochsCount = stagnateEpochsCount,
+        });
     }
 
     running.store(false);

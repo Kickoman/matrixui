@@ -1,14 +1,13 @@
+#include <filesystem>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <filesystem>
 
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/directory_dataset.h"
 #include "core/lib/dataset.h"
+#include "core/lib/cache.h"
 
 #include "core/generator/gan_config.h"
 #include "core/generator/gan_trainer.h"
@@ -18,58 +17,13 @@
 #include "png/pngreader.h"
 #include "matrix/matrix.h"
 
-
-// ---------------------------------------------------------------------------
-// Minimal CLI argument parser (same interface as main_headless.cpp)
-// ---------------------------------------------------------------------------
-class InputParser {
-public:
-    InputParser() = default;
-    explicit InputParser(int& argc, char** argv) {
-        for (int i = 1; i < argc; ++i)
-            tokens.emplace_back(argv[i]);
-    }
-
-    const std::string& getCmdOption(const std::string& option, const std::string& defaultValue = {}) const {
-        const auto it = std::find(tokens.cbegin(), tokens.cend(), option);
-        if (it != tokens.cend() && std::next(it) != tokens.cend())
-            return *std::next(it);
-        return defaultValue;
-    }
-
-    bool cmdOptionExists(const std::string& option) const {
-        return std::find(tokens.cbegin(), tokens.cend(), option) != tokens.cend();
-    }
-
-private:
-    std::vector<std::string> tokens;
-};
+#include <CLI11/CLI11.hpp>
 
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 namespace {
-
-double parseDoubleOpt(const InputParser& cmd, const std::string& option, double def) {
-    return cmd.cmdOptionExists(option) ? std::stod(cmd.getCmdOption(option)) : def;
-}
-
-std::size_t parseSizeOpt(const InputParser& cmd, const std::string& option, std::size_t def) {
-    return cmd.cmdOptionExists(option)
-        ? static_cast<std::size_t>(std::stoull(cmd.getCmdOption(option)))
-        : def;
-}
-
-std::vector<std::size_t> parseLayers(const std::string& s) {
-    std::vector<std::size_t> result;
-    std::istringstream stream(s);
-    std::string token;
-    while (std::getline(stream, token, ','))
-        if (!token.empty())
-            result.push_back(std::stoull(token));
-    return result;
-}
 
 Neural::NeuralNetwork loadOrCreate(
     const std::string& path,
@@ -82,58 +36,6 @@ Neural::NeuralNetwork loadOrCreate(
     return Neural::CreateNetwork(config);
 }
 
-void printUsage(const char* argv0) {
-    const Neural::GAN::GanConfig d{};
-    std::cerr
-        << "Usage:\n  " << argv0 << " --classifier <path.wgt> --dataset <dir> [options]\n\n"
-        << "Required:\n"
-        << "  --classifier <path.wgt>    Trained classifier (frozen signal source).\n"
-        << "  --dataset <dir>            Training images root (subdirs 0..9 of PNGs).\n\n"
-        << "Network paths (created fresh if the file does not exist):\n"
-        << "  --generator <path.wgt>     Generator save path (default: generator.wgt).\n"
-        << "  --discriminator <path.wgt> Discriminator save path (default: discriminator.wgt).\n\n"
-        << "Network topology (used only when creating new networks):\n"
-        << "  --latent-dim <n>           Noise vector size fed to generator (default " << d.latentDim << ").\n"
-        << "  --gen-layers <n,n,...>     Generator hidden layer sizes (default 256,512).\n"
-        << "  --disc-layers <n,n,...>    Discriminator hidden layer sizes (default 512,256).\n\n"
-        << "GAN training:\n"
-        << "  --gen-lr <x>               Generator learning rate (default " << d.generatorLr << ").\n"
-        << "  --disc-lr <x>              Discriminator learning rate (default " << d.discriminatorLr << ").\n"
-        << "  --epochs <n>               Total epochs (default " << d.epochs << ").\n"
-        << "  --batch-size <n>           Samples per batch (default " << d.batchSize << ").\n"
-        << "  --disc-steps <n>           Discriminator updates per generator update (default "
-                                         << d.discriminatorStepsPerGenStep << ").\n"
-        << "  --dropout <x>              Discriminator dropout rate (default " << d.dropoutRate << ").\n"
-        << "  --classifier-weight <x>    Weight of classifier loss in generator update (default "
-                                         << d.classifierLossWeight << ").\n"
-        << "  --num-classes <n>          Number of digit classes (default " << d.numClasses << ").\n"
-        << "  --dataset-limit <n>        Max images per label to load (0 = all; default 0).\n"
-        << "\nAdaptive learning rate:\n"
-        << "  --adaptive-lr              Enable adaptive lr adjustment (off by default).\n"
-        << "  --lr-ema-alpha <x>         EMA smoothing factor; higher = slower reaction (default " << d.lrEmaAlpha << ").\n"
-        << "  --lr-adjust-factor <x>     Multiplicative lr step per epoch (default " << d.lrAdjustFactor << ").\n"
-        << "  --lr-min <x>               Lower lr clamp (default " << d.lrMin << ").\n"
-        << "  --lr-max <x>               Upper lr clamp (default " << d.lrMax << ").\n"
-        << "  --lr-warmup-epochs <n>     Epochs before adaptive adjustments begin (default " << d.lrWarmupEpochs << ").\n"
-        << "\nFlatness detection:\n"
-        << "  --flatness-detection           Enable plateau detection (off by default).\n"
-        << "  --flatness-threshold <x>       Max EMA change per epoch to count as flat (default " << d.flatnessThreshold << ").\n"
-        << "  --flatness-window <n>          Consecutive flat epochs before kick fires (default " << d.flatnessWindow << ").\n"
-        << "  --flatness-kick-duration <n>   Epochs to hold the kick (default " << d.flatnessKickDuration << ").\n"
-        << "  --flatness-dropout-boost <x>   Multiply D dropout by this during kick (default " << d.flatnessDropoutBoost << ").\n"
-        << "  --flatness-gen-lr-boost <x>    Multiply G lr by this during kick (default " << d.flatnessGenLrBoost << ").\n\n"
-        << "Generation mode (no training, no dataset required):\n"
-        << "  --generate                 Load the generator and produce sample images.\n"
-        << "  --label <n>                Digit to generate (required with --generate).\n"
-        << "  --generator <path.wgt>     Generator to load.\n"
-        << "  --num-samples <n>          How many images to generate (default 1).\n"
-        << "  --output <path.png>        Output file. When generating multiple samples,\n"
-        << "                             a counter is inserted before the extension\n"
-        << "                             (e.g. digit_0.png, digit_1.png, ...).\n"
-        << "  --classifier <path.wgt>    Optional: print the classifier's predicted label.\n\n"
-        << "  -h, --help                 Show this text.\n";
-}
-
 // For "digit.png" + index 3 → "digit_3.png"
 std::string indexedPath(const std::string& base, std::size_t index) {
     const auto dot = base.rfind('.');
@@ -142,18 +44,14 @@ std::string indexedPath(const std::string& base, std::size_t index) {
     return base.substr(0, dot) + "_" + std::to_string(index) + base.substr(dot);
 }
 
-int runGenerate(const InputParser& cmd) {
-    if (!cmd.cmdOptionExists("--label")) {
-        std::cerr << "--label <n> is required in generation mode\n";
-        return 1;
-    }
-    const std::size_t label      = parseSizeOpt(cmd, "--label", 0);
-    const std::size_t numClasses = parseSizeOpt(cmd, "--num-classes", 10);
-
-    const std::string generatorPath = cmd.getCmdOption("--generator", "generator.wgt");
-    const std::string outputPath    = cmd.getCmdOption("--output", "generated.png");
-    const std::size_t numSamples    = parseSizeOpt(cmd, "--num-samples", 1);
-
+int runGenerate(
+    std::size_t label,
+    std::size_t numClasses,
+    const std::string& generatorPath,
+    const std::string& outputPath,
+    std::size_t numSamples,
+    const std::string& classifierPath
+) {
     auto generatorNet = Neural::LoadNetwork(generatorPath);
     if (!generatorNet) {
         std::cerr << "Failed to load generator: " << generatorPath << "\n";
@@ -167,10 +65,10 @@ int runGenerate(const InputParser& cmd) {
 
     // Optional classifier for printing the predicted label alongside the output.
     std::optional<Neural::NeuralNetworkApplier> classifier;
-    if (cmd.cmdOptionExists("--classifier")) {
-        auto net = Neural::LoadNetwork(cmd.getCmdOption("--classifier"));
+    if (!classifierPath.empty()) {
+        auto net = Neural::LoadNetwork(classifierPath);
         if (!net) {
-            std::cerr << "Failed to load classifier: " << cmd.getCmdOption("--classifier") << "\n";
+            std::cerr << "Failed to load classifier: " << classifierPath << "\n";
             return 2;
         }
         classifier.emplace(std::move(*net));
@@ -190,10 +88,10 @@ int runGenerate(const InputParser& cmd) {
         std::cout << "Saved " << path;
         if (classifier) {
             const Matrix out = classifier->predict(flat);
-            std::size_t label = 0;
+            std::size_t predicted = 0;
             for (std::size_t c = 1; c < out.getCols(); ++c)
-                if (out(0, c) > out(0, label)) label = c;
-            std::cout << "  (classifier: " << label << ")";
+                if (out(0, c) > out(0, predicted)) predicted = c;
+            std::cout << "  (classifier: " << predicted << ")";
         }
         std::cout << "\n";
     }
@@ -207,85 +105,155 @@ int runGenerate(const InputParser& cmd) {
 // main
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
-    InputParser cmd(argc, argv);
+    CLI::App app{"MatrixGui GAN CLI (generator/discriminator training & sampling)"};
+    app.require_subcommand(1);
 
-    if (cmd.cmdOptionExists("--help") || cmd.cmdOptionExists("-h")) {
-        printUsage(argc > 0 ? argv[0] : "matrixgui_gan");
-        return 0;
-    }
+    // ---- generate ----
+    CLI::App* generateCmd = app.add_subcommand("generate", "Generate sample images from a trained generator");
 
-    if (cmd.cmdOptionExists("--generate")) {
+    std::size_t genLabel = 0;
+    std::size_t genNumClasses = 10;
+    std::size_t numSamples = 1;
+    std::string generatorPathArg = "generator.wgt";
+    std::string outputPath = "generated.png";
+    std::string classifierPathArg;
+    std::size_t imageWidth = 28;
+    std::size_t imageHeight = 28;
+
+    generateCmd->add_option("--label", genLabel, "Digit to generate")->required();
+    generateCmd->add_option("--num-classes", genNumClasses, "Number of digit classes")->capture_default_str();
+    generateCmd->add_option("--generator", generatorPathArg, "Generator network file to load")
+        ->check(CLI::ExistingFile)
+        ->capture_default_str();
+    generateCmd->add_option("--num-samples", numSamples, "How many images to generate")->capture_default_str();
+    generateCmd->add_option("--output", outputPath,
+            "Output PNG path. With --num-samples > 1, a counter is inserted before the extension.")
+        ->capture_default_str();
+    generateCmd->add_option("--classifier", classifierPathArg,
+            "Optional: print this classifier's predicted label alongside each image")
+        ->check(CLI::ExistingFile);
+    generateCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->capture_default_str();
+    generateCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->capture_default_str();
+
+    // ---- train ----
+    CLI::App* trainCmd = app.add_subcommand("train", "Train generator+discriminator against a frozen classifier");
+
+    std::string classifierPath;
+    std::string datasetPath;
+    std::string generatorPath = "generator.wgt";
+    std::string discriminatorPath = "discriminator.wgt";
+    Neural::GAN::GanConfig ganConfig{};
+    std::vector<std::size_t> genHidden = {256, 512};
+    std::vector<std::size_t> discHidden = {512, 256};
+
+    trainCmd->add_option("--classifier", classifierPath, "Trained classifier (frozen signal source)")->required();
+    trainCmd->add_option("--dataset", datasetPath, "Training images root (subdirs 0..9 of PNGs)")
+        ->required()
+        ->check(CLI::ExistingDirectory);
+
+    trainCmd->add_option("--generator", generatorPath, "Generator save path (created if missing)")
+        ->group("Network paths")->capture_default_str();
+    trainCmd->add_option("--discriminator", discriminatorPath, "Discriminator save path (created if missing)")
+        ->group("Network paths")->capture_default_str();
+
+    trainCmd->add_option("--latent-dim", ganConfig.latentDim, "Noise vector size fed to generator")
+        ->group("Topology")->capture_default_str();
+    trainCmd->add_option("--gen-layers", genHidden, "Generator hidden layer sizes (new network only)")
+        ->delimiter(',')->group("Topology")->capture_default_str();
+    trainCmd->add_option("--disc-layers", discHidden, "Discriminator hidden layer sizes (new network only)")
+        ->delimiter(',')->group("Topology")->capture_default_str();
+    trainCmd->add_option("--num-classes", ganConfig.numClasses, "Number of digit classes")
+        ->group("Topology")->capture_default_str();
+    trainCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->group("Topology")
+        ->capture_default_str();
+    trainCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
+        ->group("Topology")
+        ->capture_default_str();
+
+    trainCmd->add_option("--gen-lr", ganConfig.generatorLr, "Generator learning rate")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--disc-lr", ganConfig.discriminatorLr, "Discriminator learning rate")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--epochs", ganConfig.epochs, "Total epochs")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--batch-size", ganConfig.batchSize, "Samples per batch")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--disc-steps", ganConfig.discriminatorStepsPerGenStep,
+            "Discriminator updates per generator update")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--dropout", ganConfig.dropoutRate, "Discriminator dropout rate")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--classifier-weight", ganConfig.classifierLossWeight,
+            "Weight of classifier loss in generator update")
+        ->group("GAN training")->capture_default_str();
+    trainCmd->add_option("--dataset-limit", ganConfig.datasetLimitPerLabel, "Max images per label to load (0 = all)")
+        ->group("GAN training")->capture_default_str();
+
+    trainCmd->add_flag("--adaptive-lr", ganConfig.adaptiveLr, "Enable adaptive lr adjustment")
+        ->group("Adaptive learning rate");
+    trainCmd->add_option("--lr-ema-alpha", ganConfig.lrEmaAlpha, "EMA smoothing factor; higher = slower reaction")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--d-real-target-low", ganConfig.dRealTargetLow, "D(real) below this => D collapsed")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--d-real-target-high", ganConfig.dRealTargetHigh, "D(real) above this => D dominating")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--gen-fool-target-low", ganConfig.genFoolTargetLow,
+            "D(G(z)) below this => D dominating/collapsed")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--gen-fool-target-high", ganConfig.genFoolTargetHigh, "D(G(z)) above this => G dominating")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--lr-adjust-factor", ganConfig.lrAdjustFactor, "Multiplicative lr step per epoch")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--lr-min", ganConfig.lrMin, "Lower lr clamp")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--lr-max", ganConfig.lrMax, "Upper lr clamp")
+        ->group("Adaptive learning rate")->capture_default_str();
+    trainCmd->add_option("--lr-warmup-epochs", ganConfig.lrWarmupEpochs, "Epochs before adaptive adjustments begin")
+        ->group("Adaptive learning rate")->capture_default_str();
+
+    trainCmd->add_flag("--flatness-detection", ganConfig.flatnessDetection, "Enable plateau detection")
+        ->group("Flatness detection");
+    trainCmd->add_option("--flatness-threshold", ganConfig.flatnessThreshold,
+            "Max EMA change per epoch to count as flat")
+        ->group("Flatness detection")->capture_default_str();
+    trainCmd->add_option("--flatness-window", ganConfig.flatnessWindow, "Consecutive flat epochs before kick fires")
+        ->group("Flatness detection")->capture_default_str();
+    trainCmd->add_option("--flatness-kick-duration", ganConfig.flatnessKickDuration, "Epochs to hold the kick")
+        ->group("Flatness detection")->capture_default_str();
+    trainCmd->add_option("--flatness-dropout-boost", ganConfig.flatnessDropoutBoost,
+            "Multiply D dropout by this during kick")
+        ->group("Flatness detection")->capture_default_str();
+    trainCmd->add_option("--flatness-gen-lr-boost", ganConfig.flatnessGenLrBoost, "Multiply G lr by this during kick")
+        ->group("Flatness detection")->capture_default_str();
+
+    CLI11_PARSE(app, argc, argv);
+
+    if (*generateCmd) {
         try {
-            return runGenerate(cmd);
+            return runGenerate(genLabel, genNumClasses, generatorPathArg, outputPath, numSamples, classifierPathArg);
         } catch (const std::exception& e) {
             std::cerr << e.what() << "\n";
             return 4;
         }
     }
 
-    if (!cmd.cmdOptionExists("--classifier")) {
-        std::cerr << "--classifier <path.wgt> is required\n";
-        printUsage(argc > 0 ? argv[0] : "matrixgui_gan");
-        return 1;
-    }
-    if (!cmd.cmdOptionExists("--dataset")) {
-        std::cerr << "--dataset <dir> is required\n";
-        printUsage(argc > 0 ? argv[0] : "matrixgui_gan");
-        return 1;
-    }
-
-    const std::string classifierPath   = cmd.getCmdOption("--classifier");
-    const std::string datasetPath      = cmd.getCmdOption("--dataset");
-    const std::string generatorPath    = cmd.getCmdOption("--generator",    "generator.wgt");
-    const std::string discriminatorPath= cmd.getCmdOption("--discriminator","discriminator.wgt");
-
-    // GAN config
-    Neural::GAN::GanConfig ganConfig{};
-    ganConfig.latentDim                 = parseSizeOpt  (cmd, "--latent-dim",  ganConfig.latentDim);
-    ganConfig.generatorLr               = parseDoubleOpt(cmd, "--gen-lr",      ganConfig.generatorLr);
-    ganConfig.discriminatorLr           = parseDoubleOpt(cmd, "--disc-lr",     ganConfig.discriminatorLr);
-    ganConfig.epochs                    = parseSizeOpt  (cmd, "--epochs",      ganConfig.epochs);
-    ganConfig.batchSize                 = parseSizeOpt  (cmd, "--batch-size",  ganConfig.batchSize);
-    ganConfig.discriminatorStepsPerGenStep = parseSizeOpt(cmd, "--disc-steps",          ganConfig.discriminatorStepsPerGenStep);
-    ganConfig.dropoutRate               = parseDoubleOpt(cmd, "--dropout",             ganConfig.dropoutRate);
-    ganConfig.classifierLossWeight      = parseDoubleOpt(cmd, "--classifier-weight",   ganConfig.classifierLossWeight);
-    ganConfig.numClasses                = parseSizeOpt  (cmd, "--num-classes",         ganConfig.numClasses);
-    ganConfig.datasetLimitPerLabel      = parseSizeOpt  (cmd, "--dataset-limit",       ganConfig.datasetLimitPerLabel);
-    ganConfig.adaptiveLr                = cmd.cmdOptionExists("--adaptive-lr");
-    ganConfig.lrEmaAlpha                = parseDoubleOpt(cmd, "--lr-ema-alpha",        ganConfig.lrEmaAlpha);
-    ganConfig.lrAdjustFactor            = parseDoubleOpt(cmd, "--lr-adjust-factor",    ganConfig.lrAdjustFactor);
-    ganConfig.lrMin                     = parseDoubleOpt(cmd, "--lr-min",              ganConfig.lrMin);
-    ganConfig.lrMax                     = parseDoubleOpt(cmd, "--lr-max",              ganConfig.lrMax);
-    ganConfig.lrWarmupEpochs            = parseSizeOpt  (cmd, "--lr-warmup-epochs",    ganConfig.lrWarmupEpochs);
-    ganConfig.flatnessDetection         = cmd.cmdOptionExists("--flatness-detection");
-    ganConfig.flatnessThreshold         = parseDoubleOpt(cmd, "--flatness-threshold",       ganConfig.flatnessThreshold);
-    ganConfig.flatnessWindow            = parseSizeOpt  (cmd, "--flatness-window",          ganConfig.flatnessWindow);
-    ganConfig.flatnessKickDuration      = parseSizeOpt  (cmd, "--flatness-kick-duration",   ganConfig.flatnessKickDuration);
-    ganConfig.flatnessDropoutBoost      = parseDoubleOpt(cmd, "--flatness-dropout-boost",   ganConfig.flatnessDropoutBoost);
-    ganConfig.flatnessGenLrBoost        = parseDoubleOpt(cmd, "--flatness-gen-lr-boost",    ganConfig.flatnessGenLrBoost);
-
-    // Generator topology: latentDim -> hidden... -> 784, Sigmoid output
-    const std::vector<std::size_t> kDefaultGenHidden  = {256, 512};
-    const std::vector<std::size_t> kDefaultDiscHidden = {512, 256};
-    constexpr std::size_t kImageSize = 28 * 28;
+    // *trainCmd
+    // constexpr std::size_t kImageSize = 28 * 28;
 
     auto buildGenLayers = [&]() {
         // Input = noise (latentDim) concatenated with one-hot label (numClasses).
         std::vector<std::size_t> layers = {ganConfig.latentDim + ganConfig.numClasses};
-        const auto hidden = cmd.cmdOptionExists("--gen-layers")
-            ? parseLayers(cmd.getCmdOption("--gen-layers"))
-            : kDefaultGenHidden;
-        layers.insert(layers.end(), hidden.begin(), hidden.end());
-        layers.push_back(kImageSize);
+        layers.insert(layers.end(), genHidden.begin(), genHidden.end());
+        layers.push_back(imageHeight * imageWidth);
         return layers;
     };
 
     auto buildDiscLayers = [&]() {
-        std::vector<std::size_t> layers = {kImageSize};
-        const auto hidden = cmd.cmdOptionExists("--disc-layers")
-            ? parseLayers(cmd.getCmdOption("--disc-layers"))
-            : kDefaultDiscHidden;
-        layers.insert(layers.end(), hidden.begin(), hidden.end());
+        std::vector<std::size_t> layers = {imageHeight * imageWidth};
+        layers.insert(layers.end(), discHidden.begin(), discHidden.end());
         layers.push_back(1);
         return layers;
     };
@@ -313,9 +281,16 @@ int main(int argc, char** argv) {
     Neural::GAN::Discriminator discriminator(loadOrCreate(discriminatorPath, discConfig));
 
     // Load real training samples
-    PngUtils::Cache pngCache;
-    const auto reader = [&pngCache](const std::filesystem::path& path) {
-        return PngUtils::fromImage(path.string(), 28, 28, pngCache).transform(1, kImageSize);
+    cache::LRUCache<std::filesystem::path, Matrix> pngCache;
+    const auto reader = [&pngCache, imageWidth, imageHeight](const std::filesystem::path& path) {
+        if (const auto cached = pngCache.get(path); cached.has_value()) {
+            return *cached;
+        }
+
+        const auto result = PngUtils::fromImage(path.string(), imageHeight, imageWidth)
+            .transform(1, imageHeight * imageWidth);
+        pngCache.put(path, result);
+        return result;
     };
     Neural::DirectoryDataset dataset(datasetPath);
     dataset.setFileReader(reader);

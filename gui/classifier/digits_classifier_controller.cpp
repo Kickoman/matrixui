@@ -6,21 +6,23 @@
 #include "core/lib/directory_dataset.h"
 #include "core/lib/neural_network.h"
 #include "core/lib/neural_network_loader.h"
+#include "core/lib/cache.h"
+#include "core/lib/matrix_cache.h"
 
 #include "gui/lib/mode_controller.h"
 #include "png/pngreader.h"
 
 #include <QDir>
 #include <QSettings>
+#include <filesystem>
 
 
 namespace {
 
-std::unique_ptr<Neural::DirectoryDataset> LoadDataset(const QString& pathToDataset) {
-    static PngUtils::Cache pngCache;
-    static const auto reader = [](const std::filesystem::path& path) {
-        return PngUtils::fromImage(path, 28, 28, pngCache).transform(1, 28 * 28);
-    };
+std::unique_ptr<Neural::DirectoryDataset> LoadDataset(
+    const QString& pathToDataset,
+    std::function<Matrix(const std::filesystem::path&)>&& reader)
+{
     const QDir path(pathToDataset);
     for (int i = 0; i < 10; ++i) {
         const QDir subdirectory(path.filePath(QString::number(i)));
@@ -33,11 +35,6 @@ std::unique_ptr<Neural::DirectoryDataset> LoadDataset(const QString& pathToDatas
     return dataset;
 }
 
-
-static const std::vector<std::size_t> DEFAULT_LAYERS = {
-    28 * 28, 50, 20, 10
-};
-
 }
 
 
@@ -45,7 +42,7 @@ DigitsClassifierController::DigitsClassifierController(QObject* parent)
     : ModeController(parent)
     , settings("digits_classifier")
 {
-    recognizer.setEpochCallback([this]{
+    recognizer.setEpochCallback([this](const Neural::Classifier::EpochLog&){
         this->testOnce();
         Neural::SaveNetwork(this->recognizer.getNetwork(), this->networkName.toStdString());
     });
@@ -64,12 +61,16 @@ void DigitsClassifierController::loadSettings() {
     if (auto d = settings.getValue("last_testing_dataset_path"); d.isValid()) {
         setTestingDataset(d.toString());
     }
+    imageHeight = settings.getValue("last_image_height", 28).toULongLong();
+    imageWidth = settings.getValue("last_image_width", 28).toULongLong();
 }
 
 void DigitsClassifierController::saveSettings() {
     settings.setValue("last_network_name", networkName);
     settings.setValue("last_training_dataset_path", pathToTrainingDataset);
     settings.setValue("last_testing_dataset_path", pathToTestingDataset);
+    settings.setValue("last_image_width", static_cast<quint64>(imageWidth));
+    settings.setValue("last_image_height", static_cast<quint64>(imageHeight));
 }
 
 void DigitsClassifierController::run(const Neural::Classifier::LearningConfig& config) {
@@ -111,7 +112,7 @@ void DigitsClassifierController::loadNetwork(const QString& network, Neural::Neu
         throw std::runtime_error("Can't load network, while learning is running");
     }
     if (config.layersSizes.empty()) {
-        config.layersSizes = DEFAULT_LAYERS;
+        config.layersSizes = getDefaultLayers();
     }
 
     std::optional<Neural::NeuralNetwork> loadedNetwork;
@@ -138,7 +139,7 @@ bool DigitsClassifierController::setTestingDataset(const QString& pathToDataset)
     if (recognizer.isRunning()) {
         throw std::runtime_error("Can't change datasets while learning is running");
     }
-    auto dataset = LoadDataset(pathToDataset);
+    auto dataset = LoadDataset(pathToDataset, [this](const std::filesystem::path& path) { return readCached(path); });
     if (!dataset) {
         return false;
     }
@@ -152,7 +153,7 @@ bool DigitsClassifierController::setTrainingDataset(const QString& pathToDataset
     if (recognizer.isRunning()) {
         throw std::runtime_error("Can't change datasets while learning is running");
     }
-    auto dataset = LoadDataset(pathToDataset);
+    auto dataset = LoadDataset(pathToDataset, [this](const std::filesystem::path& path) { return readCached(path); });
     if (!dataset) {
         return false;
     }
@@ -169,6 +170,8 @@ DigitsClassifierController::Info DigitsClassifierController::getInfo() const {
         .pathToTrainingDataset = pathToTrainingDataset.toStdString(),
         .pathToTestingDataset = pathToTestingDataset.toStdString(),
         .networkName = networkName.toStdString(),
+        .imageWidth = imageWidth,
+        .imageHeight = imageHeight,
         .layersConfiguration = recognizer.getNetwork().config.layersSizes,
         .learningConfig = learningConfig,
     };
@@ -180,4 +183,19 @@ void DigitsClassifierController::setLogger(std::ostream* stream) {
 
 void DigitsClassifierController::updateStatistic(const Neural::Classifier::TestResult& result) const {
     emit updatedStatistics(result);
+}
+
+Matrix DigitsClassifierController::readCached(const std::filesystem::path& path) const {
+    static cache::LRUCache<std::tuple<std::filesystem::path, std::size_t, std::size_t>, Matrix, ArbitraryCache::TupleHash> pngCache;
+    return ArbitraryCache::DoCached(
+        pngCache,
+        [](const std::filesystem::path& path, std::size_t height, std::size_t width) -> Matrix {
+            return PngUtils::fromImage(path.string(), height, width).transform(1, height * width);
+        },
+        path, imageHeight, imageWidth
+    );
+}
+
+std::vector<std::size_t> DigitsClassifierController::getDefaultLayers() const {
+    return {imageHeight * imageWidth, 256, 10};
 }

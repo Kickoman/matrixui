@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <nlohmann/json.hpp>
 
 namespace Neural {
 namespace GAN {
@@ -50,3 +51,34 @@ struct GanConfig {
 
 } // namespace GAN
 } // namespace Neural
+
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    Neural::GAN::GanConfig,
+    latentDim,
+    numClasses,
+    generatorLr,
+    discriminatorLr,
+    epochs,
+    batchSize,
+    discriminatorStepsPerGenStep,
+    dropoutRate,
+    classifierLossWeight,
+    datasetLimitPerLabel,
+    adaptiveLr,
+    lrEmaAlpha,
+    dRealTargetLow,
+    dRealTargetHigh,
+    genFoolTargetLow,
+    genFoolTargetHigh,
+    lrAdjustFactor,
+    lrMin,
+    lrMax,
+    lrWarmupEpochs,
+    flatnessDetection,
+    flatnessThreshold,
+    flatnessWindow,
+    flatnessKickDuration,
+    flatnessDropoutBoost,
+    flatnessGenLrBoost
+);

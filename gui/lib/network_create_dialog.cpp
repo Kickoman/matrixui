@@ -15,6 +15,29 @@
 #include <QComboBox>
 
 
+namespace {
+
+QString LayersToTextRepresentation(const std::vector<std::size_t>& sizes) {
+    QStringList layers;
+    std::transform(sizes.begin(), sizes.end(), std::back_inserter(layers), [](std::size_t size) {
+        return QString::number(size);
+    });
+    return layers.join(", ");
+}
+
+std::vector<std::size_t> TextRepresentationToLayers(const QString& text) {
+    const auto sizes = text.split(',', Qt::SkipEmptyParts);
+    std::vector<std::size_t> result;
+    result.reserve(sizes.size());
+    std::transform(sizes.begin(), sizes.end(), std::back_inserter(result), [](const QString& size) {
+        return static_cast<std::size_t>(size.toUInt());
+    });
+    return result;
+}
+
+}
+
+
 NetworkCreateDialog::NetworkCreateDialog(QWidget* parent)
     : QDialog(parent)
 {
@@ -66,17 +89,10 @@ QString NetworkCreateDialog::getNetworkName() const {
 }
 
 Neural::NeuralNetworkConfiguration NetworkCreateDialog::getConfiguration() const {
-    const auto sizes = networkLayersInput->text().split(',', Qt::SkipEmptyParts);
-    std::vector<std::size_t> result;
-    result.reserve(sizes.size());
-    std::transform(sizes.begin(), sizes.end(), std::back_inserter(result), [](const QString& size) {
-        return static_cast<std::size_t>(size.toUInt());
-    });
-
     return {
         .hiddenActivation = static_cast<Neural::ActivationType>(hiddenActivation->currentData().toUInt()),
         .outputActivation = static_cast<Neural::ActivationType>(outputActivation->currentData().toUInt()),
-        .layersSizes = result,
+        .layersSizes = TextRepresentationToLayers(networkLayersInput->text()),
     };
 }
 
@@ -86,6 +102,10 @@ void NetworkCreateDialog::setCurrentNetworkPath(const QString& path) {
 
 void NetworkCreateDialog::setDefaultLayersText(const QString& layers) {
     defaultLayersText = layers;
+}
+
+void NetworkCreateDialog::setDefaultLayersText(const std::vector<std::size_t>& layers) {
+    defaultLayersText = LayersToTextRepresentation(layers);
 }
 
 void NetworkCreateDialog::setDefaultActivations(Neural::ActivationType hidden, Neural::ActivationType output) {
@@ -117,11 +137,7 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     if (QFile::exists(text)) {
         try {
             const auto config = Neural::LoadConfig(text.toStdString()).value();
-            QStringList layers;
-            std::transform(config.layersSizes.begin(), config.layersSizes.end(), std::back_inserter(layers), [](std::size_t size) {
-                return QString::number(size);
-            });
-            networkLayersInput->setText(layers.join(", "));
+            networkLayersInput->setText(LayersToTextRepresentation(config.layersSizes));
 
             const auto hiddenIndex = hiddenActivation->findData(static_cast<std::uint8_t>(config.hiddenActivation));
             const auto outputIndex = outputActivation->findData(static_cast<std::uint8_t>(config.outputActivation));

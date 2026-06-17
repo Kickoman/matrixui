@@ -44,6 +44,13 @@ public:
 
     Matrix transpose() const;
     Matrix transform(const size_t rows, const size_t cols) const;
+
+    Matrix transposeMultiply(const Matrix& other) const; // this->transpose() * other, fused (no materialized transpose)
+    Matrix multiplyTranspose(const Matrix& other) const; // this * other.transpose(), fused (no materialized transpose)
+    Matrix& addTransposeMultiply(const Matrix& a, const Matrix& b);
+
+    Matrix multiplyAdd(const Matrix& multiplier, const Matrix& addition) const;
+    Matrix& substractScaled(double alpha, const Matrix& other);
 };
 
 std::ostream& operator<<(std::ostream& stream, const Matrix& m);

@@ -52,23 +52,22 @@ void ApplySoftMax(Matrix& m) {
 }
 
 Matrix DenseLayer::forward(const Matrix& input) const {
-    return input * weights + biases;
+    return input.multiplyAdd(weights, biases);
 }
 
-Matrix DenseLayer::forward(const Matrix& input, const ForwardContext&) {
-    inputCache = input;
+Matrix DenseLayer::forward(const Matrix& input, const ForwardContext&) const {
     return forward(input);
 }
 
-Matrix DenseLayer::backward(const Matrix& gradOutput) {
-    gradientWeights += inputCache.transpose() * gradOutput;
+Matrix DenseLayer::backward(const Matrix& gradOutput, const Matrix& input, const Matrix& /* output */) {
+    gradientWeights.addTransposeMultiply(input, gradOutput);
     gradientBiases += gradOutput;
-    return gradOutput * weights.transpose();
+    return gradOutput.multiplyTranspose(weights);
 }
 
 void DenseLayer::applyGradients(const double learningRate) {
-    weights -= gradientWeights * learningRate;
-    biases -= gradientBiases * learningRate;
+    weights.substractScaled(learningRate, gradientWeights);
+    biases.substractScaled(learningRate, gradientBiases);
 }
 
 void DenseLayer::zeroGradients() {
@@ -86,17 +85,21 @@ Matrix ActivationLayer::forward(const Matrix& input) const {
     return activation;
 }
 
-Matrix ActivationLayer::forward(const Matrix& input, const ForwardContext&) {
-    outputCache = forward(input);
-    return outputCache;
+Matrix ActivationLayer::forward(const Matrix& input, const ForwardContext&) const {
+    return forward(input);
 }
 
-Matrix ActivationLayer::backward(const Matrix& gradOutput) {
+Matrix ActivationLayer::backward(const Matrix& gradOutput, const Matrix& input, const Matrix& output) {
     Matrix gradient = gradOutput;
+
+    const auto& activation =
+        activationType == ActivationType::ReLU || activationType == ActivationType::LeakyReLU
+        ? input
+        : output;
 
     for (std::size_t row = 0; row < gradient.getRows(); ++row) {
         for (std::size_t col = 0; col < gradient.getCols(); ++col) {
-            gradient(row, col) *= applyActivationDerivative(outputCache(row, col), activationType);
+            gradient(row, col) *= applyActivationDerivative(activation(row, col), activationType);
         }
     }
     return gradient;
@@ -107,7 +110,7 @@ Matrix DropoutLayer::forward(const Matrix& input) const {
     return input;
 }
 
-Matrix DropoutLayer::forward(const Matrix& input, const ForwardContext& ctx) {
+Matrix DropoutLayer::forward(const Matrix& input, const ForwardContext& ctx) const {
     if (!ctx.training || ctx.dropoutRate == 0) {
         return input;
     }
@@ -133,7 +136,7 @@ Matrix DropoutLayer::forward(const Matrix& input, const ForwardContext& ctx) {
     return output;
 }
 
-Matrix DropoutLayer::backward(const Matrix& gradOutput) {
+Matrix DropoutLayer::backward(const Matrix& gradOutput, const Matrix& /* input */, const Matrix& /* output */) {
     if (mask.getRows() == 0) {
         return gradOutput;
     }
@@ -147,12 +150,13 @@ Matrix SoftmaxLayer::forward(const Matrix& input) const {
     return out;
 }
 
-Matrix SoftmaxLayer::forward(const Matrix& input, const ForwardContext&) {
-    outputCache = forward(input);
-    return outputCache;
+Matrix SoftmaxLayer::forward(const Matrix& input, const ForwardContext&) const {
+    // outputCache = forward(input);
+    // return outputCache;
+    return forward(input);
 }
 
-Matrix SoftmaxLayer::backward(const Matrix& gradOutput) {
+Matrix SoftmaxLayer::backward(const Matrix& gradOutput, const Matrix& /*input*/, const Matrix& output) {
     return gradOutput;
 }
 
