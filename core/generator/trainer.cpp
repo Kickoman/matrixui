@@ -130,8 +130,8 @@ void GanTrainer::train(
     std::vector<std::size_t> indices(realSamples.size());
     std::iota(indices.begin(), indices.end(), 0);
 
-    double currentDLr = config.discriminatorLr;
-    double currentGLr = config.generatorLr;
+    double currentDLr = config.discriminatorLearningRate;
+    double currentGLr = config.generatorLearningRate;
     // Uninitialized sentinel: first epoch sets EMA to the raw value directly,
     // avoiding the bias that comes from starting at an arbitrary 0.5.
     double emaReal = -1.0, emaGen = -1.0;
@@ -149,7 +149,7 @@ void GanTrainer::train(
 
         // During a kick, D dropout is raised to weaken it and give G room.
         const double effectiveDropout = (kickEpochsRemaining > 0)
-            ? std::min(config.dropoutRate * config.flatnessDropoutBoost, 0.95)
+            ? std::min(config.dropoutRate * config.flatnessDetection.discriminatorDropoutBoost, 0.95)
             : config.dropoutRate;
 
         for (std::size_t i = 0; i + config.batchSize <= indices.size(); i += config.batchSize) {
@@ -186,24 +186,23 @@ void GanTrainer::train(
             emaReal = avgDiscReal;
             emaGen  = avgGenFool;
         } else {
-            emaReal = config.lrEmaAlpha * emaReal + (1.0 - config.lrEmaAlpha) * avgDiscReal;
-            emaGen  = config.lrEmaAlpha * emaGen  + (1.0 - config.lrEmaAlpha) * avgGenFool;
+            emaReal = config.adaptiveLr.lrEmaAlpha * emaReal + (1.0 - config.adaptiveLr.lrEmaAlpha) * avgDiscReal;
+            emaGen  = config.adaptiveLr.lrEmaAlpha * emaGen  + (1.0 - config.adaptiveLr.lrEmaAlpha) * avgGenFool;
         }
 
         // Flatness detection — fires only when no kick is already active.
-        if (config.flatnessDetection && epoch >= config.lrWarmupEpochs
+        if (config.flatnessDetection.enabled && epoch >= config.adaptiveLr.lrWarmupEpochs
                 && prevEmaReal >= 0.0 && kickEpochsRemaining == 0) {
-            const bool emaRealFlat = std::abs(emaReal - prevEmaReal) < config.flatnessThreshold;
-            const bool emaGenFlat  = std::abs(emaGen  - prevEmaGen)  < config.flatnessThreshold;
+            const bool emaRealFlat = std::abs(emaReal - prevEmaReal) < config.flatnessDetection.threshold;
+            const bool emaGenFlat  = std::abs(emaGen  - prevEmaGen)  < config.flatnessDetection.threshold;
             if (emaRealFlat && emaGenFlat) {
                 ++flatEpochCount;
-                if (flatEpochCount >= config.flatnessWindow) {
+                if (flatEpochCount >= config.flatnessDetection.window) {
                     // Fire kick: raise D dropout (via effectiveDropout next epoch)
                     // and spike G lr. Adaptive lr is suspended for the duration.
                     kickSavedGLr = currentGLr;
-                    currentGLr = std::clamp(
-                        currentGLr * config.flatnessGenLrBoost, config.lrMin, config.lrMax);
-                    kickEpochsRemaining = config.flatnessKickDuration;
+                    currentGLr = std::clamp(currentGLr * config.flatnessDetection.generatorLrBoost, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+                    kickEpochsRemaining = config.flatnessDetection.kickDuration;
                     flatEpochCount = 0;
                 }
             } else {
@@ -212,19 +211,19 @@ void GanTrainer::train(
         }
 
         // Adaptive lr adjustment — suspended during a kick to avoid fighting it.
-        if (config.adaptiveLr && epoch >= config.lrWarmupEpochs && kickEpochsRemaining == 0) {
-            if (emaReal < config.dRealTargetLow && emaGen < config.genFoolTargetLow) {
+        if (config.adaptiveLr.enabled && epoch >= config.adaptiveLr.lrWarmupEpochs && kickEpochsRemaining == 0) {
+            if (emaReal < config.adaptiveLr.dRealTargetLow && emaGen < config.adaptiveLr.dFakeTargetLow) {
                 // D collapsed: scoring everything near 0. Boost D, slow G.
-                currentDLr = std::clamp(currentDLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
-                currentGLr = std::clamp(currentGLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
-            } else if (emaReal > config.dRealTargetHigh && emaGen < config.genFoolTargetLow) {
+                currentDLr = std::clamp(currentDLr * config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+                currentGLr = std::clamp(currentGLr / config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+            } else if (emaReal > config.adaptiveLr.dRealTargetHigh && emaGen < config.adaptiveLr.dFakeTargetLow) {
                 // D dominating: slow D, speed G.
-                currentDLr = std::clamp(currentDLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
-                currentGLr = std::clamp(currentGLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
-            } else if (emaGen > config.genFoolTargetHigh) {
+                currentDLr = std::clamp(currentDLr / config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+                currentGLr = std::clamp(currentGLr * config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+            } else if (emaGen > config.adaptiveLr.dFakeTargetHigh) {
                 // G dominating: slow G, speed D.
-                currentGLr = std::clamp(currentGLr / config.lrAdjustFactor, config.lrMin, config.lrMax);
-                currentDLr = std::clamp(currentDLr * config.lrAdjustFactor, config.lrMin, config.lrMax);
+                currentGLr = std::clamp(currentGLr / config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
+                currentDLr = std::clamp(currentDLr * config.adaptiveLr.lrAdjustFactor, config.adaptiveLr.lrMin, config.adaptiveLr.lrMax);
             }
         }
 
@@ -248,13 +247,13 @@ void GanTrainer::train(
             *log << "Epoch " << epoch + 1 << "/" << config.epochs
                  << "  D(real)=" << avgDiscReal
                  << "  D(G(z))=" << avgGenFool;
-            if (config.adaptiveLr || config.flatnessDetection)
+            if (config.adaptiveLr.enabled || config.flatnessDetection.enabled)
                 *log << "  ema_D(real)=" << emaReal
                      << "  ema_D(G(z))=" << emaGen
                      << "  dLr=" << currentDLr
                      << "  gLr=" << currentGLr;
-            if (config.flatnessDetection)
-                *log << "  flat=" << flatEpochCount << "/" << config.flatnessWindow
+            if (config.flatnessDetection.enabled)
+                *log << "  flat=" << flatEpochCount << "/" << config.flatnessDetection.window
                      << (kickEpochsRemaining > 0 ? "  [KICK]" : "");
             *log << "  sample(label=" << logLabel << " -> classifier=" << predictedLabel << ")"
                  << std::endl;

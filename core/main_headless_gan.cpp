@@ -170,9 +170,9 @@ int main(int argc, char** argv) {
         ->group("Topology")
         ->capture_default_str();
 
-    trainCmd->add_option("--gen-lr", ganConfig.generatorLr, "Generator learning rate")
+    trainCmd->add_option("--gen-lr", ganConfig.generatorLearningRate, "Generator learning rate")
         ->group("GAN training")->capture_default_str();
-    trainCmd->add_option("--disc-lr", ganConfig.discriminatorLr, "Discriminator learning rate")
+    trainCmd->add_option("--disc-lr", ganConfig.discriminatorLearningRate, "Discriminator learning rate")
         ->group("GAN training")->capture_default_str();
     trainCmd->add_option("--epochs", ganConfig.epochs, "Total epochs")
         ->group("GAN training")->capture_default_str();
@@ -189,41 +189,41 @@ int main(int argc, char** argv) {
     trainCmd->add_option("--dataset-limit", ganConfig.datasetLimitPerLabel, "Max images per label to load (0 = all)")
         ->group("GAN training")->capture_default_str();
 
-    trainCmd->add_flag("--adaptive-lr", ganConfig.adaptiveLr, "Enable adaptive lr adjustment")
+    trainCmd->add_flag("--adaptive-lr", ganConfig.adaptiveLr.enabled, "Enable adaptive lr adjustment")
         ->group("Adaptive learning rate");
-    trainCmd->add_option("--lr-ema-alpha", ganConfig.lrEmaAlpha, "EMA smoothing factor; higher = slower reaction")
+    trainCmd->add_option("--lr-ema-alpha", ganConfig.adaptiveLr.lrEmaAlpha, "EMA smoothing factor; higher = slower reaction")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--d-real-target-low", ganConfig.dRealTargetLow, "D(real) below this => D collapsed")
+    trainCmd->add_option("--d-real-target-low", ganConfig.adaptiveLr.dRealTargetLow, "D(real) below this => D collapsed")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--d-real-target-high", ganConfig.dRealTargetHigh, "D(real) above this => D dominating")
+    trainCmd->add_option("--d-real-target-high", ganConfig.adaptiveLr.dRealTargetHigh, "D(real) above this => D dominating")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--gen-fool-target-low", ganConfig.genFoolTargetLow,
+    trainCmd->add_option("--gen-fool-target-low", ganConfig.adaptiveLr.dFakeTargetLow,
             "D(G(z)) below this => D dominating/collapsed")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--gen-fool-target-high", ganConfig.genFoolTargetHigh, "D(G(z)) above this => G dominating")
+    trainCmd->add_option("--gen-fool-target-high", ganConfig.adaptiveLr.dFakeTargetHigh, "D(G(z)) above this => G dominating")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--lr-adjust-factor", ganConfig.lrAdjustFactor, "Multiplicative lr step per epoch")
+    trainCmd->add_option("--lr-adjust-factor", ganConfig.adaptiveLr.lrAdjustFactor, "Multiplicative lr step per epoch")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--lr-min", ganConfig.lrMin, "Lower lr clamp")
+    trainCmd->add_option("--lr-min", ganConfig.adaptiveLr.lrMin, "Lower lr clamp")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--lr-max", ganConfig.lrMax, "Upper lr clamp")
+    trainCmd->add_option("--lr-max", ganConfig.adaptiveLr.lrMax, "Upper lr clamp")
         ->group("Adaptive learning rate")->capture_default_str();
-    trainCmd->add_option("--lr-warmup-epochs", ganConfig.lrWarmupEpochs, "Epochs before adaptive adjustments begin")
+    trainCmd->add_option("--lr-warmup-epochs", ganConfig.adaptiveLr.lrWarmupEpochs, "Epochs before adaptive adjustments begin")
         ->group("Adaptive learning rate")->capture_default_str();
 
-    trainCmd->add_flag("--flatness-detection", ganConfig.flatnessDetection, "Enable plateau detection")
+    trainCmd->add_flag("--flatness-detection", ganConfig.flatnessDetection.enabled, "Enable plateau detection")
         ->group("Flatness detection");
-    trainCmd->add_option("--flatness-threshold", ganConfig.flatnessThreshold,
+    trainCmd->add_option("--flatness-threshold", ganConfig.flatnessDetection.threshold,
             "Max EMA change per epoch to count as flat")
         ->group("Flatness detection")->capture_default_str();
-    trainCmd->add_option("--flatness-window", ganConfig.flatnessWindow, "Consecutive flat epochs before kick fires")
+    trainCmd->add_option("--flatness-window", ganConfig.flatnessDetection.window, "Consecutive flat epochs before kick fires")
         ->group("Flatness detection")->capture_default_str();
-    trainCmd->add_option("--flatness-kick-duration", ganConfig.flatnessKickDuration, "Epochs to hold the kick")
+    trainCmd->add_option("--flatness-kick-duration", ganConfig.flatnessDetection.kickDuration, "Epochs to hold the kick")
         ->group("Flatness detection")->capture_default_str();
-    trainCmd->add_option("--flatness-dropout-boost", ganConfig.flatnessDropoutBoost,
+    trainCmd->add_option("--flatness-dropout-boost", ganConfig.flatnessDetection.discriminatorDropoutBoost,
             "Multiply D dropout by this during kick")
         ->group("Flatness detection")->capture_default_str();
-    trainCmd->add_option("--flatness-gen-lr-boost", ganConfig.flatnessGenLrBoost, "Multiply G lr by this during kick")
+    trainCmd->add_option("--flatness-gen-lr-boost", ganConfig.flatnessDetection.generatorLrBoost, "Multiply G lr by this during kick")
         ->group("Flatness detection")->capture_default_str();
 
     CLI11_PARSE(app, argc, argv);
@@ -306,8 +306,8 @@ int main(int argc, char** argv) {
               << "  epochs: " << ganConfig.epochs
               << "  batch: " << ganConfig.batchSize
               << "  disc-steps: " << ganConfig.discriminatorStepsPerGenStep
-              << "  gen-lr: " << ganConfig.generatorLr
-              << "  disc-lr: " << ganConfig.discriminatorLr
+              << "  gen-lr: " << ganConfig.generatorLearningRate
+              << "  disc-lr: " << ganConfig.discriminatorLearningRate
               << "\n\n";
 
     // Train
