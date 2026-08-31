@@ -232,7 +232,7 @@ void CoverageCheck(const Words::Vocabulary& vocabulary, const Words::NegativeSam
 void DistributionCheck(const Words::Vocabulary& vocabulary, const Words::NegativeSampler& sampler) {
     constexpr std::size_t draws = 20'000'000;
     constexpr double power = 0.75;
-
+    constexpr double minExpectedHits = 50.;
     std::vector<std::size_t> hits(vocabulary.getSize(), 0);
     XorShift rng(2);
     for (std::size_t i = 0; i < draws; ++i) {
@@ -240,34 +240,47 @@ void DistributionCheck(const Words::Vocabulary& vocabulary, const Words::Negativ
     }
 
     double total = 0.;
-    for (Words::TWordId id = 0; id < vocabulary.getSize(); ++id) {
-        total += std::pow(static_cast<double>(vocabulary.getCount(id)), power);
+    std::vector<double> weights(vocabulary.getSize());
+    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
+        weights[id] = std::pow(static_cast<double>(vocabulary.getCount(id)), power);
+        total += weights[id];
     }
 
-    std::cout << "\n" << std::setw(10) << "word" << std::setw(12) << "expected"
-              << std::setw(12) << "actual" << std::setw(10) << "ratio" << '\n';
+    double chiSquare = 0.;
+    std::size_t counted = 0;
+    double maxAbsZ = 0.;
+    std::size_t worstId = 0;
 
-    double worstRatio = 1.;
-    for (Words::TWordId id = 0; id < vocabulary.getSize(); ++id) {
-        const double expected = std::pow(static_cast<double>(vocabulary.getCount(id)), power) / total;
-        const double actual = static_cast<double>(hits[id]) / draws;
-
-        if (expected * draws < 1000) {
+    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
+        const double p = weights[id] / total;
+        const double expected = p * static_cast<double>(draws);
+        if (expected < minExpectedHits) {
             continue;
         }
-        const double ratio = actual / expected;
-        worstRatio = std::max(worstRatio, ratio > 1. ? ratio : 1. / ratio);
 
-        if (id < 5) {
-            std::cout << std::setw(10) << vocabulary.getWord(id)
-                      << std::setw(12) << std::fixed << std::setprecision(6) << expected
-                      << std::setw(12) << actual
-                      << std::setw(10) << std::setprecision(3) << ratio << '\n';
+        const double sigma = std::sqrt(expected * (1. - p));
+        const double z = (static_cast<double>(hits[id]) - expected) / sigma;
+
+        chiSquare += z * z;
+        ++counted;
+
+        if (std::abs(z) > maxAbsZ) {
+            maxAbsZ = std::abs(z);
+            worstId = id;
         }
     }
 
-    std::cout << "\nworst ratio among well-sampled words: " << worstRatio;
-    std::cout << (worstRatio < 1.05 ? "  passed" : "  FAILED") << '\n';
+    const double reduced = chiSquare / static_cast<double>(counted);
+    const double tolerance = 4. * std::sqrt(2. / static_cast<double>(counted));
+
+    std::cout << "\nwords tested:   " << counted << '\n';
+    std::cout << "chi2 / df:      " << std::fixed << std::setprecision(4) << reduced
+              << "   (expected 1.0 +- " << tolerance << ")\n";
+    std::cout << (std::abs(reduced - 1.) < tolerance ? "  passed" : "  FAILED") << '\n';
+
+    const double expectedMaxZ = std::sqrt(2. * std::log(2. * static_cast<double>(counted)));
+    std::cout << "max |z|:        " << maxAbsZ << " (" << vocabulary.getWord(worstId) << ")"
+              << "   typical max ~ " << expectedMaxZ << '\n';
 }
 
 
