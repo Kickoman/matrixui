@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/words/types.h"
+
 #include <vector>
 
 class XorShift;
@@ -12,8 +14,8 @@ class Subsampler {
 public:
     explicit Subsampler(const Vocabulary& vocabulary, double sample = 1e-4);
 
-    bool shouldKeep(std::size_t id, ::XorShift& rng) const;
-    float getKeepProbability(std::size_t id) const;
+    bool shouldKeep(TWordId id, ::XorShift& rng) const;
+    float getKeepProbability(TWordId id) const;
 
     // Exploration only?
     std::size_t getAffectedWordsCount() const;

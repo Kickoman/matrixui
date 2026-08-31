@@ -80,7 +80,7 @@ inline void WriteBulkLE(std::ofstream& file, const std::vector<T>& values) {
     if constexpr (IsLittleEndian()) {
         file.write(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(T));
     } else {
-        for (double val : values) {
+        for (T val : values) {
             WriteBinaryLE(file, val);
         }
     }
@@ -91,7 +91,7 @@ inline void ReadBulkLE(std::ifstream& file, std::vector<T>& values) {
     if constexpr (IsLittleEndian()) {
         file.read(reinterpret_cast<char*>(values.data()), values.size() * sizeof(T));
     } else {
-        for (double& val : values) {
+        for (T& val : values) {
             ReadBinaryLE(file, val);
         }
     }

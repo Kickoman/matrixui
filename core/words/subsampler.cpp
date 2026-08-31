@@ -15,7 +15,7 @@ Subsampler::Subsampler(const Vocabulary& vocabulary, const double sample)
     }
 
     keepProbability.resize(vocabulary.getSize());
-    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
+    for (TWordId id = 0; id < vocabulary.getSize(); ++id) {
         const double frequency = vocabulary.getFrequency(id);
         const double ratio = sample / frequency;
         const double shouldKeep = std::sqrt(ratio) + ratio;
@@ -25,7 +25,7 @@ Subsampler::Subsampler(const Vocabulary& vocabulary, const double sample)
     }
 }
 
-bool Subsampler::shouldKeep(const std::size_t id, ::XorShift& rng) const {
+bool Subsampler::shouldKeep(const TWordId id, ::XorShift& rng) const {
     if (!enabled) {
         return true;
     }
@@ -34,7 +34,7 @@ bool Subsampler::shouldKeep(const std::size_t id, ::XorShift& rng) const {
     return probability > 1.f || rng.nextDouble() < probability;
 }
 
-float Subsampler::getKeepProbability(const std::size_t id) const {
+float Subsampler::getKeepProbability(const TWordId id) const {
     return enabled ? keepProbability[id] : 1.f;
 }
 
@@ -50,7 +50,7 @@ std::size_t Subsampler::getAffectedWordsCount() const {
 
 double Subsampler::getExpectedCorpusLength(const Vocabulary& vocabulary) const {
     double total = 0;
-    for (std::size_t id = 0; id < keepProbability.size(); ++id) {
+    for (TWordId id = 0; id < keepProbability.size(); ++id) {
         total += 1. * vocabulary.getCount(id) * keepProbability[id];
     }
     return total;

@@ -1,12 +1,14 @@
 #pragma once
 
+#include "core/words/types.h"
+
 #include <vector>
 #include <filesystem>
 
 namespace Words {
 
 class Vocabulary;
-using TCorpus = std::vector<std::size_t>;
+using TCorpus = std::vector<TWordId>;
 
 TCorpus EncodeCorpus(const std::filesystem::path& dump, const Vocabulary& vocabulary);
 void SaveCorpus(const std::filesystem::path& path, const TCorpus& corpus);

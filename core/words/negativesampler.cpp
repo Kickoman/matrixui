@@ -20,13 +20,13 @@ NegativeSampler::NegativeSampler(const Vocabulary& vocabulary, const std::size_t
 
     double total = 0.;
     std::vector<double> weights(size);
-    for (std::size_t id = 0; id < size; ++id) {
+    for (TWordId id = 0; id < size; ++id) {
         weights[id] = std::pow(1. * vocabulary.getCount(id), power);
         total += weights[id];
     }
 
     table.resize(tableSize);
-    std::size_t id = 0;
+    TWordId id = 0;
     double covered = weights[0] / total;
 
     for (std::size_t slot = 0; slot < tableSize; ++slot) {
@@ -42,11 +42,11 @@ NegativeSampler::NegativeSampler(const Vocabulary& vocabulary, const std::size_t
     }
 }
 
-std::size_t NegativeSampler::sample(XorShift& rng) const {
+TWordId NegativeSampler::sample(XorShift& rng) const {
     return table[rng.nextInteger(table.size())];
 }
 
-std::size_t NegativeSampler::sampleExcluding(const std::size_t wordId, XorShift& rng) const {
+TWordId NegativeSampler::sampleExcluding(const TWordId wordId, XorShift& rng) const {
     constexpr std::size_t maxAttempts = 8;
     for (std::size_t attempt = 0; attempt < maxAttempts; ++attempt) {
         const auto candidate = sample(rng);
@@ -57,7 +57,7 @@ std::size_t NegativeSampler::sampleExcluding(const std::size_t wordId, XorShift&
     return sample(rng);
 }
 
-double NegativeSampler::getProbability(const std::size_t wordId) const {
+double NegativeSampler::getProbability(const TWordId wordId) const {
     std::size_t slots = 0;
     for (const auto slot : table) {
         if (slot == wordId) {

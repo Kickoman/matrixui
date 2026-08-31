@@ -4,6 +4,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
+#include <limits>
 
 namespace Words {
 
@@ -39,12 +40,16 @@ Vocabulary Vocabulary::Build(const std::filesystem::path &dump, const std::size_
         return a.word != b.word ? a.occurrences > b.occurrences : a.word < b.word;
     });
 
+    if (kept.size() > std::numeric_limits<TWordId>::max()) {
+        throw std::runtime_error("vocabulary too large for TWordId");
+    }
+
     Vocabulary vocabulary;
     vocabulary.id2word.reserve(kept.size());
     vocabulary.counts.reserve(kept.size());
     vocabulary.word2id.reserve(kept.size());
 
-    for (std::size_t i = 0; i < kept.size(); ++i) {
+    for (TWordId i = 0; i < kept.size(); ++i) {
         auto& info = kept[i];
         vocabulary.word2id.emplace(info.word, i);
         vocabulary.id2word.push_back(std::move(info.word));
@@ -55,7 +60,7 @@ Vocabulary Vocabulary::Build(const std::filesystem::path &dump, const std::size_
     return vocabulary;
 }
 
-std::optional<std::size_t> Vocabulary::getId(const std::string& word) const {
+std::optional<TWordId> Vocabulary::getId(const std::string& word) const {
     const auto it = word2id.find(word);
     if (it == word2id.end()) {
         return std::nullopt;
@@ -63,7 +68,7 @@ std::optional<std::size_t> Vocabulary::getId(const std::string& word) const {
     return it->second;
 }
 
-double Vocabulary::getFrequency(const std::size_t id) const {
+double Vocabulary::getFrequency(const TWordId id) const {
     return 1. * counts[id] / keptTokens;
 }
 
@@ -73,13 +78,17 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
         throw std::runtime_error("Can't open file for reading: " + path.string());
     }
 
-    std::size_t size = 0;
+    std::uint64_t size = 0;
     std::size_t raw = 0;
     std::size_t kept = 0;
 
     ReadBinaryLE(file, size);
     ReadBinaryLE(file, raw);
     ReadBinaryLE(file, kept);
+
+    if (size > std::numeric_limits<TWordId>::max()) {
+        throw std::runtime_error("vocabulary too large for TWordId: " + path.string());
+    }
 
     Vocabulary vocabulary;
     vocabulary.rawTokens = raw;
@@ -88,7 +97,7 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
     vocabulary.counts.reserve(size);
     vocabulary.word2id.reserve(size);
 
-    for (std::size_t i = 0; i < size; ++i) {
+    for (TWordId i = 0; i < size; ++i) {
         std::size_t length = 0;
         ReadBinaryLE(file, length);
         std::string word(length, '\0');
@@ -105,10 +114,10 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
 
 void Vocabulary::Save(const Vocabulary &vocabulary, const std::filesystem::path &path) {
     std::ofstream file(path, std::ios::binary);
-    WriteBinaryLE(file, vocabulary.getSize());
+    WriteBinaryLE(file, static_cast<std::uint64_t>(vocabulary.getSize()));
     WriteBinaryLE(file, vocabulary.rawTokens);
     WriteBinaryLE(file, vocabulary.keptTokens);
-    for (std::size_t i = 0; i < vocabulary.getSize(); ++i) {
+    for (TWordId i = 0; i < vocabulary.getSize(); ++i) {
         WriteBinaryLE(file, vocabulary.id2word[i].size());
         file.write(vocabulary.id2word[i].data(), vocabulary.id2word[i].size());
         WriteBinaryLE(file, vocabulary.counts[i]);

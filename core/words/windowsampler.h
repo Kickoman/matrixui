@@ -5,14 +5,16 @@
 #include "core/words/corpus.h"
 #include "core/words/subsampler.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <limits>
 
 
 namespace Words {
 
 struct Pair {
-    std::size_t center;
-    std::size_t context;
+    TWordId center;
+    TWordId context;
 };
 
 class WindowSampler {

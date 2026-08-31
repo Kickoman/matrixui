@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/words/types.h"
+
 #include <vector>
 
 
@@ -13,15 +15,15 @@ class NegativeSampler {
 public:
     explicit NegativeSampler(const Vocabulary& vocabulary, std::size_t tableSize = 10'000'000, double power = 0.75);
 
-    std::size_t sample(XorShift& rng) const;
-    std::size_t sampleExcluding(std::size_t wordId, XorShift& rng) const;
+    TWordId sample(XorShift& rng) const;
+    TWordId sampleExcluding(TWordId wordId, XorShift& rng) const;
     std::size_t getTableSize() const { return table.size(); }
 
     // Exploration ???
-    double getProbability(std::size_t wordId) const;
+    double getProbability(TWordId wordId) const;
 
 private:
-    std::vector<std::size_t> table;
+    std::vector<TWordId> table;
 };
 
 }

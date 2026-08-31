@@ -8,6 +8,13 @@
 
 namespace Words {
 
+namespace {
+
+constexpr std::uint32_t CorpusMagic = 0x57435250;  // 'WCRP'
+constexpr std::uint32_t CorpusVersion = 1;
+
+}
+
 TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabulary) {
     std::ifstream file(dump);
     if (!file) {
@@ -29,7 +36,9 @@ TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabu
 
 void SaveCorpus(const std::filesystem::path &path, const TCorpus &corpus) {
     std::ofstream file(path, std::ios::binary);
-    WriteBinaryLE(file, corpus.size());
+    WriteBinaryLE(file, CorpusMagic);
+    WriteBinaryLE(file, CorpusVersion);
+    WriteBinaryLE(file, static_cast<std::uint64_t>(corpus.size()));
     WriteBulkLE(file, corpus);
 }
 
@@ -38,7 +47,22 @@ TCorpus LoadCorpus(const std::filesystem::path& path) {
     if (!file) {
         throw std::runtime_error("Can't open file for reading: " + path.string());
     }
-    std::size_t size = 0;
+
+    std::uint32_t magic = 0;
+    std::uint32_t version = 0;
+    ReadBinaryLE(file, magic);
+    ReadBinaryLE(file, version);
+    if (magic != CorpusMagic) {
+        throw std::runtime_error(
+            "Not a corpus file or built by an older version: " + path.string()
+            + ". Rebuild it with buildcor."
+        );
+    }
+    if (version != CorpusVersion) {
+        throw std::runtime_error("Unsupported corpus version: " + path.string());
+    }
+
+    std::uint64_t size = 0;
     ReadBinaryLE(file, size);
     TCorpus corpus(size);
     ReadBulkLE(file, corpus);

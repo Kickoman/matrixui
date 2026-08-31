@@ -8,12 +8,13 @@
 #include "core/words/negativesampler.h"
 
 #include <CLI11/CLI11.hpp>
+#include <limits>
 #include <unordered_set>
 
 void PrintVocabularyInfo(const Words::Vocabulary& vocabulary) {
     std::cout << "Size: " << vocabulary.getSize() << std::endl;
     std::cout << "First 10 ids:" << std::endl;
-    for (std::size_t id = 0; id < std::min(10ul, vocabulary.getSize()); ++id) {
+    for (Words::TWordId id = 0; id < std::min<Words::TWordId>(10, vocabulary.getSize()); ++id) {
         std::cout << "  - " << vocabulary.getWord(id) << std::endl;
     }
 }
@@ -85,7 +86,7 @@ void ValidateSubsampler(
               << "% survives)\n\n";
 
     std::cout << "Top-10 keep probabilities:\n";
-    for (int32_t id = 0; id < 10 && id < static_cast<int32_t>(vocabulary.getSize()); ++id) {
+    for (Words::TWordId id = 0; id < 10 && id < vocabulary.getSize(); ++id) {
         std::cout << "  " << std::setw(8) << vocabulary.getWord(id) << "  share " << std::setw(6)
                   << std::setprecision(3) << 100.0 * vocabulary.getFrequency(id) << "%"
                   << "  keep " << std::setw(6) << 100.0 * subsampler.getKeepProbability(id) << "%\n";
@@ -125,7 +126,7 @@ void VisualSamplerCheck(
     std::cout << "\n\n";
 
     XorShift rng(42);
-    int32_t prevCenter = -1;
+    auto prevCenter = std::numeric_limits<Words::TWordId>::max();
     windowSampler.forEachPair(toy, rng, [&](const Words::Pair& p) {
         if (p.center != prevCenter) {
             std::cout << "\n  " << vocabulary.getWord(p.center) << " -> ";
@@ -138,7 +139,7 @@ void VisualSamplerCheck(
 
 void CenterContextCheck(const Words::WindowSampler& windowSampler) {
     Words::TCorpus unique;
-    for (int32_t i = 0; i < 20; ++i) {
+    for (Words::TWordId i = 0; i < 20; ++i) {
         unique.push_back(i);
     }
 
@@ -175,7 +176,7 @@ void RealCorpusStatisticsCheck(
     std::size_t tokens = 0;
     std::vector<std::size_t> asCenter(vocabulary.getSize(), 0);
 
-    int32_t prevCenter = -1;
+    auto prevCenter = std::numeric_limits<Words::TWordId>::max();
     GeneratePairs(corpus, subsampler, windowSampler, rng, [&](const Words::Pair& p) {
         ++pairs;
         ++asCenter[p.center];
@@ -191,10 +192,10 @@ void RealCorpusStatisticsCheck(
               << "  (edges make the real count lower)\n\n";
 
     std::cout << "Most frequent centers after subsampling:\n";
-    std::vector<std::pair<std::size_t, int32_t>> byCount;
+    std::vector<std::pair<std::size_t, Words::TWordId>> byCount;
     byCount.reserve(vocabulary.getSize());
-    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
-        byCount.emplace_back(asCenter[id], static_cast<int32_t>(id));
+    for (Words::TWordId id = 0; id < vocabulary.getSize(); ++id) {
+        byCount.emplace_back(asCenter[id], id);
     }
     std::partial_sort(byCount.begin(), byCount.begin() + 10, byCount.end(), std::greater<>());
     for (std::size_t i = 0; i < 10; ++i) {
@@ -217,7 +218,7 @@ void PerformSamplerChecks(
 }
 
 void CoverageCheck(const Words::Vocabulary& vocabulary, const Words::NegativeSampler& sampler) {
-    std::unordered_set<std::size_t> seen;
+    std::unordered_set<Words::TWordId> seen;
     XorShift rng(1);
     for (std::size_t i = 0; i < 20'000'000; ++i) {
         seen.insert(sampler.sample(rng));
@@ -239,7 +240,7 @@ void DistributionCheck(const Words::Vocabulary& vocabulary, const Words::Negativ
     }
 
     double total = 0.;
-    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
+    for (Words::TWordId id = 0; id < vocabulary.getSize(); ++id) {
         total += std::pow(static_cast<double>(vocabulary.getCount(id)), power);
     }
 
@@ -247,7 +248,7 @@ void DistributionCheck(const Words::Vocabulary& vocabulary, const Words::Negativ
               << std::setw(12) << "actual" << std::setw(10) << "ratio" << '\n';
 
     double worstRatio = 1.;
-    for (std::size_t id = 0; id < vocabulary.getSize(); ++id) {
+    for (Words::TWordId id = 0; id < vocabulary.getSize(); ++id) {
         const double expected = std::pow(static_cast<double>(vocabulary.getCount(id)), power) / total;
         const double actual = static_cast<double>(hits[id]) / draws;
 
@@ -285,7 +286,7 @@ void FlatteningCheck(const Words::Vocabulary& vocabulary) {
 
 void ExclusionCheck(const Words::NegativeSampler& sampler) {
     XorShift rng(3);
-    constexpr std::size_t excluded = 0;
+    constexpr Words::TWordId excluded = 0;
     bool leaked = false;
     for (std::size_t i = 0; i < 1'000'000; ++i) {
         if (sampler.sampleExcluding(excluded, rng) == excluded) {
@@ -303,7 +304,7 @@ void PerformNegativeSamplerChecks(const std::filesystem::path& vocabularyPath) {
 
     std::cout << "=== Negative sampling table ===\n";
     std::cout << "table size: " << sampler.getTableSize() << "  ("
-              << sampler.getTableSize() * sizeof(std::size_t) / (1024 * 1024) << " MB)\n\n";
+              << sampler.getTableSize() * sizeof(Words::TWordId) / (1024 * 1024) << " MB)\n\n";
 
     CoverageCheck(vocabulary, sampler);
     DistributionCheck(vocabulary, sampler);
