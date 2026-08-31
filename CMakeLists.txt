@@ -98,6 +98,12 @@ set(
     core/words/corpus.cpp
     core/words/subsampler.cpp
     core/words/negativesampler.cpp
+    core/words/embeddings.cpp
+    core/words/model.cpp
+    core/words/trainer.cpp
+    core/words/similarity.cpp
+    core/words/evaluate.cpp
+    core/words/expressions.cpp
 
     # Other
     matrix/matrix.cpp

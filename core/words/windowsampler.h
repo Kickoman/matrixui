@@ -12,11 +12,6 @@
 
 namespace Words {
 
-struct Pair {
-    TWordId center;
-    TWordId context;
-};
-
 class WindowSampler {
 public:
     explicit WindowSampler(std::size_t window = 5) : window(window) {}
