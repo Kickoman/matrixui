@@ -38,8 +38,6 @@ AnalogyReport EvaluateAnalogies(
     std::size_t threads
 );
 
-void PrintAnalogyReport(const AnalogyReport& report);
-
 struct SimilarityReport {
     std::size_t asked{0};
     std::size_t skipped{0};
@@ -53,7 +51,5 @@ SimilarityReport EvaluateSimilarity(
     const std::filesystem::path& path,
     std::size_t scoreColumn
 );
-
-void PrintSimilarityReport(const std::string& name, const SimilarityReport& report);
 
 }

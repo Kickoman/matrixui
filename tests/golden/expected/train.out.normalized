@@ -1,0 +1,10 @@
+vocab 1400, corpus 400000, model 0 MB
+dim 32, negatives 5, window 5, epochs 1, threads 1
+estimated pairs: 931904
+probe set: 500 pairs
+initial loss: 4.1589
+
+done: 926869 pairs in <SECS> (<RATE>)
+estimate was 931904, ratio 0.995
+final loss: 2.6425
+saved embeddings to "<WORK>/emb.bin"

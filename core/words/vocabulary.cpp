@@ -1,3 +1,4 @@
+#include "core/words/error.h"
 #include "core/words/vocabulary.h"
 #include "core/lib/write.h"
 
@@ -11,7 +12,7 @@ namespace Words {
 Vocabulary Vocabulary::Build(const std::filesystem::path &dump, const std::size_t minCount) {
     std::ifstream file(dump);
     if (!file) {
-        throw std::runtime_error("Cannot open file: " + dump.string());
+        throw IoError("Cannot open file: " + dump.string());
     }
 
     std::unordered_map<std::string, std::size_t> frequencies;
@@ -41,7 +42,7 @@ Vocabulary Vocabulary::Build(const std::filesystem::path &dump, const std::size_
     });
 
     if (kept.size() > std::numeric_limits<TWordId>::max()) {
-        throw std::runtime_error("vocabulary too large for TWordId");
+        throw VocabularyError("vocabulary too large for TWordId");
     }
 
     Vocabulary vocabulary;
@@ -73,9 +74,11 @@ double Vocabulary::getFrequency(const TWordId id) const {
 }
 
 Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
-    std::ifstream file(path);
+    // Binary, to match Save. This used to open in text mode, which happens to
+    // be identical on POSIX but mangles the payload on Windows.
+    std::ifstream file(path, std::ios::binary);
     if (!file) {
-        throw std::runtime_error("Can't open file for reading: " + path.string());
+        throw IoError("Can't open file for reading: " + path.string());
     }
 
     std::uint64_t size = 0;
@@ -86,8 +89,17 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
     ReadBinaryLE(file, raw);
     ReadBinaryLE(file, kept);
 
+    // Unchecked before: anything that opened -- /dev/null, a text file, a
+    // truncated artifact -- came back as a silent zero-word vocabulary that
+    // every downstream command then treated as valid.
+    if (!file) {
+        throw IoError("Not a vocabulary file (header is truncated): " + path.string());
+    }
+    if (size == 0) {
+        throw VocabularyError("Vocabulary file contains no words: " + path.string());
+    }
     if (size > std::numeric_limits<TWordId>::max()) {
-        throw std::runtime_error("vocabulary too large for TWordId: " + path.string());
+        throw VocabularyError("vocabulary too large for TWordId: " + path.string());
     }
 
     Vocabulary vocabulary;
@@ -105,6 +117,10 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
         std::size_t count = 0;
         ReadBinaryLE(file, count);
 
+        if (!file) {
+            throw IoError("Vocabulary file is truncated: " + path.string());
+        }
+
         vocabulary.word2id.emplace(word, i);
         vocabulary.id2word.emplace_back(std::move(word));
         vocabulary.counts.push_back(count);
@@ -114,6 +130,9 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
 
 void Vocabulary::Save(const Vocabulary &vocabulary, const std::filesystem::path &path) {
     std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw IoError("Can't open file for writing: " + path.string());
+    }
     WriteBinaryLE(file, static_cast<std::uint64_t>(vocabulary.getSize()));
     WriteBinaryLE(file, vocabulary.rawTokens);
     WriteBinaryLE(file, vocabulary.keptTokens);
@@ -121,6 +140,11 @@ void Vocabulary::Save(const Vocabulary &vocabulary, const std::filesystem::path 
         WriteBinaryLE(file, vocabulary.id2word[i].size());
         file.write(vocabulary.id2word[i].data(), vocabulary.id2word[i].size());
         WriteBinaryLE(file, vocabulary.counts[i]);
+    }
+
+    file.flush();
+    if (!file) {
+        throw IoError("Failed while writing the vocabulary to " + path.string());
     }
 }
 

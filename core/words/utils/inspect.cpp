@@ -1,51 +1,57 @@
 #include "core/words/utils/inspect.h"
 
-#include <iostream>
+#include "core/words/error.h"
+
+#include <algorithm>
+#include <array>
 #include <fstream>
 #include <unordered_map>
-#include <array>
-#include <vector>
-#include <algorithm>
 
 namespace Words {
 
-void Inspect(const std::filesystem::path &dump) {
+CorpusStatistics InspectDump(const std::filesystem::path& dump, const std::size_t topN) {
     std::ifstream file(dump);
+    if (!file) {
+        throw IoError("Can't open file for reading: " + dump.string());
+    }
 
     std::unordered_map<std::string, std::size_t> words;
-    std::size_t symbols = 0;
-    std::size_t wordsCount = 0;
+    CorpusStatistics statistics;
+    statistics.path = dump;
+
     std::string word;
     while (file >> word) {
         words[word] += 1;
-        symbols += word.size();
-        ++wordsCount;
+        statistics.symbols += word.size();
+        ++statistics.totalWords;
     }
+    statistics.uniqueWords = words.size();
 
-    std::cout << "Processed " << dump.string() << std::endl;
-    std::cout << "Symbols: " << symbols << std::endl;
-    std::cout << "Words: " << wordsCount << std::endl;
-    std::cout << "Unique words: " << words.size() << std::endl;
-
-    static const std::array<std::size_t, 3> minCounts = {5, 10, 50};
+    static constexpr std::array<std::size_t, 3> minCounts = {5, 10, 50};
     for (const auto minCount : minCounts) {
-        const auto kept = std::count_if(words.cbegin(), words.cend(), [minCount](const auto& el){
-            return el.second >= minCount;
+        const auto kept = std::count_if(words.cbegin(), words.cend(),
+            [minCount](const auto& entry) { return entry.second >= minCount; });
+        statistics.survivorsByMinCount.emplace_back(minCount, static_cast<std::size_t>(kept));
+    }
+
+    const auto shown = std::min(topN, words.size());
+    std::vector<std::pair<std::string, std::size_t>> byFrequency(words.cbegin(), words.cend());
+    std::partial_sort(byFrequency.begin(), byFrequency.begin() + shown, byFrequency.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
+
+    statistics.topByFrequency.reserve(shown);
+    for (std::size_t i = 0; i < shown; ++i) {
+        const auto& [text, count] = byFrequency[i];
+        statistics.topByFrequency.push_back({
+            text,
+            count,
+            statistics.totalWords > 0
+                ? static_cast<double>(count) / static_cast<double>(statistics.totalWords)
+                : 0.,
         });
-        std::cout << "  words with minCount = " << minCount << ": " << kept << std::endl;
     }
 
-    std::cout << "Top-15 by frequency:" << std::endl;
-    const auto topN = std::min(15ul, words.size());
-    std::vector<std::pair<std::string, std::size_t>> byFreq(words.cbegin(), words.cend());
-    std::partial_sort(byFreq.begin(), byFreq.begin() + topN, byFreq.end(), [](const auto& a, const auto& b) {
-        return a.second > b.second;
-    });
-    for (std::size_t i = 0; i < topN; ++i) {
-        const auto& it = byFreq[i];
-        const double share = it.second * 1. / wordsCount;
-        std::cout << "  " << it.first << " of " << it.second << " (share " << share << ")" << std::endl;
-    }
+    return statistics;
 }
 
-}
+}  // namespace Words

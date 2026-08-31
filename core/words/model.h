@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/lib/random.h"
+#include "core/words/config.h"
 #include "core/words/embeddings.h"
 
 namespace Words {
@@ -14,13 +15,6 @@ namespace Words {
 class Vocabulary;
 class NegativeSampler;
 struct Pair;
-
-struct ModelConfig {
-    std::size_t dim{100};
-    std::size_t negatives{5};
-    double initialLearningRate = 0.025;
-    double minLearningRateFactor = 1e-4;
-};
 
 struct WorkerContext {
     WorkerContext(const ModelConfig& config, const std::uint64_t seed)

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <utility>
 
 
 namespace Words {
@@ -35,7 +36,8 @@ public:
 
     std::size_t getWindow() const { return window; }
 
-    // Exploration?
+    // Mean pairs emitted per token, away from the chunk edges: the radius
+    // is uniform on [1, window], so the expectation is window + 1.
     double getPairsPerToken() const { return 1. * window + 1; }
 
 private:
@@ -43,13 +45,20 @@ private:
 };
 
 
-template<typename Fn>
-void GeneratePairs(
+// Emits pairs while `keepGoing()` holds, checked once per chunk.
+//
+// The predicate deliberately sits at the chunk boundary rather than inside
+// forEachPair: that is the innermost loop in the program, and a per-pair test
+// would cost a branch on every single pair. One chunk is ~1000 corpus tokens,
+// which is a sub-millisecond response to a cancellation request.
+template<typename Fn, typename Predicate>
+void GeneratePairsWhile(
     const TCorpus& corpus,
     const Subsampler& subsampler,
     const WindowSampler& windowSampler,
     XorShift& rng,
     Fn&& emit,
+    Predicate&& keepGoing,
     const std::size_t chunkSize = 1000,
     const std::size_t from = 0,
     std::size_t to = std::numeric_limits<std::size_t>::max()
@@ -60,6 +69,10 @@ void GeneratePairs(
     chunk.reserve(chunkSize);
 
     for (std::size_t start = from; start < to; start += chunkSize) {
+        if (!keepGoing()) {
+            return;
+        }
+
         const std::size_t finish = std::min(start + chunkSize, to);
         chunk.clear();
         for (std::size_t i = start; i < finish; ++i) {
@@ -70,6 +83,22 @@ void GeneratePairs(
 
         windowSampler.forEachPair(chunk, rng, emit);
     }
+}
+
+template<typename Fn>
+void GeneratePairs(
+    const TCorpus& corpus,
+    const Subsampler& subsampler,
+    const WindowSampler& windowSampler,
+    XorShift& rng,
+    Fn&& emit,
+    const std::size_t chunkSize = 1000,
+    const std::size_t from = 0,
+    const std::size_t to = std::numeric_limits<std::size_t>::max()
+) {
+    GeneratePairsWhile(
+        corpus, subsampler, windowSampler, rng, std::forward<Fn>(emit),
+        [] { return true; }, chunkSize, from, to);
 }
 
 }

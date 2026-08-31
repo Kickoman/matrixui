@@ -19,7 +19,7 @@ public:
     TWordId sampleExcluding(TWordId wordId, XorShift& rng) const;
     std::size_t getTableSize() const { return table.size(); }
 
-    // Exploration ???
+    // Used by the negative-sampler diagnostics.
     double getProbability(TWordId wordId) const;
 
 private:

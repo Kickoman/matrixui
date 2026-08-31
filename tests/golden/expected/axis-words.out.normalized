@@ -1,0 +1,6 @@
+axis: good - bad
+
+  +0.0045  king
+  +0.0005  music
+  -0.0022  war
+  -0.0107  queen

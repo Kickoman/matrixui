@@ -2,6 +2,9 @@
 
 #include "core/lib/random.h"
 #include "core/lib/write.h"
+#include "core/words/error.h"
+
+#include <algorithm>
 #include <fstream>
 
 namespace Words {
@@ -32,24 +35,59 @@ void Embeddings::initializeZero() {
 
 void Embeddings::Save(const Embeddings &embeddings, const std::filesystem::path &path) {
     std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw IoError("Can't open file for writing: " + path.string());
+    }
 
     const auto w = static_cast<std::uint64_t>(embeddings.words);
     const auto d = static_cast<std::uint64_t>(embeddings.dim);
     WriteBinaryLE(file, w);
     WriteBinaryLE(file, d);
     WriteBulkLE(file, embeddings.data);
+
+    file.flush();
+    if (!file) {
+        throw IoError("Failed while writing embeddings to " + path.string());
+    }
 }
 
 Embeddings Embeddings::Load(const std::filesystem::path &path) {
+    // Every step here used to be unchecked: a missing file produced a silently
+    // zero-filled matrix, and a truncated one produced a partially-filled
+    // matrix, both of which look like a trained model to everything downstream.
     std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        throw IoError("Can't open file for reading: " + path.string());
+    }
+
     std::uint64_t w = 0;
     std::uint64_t d = 0;
-
     ReadBinaryLE(file, w);
     ReadBinaryLE(file, d);
+    if (!file) {
+        throw IoError("Not an embeddings file (header is truncated): " + path.string());
+    }
+
+    if (w == 0 || d == 0) {
+        throw IoError("Embeddings file declares an empty matrix: " + path.string());
+    }
+
+    // Guard against a header that would ask for an absurd allocation.
+    const auto expectedBytes = static_cast<std::uintmax_t>(w) * d * sizeof(TFloat);
+    std::error_code ec;
+    const auto actualBytes = std::filesystem::file_size(path, ec);
+    if (!ec && actualBytes < expectedBytes + 2 * sizeof(std::uint64_t)) {
+        throw IoError(
+            "Embeddings file is shorter than its header claims: " + path.string()
+            + " (expected " + std::to_string(expectedBytes) + " bytes of data, file is "
+            + std::to_string(actualBytes) + " bytes)");
+    }
 
     Embeddings result(w, d);
     ReadBulkLE(file, result.data);
+    if (!file) {
+        throw IoError("Embeddings file is truncated: " + path.string());
+    }
     return result;
 }
 

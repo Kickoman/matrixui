@@ -1,3 +1,4 @@
+#include "core/words/error.h"
 #include "corpus.h"
 
 #include "core/lib/write.h"
@@ -18,7 +19,7 @@ constexpr std::uint32_t CorpusVersion = 1;
 TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabulary) {
     std::ifstream file(dump);
     if (!file) {
-        throw std::runtime_error("Can't open file for reading: " + dump.string());
+        throw IoError("Can't open file for reading: " + dump.string());
     }
 
     TCorpus corpus;
@@ -36,16 +37,24 @@ TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabu
 
 void SaveCorpus(const std::filesystem::path &path, const TCorpus &corpus) {
     std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw IoError("Can't open file for writing: " + path.string());
+    }
     WriteBinaryLE(file, CorpusMagic);
     WriteBinaryLE(file, CorpusVersion);
     WriteBinaryLE(file, static_cast<std::uint64_t>(corpus.size()));
     WriteBulkLE(file, corpus);
+
+    file.flush();
+    if (!file) {
+        throw IoError("Failed while writing the corpus to " + path.string());
+    }
 }
 
 TCorpus LoadCorpus(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
-        throw std::runtime_error("Can't open file for reading: " + path.string());
+        throw IoError("Can't open file for reading: " + path.string());
     }
 
     std::uint32_t magic = 0;
@@ -53,13 +62,13 @@ TCorpus LoadCorpus(const std::filesystem::path& path) {
     ReadBinaryLE(file, magic);
     ReadBinaryLE(file, version);
     if (magic != CorpusMagic) {
-        throw std::runtime_error(
+        throw IoError(
             "Not a corpus file or built by an older version: " + path.string()
             + ". Rebuild it with buildcor."
         );
     }
     if (version != CorpusVersion) {
-        throw std::runtime_error("Unsupported corpus version: " + path.string());
+        throw IoError("Unsupported corpus version: " + path.string());
     }
 
     std::uint64_t size = 0;

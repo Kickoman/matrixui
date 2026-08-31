@@ -1,0 +1,30 @@
+=== Toy chunk ===
+chunk: computer france w0039 w0016 the w0067 w0385 w0184 
+
+  computer -> france w0039 w0016 the w0067 
+  france -> computer w0039 w0016 
+  w0039 -> computer france w0016 the w0067 w0385 w0184 
+  w0016 -> france w0039 the w0067 
+  the -> france w0039 w0016 w0067 w0385 w0184 
+  w0067 -> w0039 w0016 the w0385 w0184 
+  w0385 -> w0067 w0184 
+  w0184 -> w0039 w0016 the w0067 w0385 
+
+self-pair check: passed
+coverage check:  passed
+
+=== Full pass ===
+pairs generated: 925565
+expected upper bound: 931904  (edges make the real count lower)
+
+Most frequent centers after subsampling:
+         the  7722
+         one  5246
+        king  4562
+      france  4070
+    computer  3604
+       water  3440
+         red  3202
+       music  3048
+         war  2740
+       paris  2578

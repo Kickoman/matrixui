@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 
 namespace Words {
 
@@ -98,71 +97,6 @@ std::vector<TFloat> EmbeddingIndex::analogyVector(
 
 double EmbeddingIndex::similarity(const TWordId first, const TWordId second) const {
     return dot(normalized.row(first), normalized.row(second), normalized.getDim());
-}
-
-void PrintNeighbours(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& word,
-    const std::size_t count
-) {
-    const auto id = vocabulary.getId(word);
-    if (!id.has_value()) {
-        std::cout << "  '" << word << "' is not in the vocabulary\n";
-        return;
-    }
-
-    std::cout << word << " (id " << *id << ", count " << vocabulary.getCount(*id) << "):\n";
-    for (const auto& neighbour : index.nearest(*id, count)) {
-        std::cout << "    " << std::setw(18) << std::left << vocabulary.getWord(neighbour.id)
-                  << std::right << std::fixed << std::setprecision(4) << neighbour.similarity << '\n';
-    }
-    std::cout << '\n';
-}
-
-void PrintAnalogy(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& a,
-    const std::string& b,
-    const std::string& c,
-    const std::size_t count
-) {
-    const auto idA = vocabulary.getId(a);
-    const auto idB = vocabulary.getId(b);
-    const auto idC = vocabulary.getId(c);
-
-    if (!idA.has_value() || !idB.has_value() || !idC.has_value()) {
-        std::cout << "  some of '" << a << "', '" << b << "', '" << c
-                  << "' are not in the vocabulary\n\n";
-        return;
-    }
-
-    const auto query = index.analogyVector(*idA, *idB, *idC);
-    const std::array<TWordId, 3> exclude{*idA, *idB, *idC};
-
-    std::cout << b << " - " << a << " + " << c << ":\n";
-    for (const auto& neighbour : index.nearestToVector(query, exclude, count)) {
-        std::cout << "    " << std::setw(18) << std::left << vocabulary.getWord(neighbour.id)
-                  << std::right << std::fixed << std::setprecision(4) << neighbour.similarity << '\n';
-    }
-    std::cout << '\n';
-}
-
-void RunDefaultBattery(const Vocabulary& vocabulary, const EmbeddingIndex& index) {
-    const std::vector<std::string> words = {
-        "one", "king", "france", "computer", "water", "music", "red", "war"
-    };
-
-    std::cout << "=== Nearest neighbours ===\n\n";
-    for (const auto& word : words) {
-        PrintNeighbours(vocabulary, index, word, 8);
-    }
-
-    std::cout << "=== Analogies ===\n\n";
-    PrintAnalogy(vocabulary, index, "man", "king", "woman", 5);
-    PrintAnalogy(vocabulary, index, "paris", "france", "rome", 5);
-    PrintAnalogy(vocabulary, index, "good", "better", "bad", 5);
 }
 
 }

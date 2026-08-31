@@ -17,6 +17,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 option(BUILD_GUI "Build GUI version" ON)
 option(BUILD_CLI "Build CLI version" ON)
 option(BUILD_READER "Build Reader version" ON)
+option(BUILD_TESTS "Build unit tests" ON)
 
 # Qt options
 if (BUILD_GUI)
@@ -94,6 +95,7 @@ set(
 
     # Words
     core/words/utils/inspect.cpp
+    core/words/config.cpp
     core/words/vocabulary.cpp
     core/words/corpus.cpp
     core/words/subsampler.cpp
@@ -104,6 +106,19 @@ set(
     core/words/similarity.cpp
     core/words/evaluate.cpp
     core/words/expressions.cpp
+    core/words/queries.cpp
+
+    # Words: diagnostics and console rendering
+    core/words/diagnostics/sampler_checks.cpp
+    core/words/diagnostics/negative_sampler_checks.cpp
+    core/words/diagnostics/model_checks.cpp
+    core/words/diagnostics/gradient_checks.cpp
+    core/words/report/format.cpp
+    core/words/report/inspect_report.cpp
+    core/words/report/query_report.cpp
+    core/words/report/evaluate_report.cpp
+    core/words/report/train_report.cpp
+    core/words/report/diagnostics_report.cpp
 
     # Other
     matrix/matrix.cpp
@@ -111,6 +126,13 @@ set(
 )
 
 include_directories(eigen)
+
+# One compilation of the framework-free core, shared by every executable and by
+# the test binary. Previously CORE_SOURCES was compiled separately into each of
+# the four targets. Nothing here uses Qt, so the autogen steps are turned off.
+add_library(matrixgui_core STATIC ${CORE_SOURCES})
+target_include_directories(matrixgui_core PUBLIC contrib)
+set_target_properties(matrixgui_core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
 if(BUILD_GUI)
     if(${QT_VERSION_MAJOR} EQUAL 5)
@@ -121,7 +143,6 @@ if(BUILD_GUI)
 
     add_executable(
         ${PROJECT_NAME}
-        ${CORE_SOURCES}
         ${GUI_SOURCES}
         ${GUI_COMMON_SOURCES}
         gui/main.cpp
@@ -130,6 +151,8 @@ if(BUILD_GUI)
     target_sources(${PROJECT_NAME} PRIVATE ${FONTS})
 
     target_link_libraries(${PROJECT_NAME}
+        matrixgui_core
+
         Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Concurrent
@@ -145,23 +168,58 @@ endif()
 if(BUILD_CLI)
     add_executable(
         ${PROJECT_NAME}_headless
-        ${CORE_SOURCES}
         core/main_headless.cpp
     )
+    target_link_libraries(${PROJECT_NAME}_headless matrixgui_core)
 
     add_executable(
         ${PROJECT_NAME}_gan
-        ${CORE_SOURCES}
         core/main_headless_gan.cpp
     )
+    target_link_libraries(${PROJECT_NAME}_gan matrixgui_core)
 
+    # words_cli is deliberately NOT in CORE_SOURCES: that list is compiled into
+    # the Qt GUI too, and CLI11 has no business being there.
     add_executable(
         ${PROJECT_NAME}_words
-        ${CORE_SOURCES}
         core/main_words.cpp
+        core/words_cli/commands.cpp
     )
+    target_link_libraries(${PROJECT_NAME}_words matrixgui_core)
 
     target_include_directories(${PROJECT_NAME}_headless PUBLIC contrib)
     target_include_directories(${PROJECT_NAME}_gan PUBLIC contrib)
     target_include_directories(${PROJECT_NAME}_words PUBLIC contrib)
+endif()
+
+if(BUILD_TESTS)
+    enable_testing()
+
+    set(
+        TEST_SOURCES
+        tests/main.cpp
+        tests/words/vocabulary_test.cpp
+        tests/words/corpus_test.cpp
+        tests/words/embeddings_test.cpp
+        tests/words/subsampler_test.cpp
+        tests/words/windowsampler_test.cpp
+        tests/words/negativesampler_test.cpp
+        tests/words/model_test.cpp
+        tests/words/similarity_test.cpp
+        tests/words/expressions_test.cpp
+        tests/words/evaluate_test.cpp
+        tests/words/golden_print_test.cpp
+        tests/words/trainer_test.cpp
+        tests/words/diagnostics_test.cpp
+        tests/words/config_test.cpp
+        tests/words/inspect_test.cpp
+        tests/words/queries_test.cpp
+    )
+
+    add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
+    target_link_libraries(${PROJECT_NAME}_tests matrixgui_core)
+    target_include_directories(${PROJECT_NAME}_tests PUBLIC contrib)
+    set_target_properties(${PROJECT_NAME}_tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
+    add_test(NAME unit COMMAND ${PROJECT_NAME}_tests)
 endif()

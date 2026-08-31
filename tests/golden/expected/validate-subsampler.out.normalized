@@ -1,0 +1,24 @@
+sample t = 0.0001
+Words affected: 664 of 1400  (47.4286%)
+Corpus: 400000 -> ~155317  (38.8% survives)
+
+Top-10 keep probabilities:
+       the  share  8.872%  keep  3.470%
+       one  share  4.759%  keep  4.794%
+      king  share  3.288%  keep  5.819%
+    france  share  2.548%  keep  6.657%
+  computer  share  2.086%  keep  7.403%
+     water  share  1.800%  keep  8.008%
+     music  share  1.530%  keep  8.737%
+       red  share  1.354%  keep  9.332%
+       war  share  1.244%  keep  9.769%
+       man  share  1.127%  keep 10.306%
+
+Actual after subsampling: 154979  (38.745%)
+(should closely match the estimate above)
+
+Before:
+  computer france w0039 w0016 the w0067 w0385 w0184 w0069 w0003 w0309 the w0425 w0502 w0258 w0189 good water w1255 red w0125 king w0279 big one w0465 water w0484 w0968 w0080 w1264 w0343 w1340 w0443 better w0016 w0002 w0294 paris w0051 
+
+After:
+  computer w0016 w0385 w0184 w0069 w0309 w0425 w0189 w1255 w0125 king w0279 w0465 w0968 w1264 w0343 w1340 w0443 w0294 w0013 w1068 music w0013 w1019 w0877 w0756 w0806 w0061 w1359 w0802 w0049 w0259 w0208 w0103 w0649 the w0447 w0024 w0799 w0100 

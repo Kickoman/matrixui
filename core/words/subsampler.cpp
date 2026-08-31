@@ -48,7 +48,32 @@ std::size_t Subsampler::getAffectedWordsCount() const {
     return n;
 }
 
+TCorpus Subsample(
+    const TCorpus& corpus,
+    const std::size_t from,
+    const std::size_t to,
+    const Subsampler& subsampler,
+    ::XorShift& rng
+) {
+    TCorpus result;
+    result.reserve(to - from);
+    for (std::size_t i = from; i < to; ++i) {
+        if (subsampler.shouldKeep(corpus[i], rng)) {
+            result.push_back(corpus[i]);
+        }
+    }
+    return result;
+}
+
 double Subsampler::getExpectedCorpusLength(const Vocabulary& vocabulary) const {
+    // With subsampling switched off, keepProbability is empty and the loop
+    // below would report zero surviving tokens. That matters beyond the
+    // reported figure: EstimateTotalPairs feeds the learning-rate schedule, and
+    // a total of zero pins progress at 0 so the rate never decays.
+    if (!enabled) {
+        return static_cast<double>(vocabulary.getKeptTokens());
+    }
+
     double total = 0;
     for (TWordId id = 0; id < keepProbability.size(); ++id) {
         total += 1. * vocabulary.getCount(id) * keepProbability[id];

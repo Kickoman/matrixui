@@ -1,3 +1,4 @@
+#include "core/words/error.h"
 #include "core/words/negativesampler.h"
 
 #include "core/lib/random.h"
@@ -12,10 +13,10 @@ namespace Words {
 NegativeSampler::NegativeSampler(const Vocabulary& vocabulary, const std::size_t tableSize, const double power) {
     const auto size = vocabulary.getSize();
     if (size == 0) {
-        throw std::runtime_error("empty vocabulary");
+        throw VocabularyError("empty vocabulary");
     }
     if (tableSize < size) {
-        throw std::runtime_error("table smaller than vocabulary");
+        throw ConfigError("table smaller than vocabulary");
     }
 
     double total = 0.;

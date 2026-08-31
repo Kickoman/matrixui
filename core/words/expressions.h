@@ -27,26 +27,4 @@ std::vector<TFloat> BuildExpressionVector(
     const std::vector<ExpressionTerm>& terms
 );
 
-void RunExpression(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& expression,
-    std::size_t count
-);
-
-void RunOddOne(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& words
-);
-
-void RunAxis(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& axisExpression,
-    const std::string& words,
-    std::size_t restrictTo,
-    std::size_t count
-);
-
 }

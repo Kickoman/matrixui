@@ -20,6 +20,10 @@ struct Neighbour {
 
 class EmbeddingIndex {
 public:
+    // Public so an index can be built from a just-trained model without a
+    // round-trip through the filesystem. Normalises the rows it is given.
+    explicit EmbeddingIndex(Embeddings embeddings);
+
     static EmbeddingIndex Load(const std::filesystem::path& path);
 
     std::vector<Neighbour> nearest(TWordId id, std::size_t count) const;
@@ -33,27 +37,7 @@ public:
     std::size_t getWords() const { return normalized.getWords(); }
 
 private:
-    explicit EmbeddingIndex(Embeddings embeddings);
-
     Embeddings normalized;
 };
-
-void PrintNeighbours(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& word,
-    std::size_t count
-);
-
-void PrintAnalogy(
-    const Vocabulary& vocabulary,
-    const EmbeddingIndex& index,
-    const std::string& a,
-    const std::string& b,
-    const std::string& c,
-    std::size_t count
-);
-
-void RunDefaultBattery(const Vocabulary& vocabulary, const EmbeddingIndex& index);
 
 }

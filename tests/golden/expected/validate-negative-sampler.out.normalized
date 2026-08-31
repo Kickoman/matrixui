@@ -1,0 +1,15 @@
+=== Negative sampling table ===
+table size: 10000000  (38 MB)
+
+reachable words: 1400 of 1400  passed
+
+words tested:   1400
+chi2 / df:      0.9685   (expected 1.0 +- 0.1512)
+  passed
+max |z|:        3.1145 (w0720)   typical max ~ 3.9843
+
+flattening effect (the vs w1325):
+  raw counts ratio:  1013.9143
+  after ^0.75:       179.6805
+
+exclusion check: passed

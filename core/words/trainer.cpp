@@ -1,15 +1,16 @@
 #include "core/words/trainer.h"
 
 #include "core/lib/random.h"
+#include "core/words/error.h"
 #include "core/words/negativesampler.h"
+#include "core/words/report/format.h"
+#include "core/words/report/train_report.h"
 #include "core/words/subsampler.h"
 #include "core/words/vocabulary.h"
 #include "core/words/windowsampler.h"
 
-#include <atomic>
+#include <algorithm>
 #include <chrono>
-#include <iomanip>
-#include <iostream>
 #include <thread>
 
 namespace Words {
@@ -77,117 +78,240 @@ std::size_t EstimateTotalPairs(
     return static_cast<std::size_t>(perEpoch * epochs);
 }
 
-void Train(
-    SGNSModel& model,
-    const TCorpus& corpus,
-    const Subsampler& subsampler,
-    const WindowSampler& windowSampler,
-    const NegativeSampler& negativeSampler,
-    const Vocabulary& vocabulary,
-    const TrainConfig& trainConfig
-) {
+Trainer::Trainer() = default;
+Trainer::~Trainer() = default;
+
+void Trainer::setVocabulary(std::shared_ptr<const Vocabulary> value) {
+    if (running.load()) {
+        throw Error("cannot change the vocabulary while training is running");
+    }
+    vocabulary = std::move(value);
+}
+
+void Trainer::setCorpus(std::shared_ptr<const TCorpus> value) {
+    if (running.load()) {
+        throw Error("cannot change the corpus while training is running");
+    }
+    corpus = std::move(value);
+}
+
+void Trainer::setModelConfig(const ModelConfig& config) {
+    if (running.load()) {
+        throw Error("cannot change the model configuration while training is running");
+    }
+    modelConfig = config;
+}
+
+void Trainer::setSamplingConfig(const SamplingConfig& config) {
+    if (running.load()) {
+        throw Error("cannot change the sampling configuration while training is running");
+    }
+    samplingConfig = config;
+}
+
+void Trainer::setProgressCallback(std::function<void(const TrainProgress&)> callback) {
+    progressCallback = std::move(callback);
+}
+
+void Trainer::setVerbose(const bool value) {
+    verbose = value;
+}
+
+void Trainer::setOutputStream(std::ostream* value) {
+    stream = value;
+}
+
+bool Trainer::isRunning() const {
+    return running.load();
+}
+
+void Trainer::requestStop() {
+    stopRequested.store(true, std::memory_order_relaxed);
+}
+
+const Embeddings& Trainer::getInputEmbeddings() const {
+    if (!model) {
+        throw Error("no model yet -- call train() first");
+    }
+    return model->getInput();
+}
+
+std::ostream& Trainer::log() const {
+    if (!verbose) {
+        return NullStream();
+    }
+    return stream != nullptr ? *stream : DefaultLogStream();
+}
+
+TrainSummary Trainer::train(const TrainConfig& trainConfig) {
+    if (running.exchange(true)) {
+        throw Error("training is already in progress");
+    }
+
+    struct RunningGuard {
+        std::atomic<bool>& flag;
+        ~RunningGuard() { flag.store(false); }
+    } guard{running};
+
+    if (!vocabulary) {
+        throw ConfigError("no vocabulary set");
+    }
+    if (!corpus) {
+        throw ConfigError("no corpus set");
+    }
+
+    Validate(WordsConfig{modelConfig, samplingConfig, trainConfig}, vocabulary->getSize());
+
+    stopRequested.store(false, std::memory_order_relaxed);
+    workerException = nullptr;
+
     const std::size_t threadCount = trainConfig.threads > 0
         ? trainConfig.threads
         : std::max<std::size_t>(1, std::thread::hardware_concurrency());
 
+    // The samplers are pure functions of (vocabulary, SamplingConfig) and are
+    // needed only for the duration of the run, so the trainer owns them rather
+    // than making the caller assemble three objects.
+    const Subsampler subsampler(*vocabulary, samplingConfig.sample);
+    const WindowSampler windowSampler(samplingConfig.window);
+    const NegativeSampler negativeSampler(
+        *vocabulary, samplingConfig.negativeTableSize, samplingConfig.negativePower);
+
+    XorShift seedRng(trainConfig.seed);
+    model = std::make_unique<SGNSModel>(*vocabulary, modelConfig, seedRng);
+
     const auto probes = BuildProbeSet(
-        corpus, subsampler, windowSampler, negativeSampler,
-        model.getConfig(), trainConfig.probePairs, trainConfig.seed);
+        *corpus, subsampler, windowSampler, negativeSampler,
+        modelConfig, trainConfig.probePairs, trainConfig.seed);
 
-    const auto total = EstimateTotalPairs(vocabulary, subsampler, windowSampler, trainConfig.epochs);
+    const auto total = EstimateTotalPairs(*vocabulary, subsampler, windowSampler, trainConfig.epochs);
 
-    std::cout << "dim " << model.getConfig().dim
-              << ", negatives " << model.getConfig().negatives
-              << ", window " << windowSampler.getWindow()
-              << ", epochs " << trainConfig.epochs
-              << ", threads " << threadCount << '\n';
-    std::cout << "estimated pairs: " << total << '\n';
-    std::cout << "probe set: " << probes.size() << " pairs\n";
-    std::cout << "initial loss: " << std::fixed << std::setprecision(4)
-              << MeanProbeLoss(model, probes) << "\n\n";
+    TrainSummary summary;
+    summary.threads = threadCount;
+    summary.pairsEstimated = total;
+    summary.probeCount = probes.size();
+    summary.initialLoss = MeanProbeLoss(*model, probes);
+
+    PrintTrainBanner(log(), modelConfig, samplingConfig, trainConfig,
+                     threadCount, total, probes.size(), summary.initialLoss);
 
     std::atomic<std::size_t> processed{0};
-    // std::atomic<bool> finished{false};
     std::atomic<std::size_t> activeWorkers{threadCount};
 
     const auto started = std::chrono::steady_clock::now();
-
-    const std::size_t perThread = corpus.size() / threadCount;
+    const std::size_t perThread = corpus->size() / threadCount;
 
     std::vector<std::thread> workers;
     workers.reserve(threadCount);
 
     for (std::size_t index = 0; index < threadCount; ++index) {
         workers.emplace_back([&, index] {
-            const std::size_t from = index * perThread;
-            const std::size_t to = (index + 1 == threadCount) ? corpus.size() : from + perThread;
+            // An exception escaping a std::thread body calls std::terminate,
+            // so nothing may propagate out of here.
+            try {
+                const std::size_t from = index * perThread;
+                const std::size_t to = (index + 1 == threadCount) ? corpus->size() : from + perThread;
 
-            WorkerContext context(model.getConfig(), trainConfig.seed + index * 7919 + 1);
+                WorkerContext context(modelConfig, trainConfig.seed + index * 7919 + 1);
 
-            double learningRate = model.getLearningRateForStep(0, total);
-            std::size_t sinceSync = 0;
+                double learningRate = model->getLearningRateForStep(0, total);
+                std::size_t sinceSync = 0;
 
-            for (std::size_t epoch = 0; epoch < trainConfig.epochs; ++epoch) {
-                GeneratePairs(corpus, subsampler, windowSampler, context.rng, [&](const Pair& pair) {
-                    model.trainPair(pair, learningRate, negativeSampler, context);
+                const auto keepGoing = [this] {
+                    return !stopRequested.load(std::memory_order_relaxed);
+                };
 
-                    if (++sinceSync < trainConfig.syncEvery) {
-                        return;
-                    }
-                    const auto done = processed.fetch_add(sinceSync, std::memory_order_relaxed) + sinceSync;
-                    sinceSync = 0;
-                    learningRate = model.getLearningRateForStep(done, total);
-                }, trainConfig.chunkSize, from, to);
+                for (std::size_t epoch = 0; epoch < trainConfig.epochs && keepGoing(); ++epoch) {
+                    GeneratePairsWhile(*corpus, subsampler, windowSampler, context.rng,
+                        [&](const Pair& pair) {
+                            model->trainPair(pair, learningRate, negativeSampler, context);
+
+                            if (++sinceSync < trainConfig.syncEvery) {
+                                return;
+                            }
+                            const auto done =
+                                processed.fetch_add(sinceSync, std::memory_order_relaxed) + sinceSync;
+                            sinceSync = 0;
+                            learningRate = model->getLearningRateForStep(done, total);
+                        },
+                        keepGoing, trainConfig.chunkSize, from, to);
+                }
+
+                processed.fetch_add(sinceSync, std::memory_order_relaxed);
+            } catch (...) {
+                const std::lock_guard<std::mutex> lock(exceptionMutex);
+                if (!workerException) {
+                    workerException = std::current_exception();
+                }
+                stopRequested.store(true, std::memory_order_relaxed);
             }
-
-            processed.fetch_add(sinceSync, std::memory_order_relaxed);
             activeWorkers.fetch_sub(1, std::memory_order_release);
         });
     }
+
+    // Monitor loop. The sleep is sliced so that requestStop() and normal
+    // completion are both noticed promptly: a single sleep of reportEveryMs
+    // (3s by default) would stall a GUI closing its tab for that long.
+    constexpr auto slice = std::chrono::milliseconds(50);
+    const auto reportEvery = std::chrono::milliseconds(trainConfig.reportEveryMs);
 
     std::size_t lastProcessed = 0;
     auto lastReport = started;
 
     while (activeWorkers.load(std::memory_order_acquire) > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(trainConfig.reportEveryMs));
+        std::this_thread::sleep_for(std::min(slice, reportEvery));
 
         const auto now = std::chrono::steady_clock::now();
+        if (now - lastReport < reportEvery) {
+            continue;
+        }
+
         const auto done = processed.load(std::memory_order_relaxed);
 
+        TrainProgress progress;
         const double windowSeconds = std::chrono::duration<double>(now - lastReport).count();
-        const double elapsed = std::chrono::duration<double>(now - started).count();
-        const double rate = windowSeconds > 0. ? (done - lastProcessed) / windowSeconds : 0.;
-        const double progress = total > 0 ? std::min(1., 1. * done / total) : 0.;
-        const double remaining = rate > 0. && total > done ? (total - done) / rate : 0.;
+        progress.elapsedSeconds = std::chrono::duration<double>(now - started).count();
+        progress.pairsDone = done;
+        progress.pairsTotal = total;
+        progress.pairsPerSecond = windowSeconds > 0.
+            ? static_cast<double>(done - lastProcessed) / windowSeconds
+            : 0.;
+        progress.progress = total > 0 ? std::min(1., static_cast<double>(done) / total) : 0.;
+        progress.etaSeconds = progress.pairsPerSecond > 0. && total > done
+            ? static_cast<double>(total - done) / progress.pairsPerSecond
+            : 0.;
+        progress.learningRate = model->getLearningRateForStep(done, total);
+        progress.loss = MeanProbeLoss(*model, probes);
 
         lastProcessed = done;
         lastReport = now;
 
-        std::cout << std::fixed << std::setprecision(1)
-                  << std::setw(5) << 100. * progress << "%"
-                  << "  pairs " << std::setw(12) << done
-                  << "  lr " << std::scientific << std::setprecision(3)
-                  << model.getLearningRateForStep(done, total)
-                  << "  loss " << std::fixed << std::setprecision(4)
-                  << MeanProbeLoss(model, probes)
-                  << "  " << std::setprecision(0) << rate / 1000. << "k pairs/s"
-                  << "  eta " << remaining << "s"
-                  << "  elapsed " << elapsed << "s\n";
+        summary.history.push_back(progress);
+        if (progressCallback) {
+            progressCallback(progress);
+        }
+        PrintTrainProgress(log(), progress);
     }
 
     for (auto& worker : workers) {
         worker.join();
     }
 
-    const auto done = processed.load(std::memory_order_relaxed);
-    const double elapsed =
+    if (workerException) {
+        std::rethrow_exception(workerException);
+    }
+
+    summary.pairsDone = processed.load(std::memory_order_relaxed);
+    summary.elapsedSeconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    summary.pairsPerSecond = summary.elapsedSeconds > 0.
+        ? static_cast<double>(summary.pairsDone) / summary.elapsedSeconds
+        : 0.;
+    summary.finalLoss = MeanProbeLoss(*model, probes);
+    summary.stopped = stopRequested.load(std::memory_order_relaxed);
 
-    std::cout << "\ndone: " << done << " pairs in " << std::fixed << std::setprecision(1)
-              << elapsed << "s (" << done / elapsed / 1000. << "k pairs/s)\n";
-    std::cout << "estimate was " << total << ", ratio "
-              << std::setprecision(3) << 1. * done / total << '\n';
-    std::cout << "final loss: " << std::setprecision(4) << MeanProbeLoss(model, probes) << '\n';
+    PrintTrainSummary(log(), summary);
+    return summary;
 }
 
-}
+}  // namespace Words

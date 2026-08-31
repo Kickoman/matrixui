@@ -69,6 +69,7 @@ Images are loaded at 28×28 pixels and flattened to a 784-element input vector.
 ## Documentation
 
 - [Building](docs/building.md) — CMake options, build targets, dependencies
+- [Word embeddings](docs/words.md) — SGNS pipeline, module layout, CLI reference
 - [Classifier](docs/classifier.md) — Training and inference CLI reference
 - [GAN](docs/gan.md) — GAN training and image generation CLI reference
 - [Hyperparameters](docs/hyperparameters.md) — Learning rate schedules, architecture guidance, GAN stability tricks

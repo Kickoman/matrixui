@@ -346,3 +346,7 @@ experiments/*
 
 .venv
 .vscode
+
+### MatrixGui golden-test scratch ###
+# Artifacts rebuilt by tests/golden/capture.sh on every run.
+tests/golden/expected/_work/

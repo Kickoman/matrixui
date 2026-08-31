@@ -1,3 +1,4 @@
+#include "core/words/error.h"
 #include "core/words/evaluate.h"
 
 #include "core/words/vocabulary.h"
@@ -7,7 +8,6 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -146,7 +146,7 @@ AnalogyReport EvaluateAnalogies(
 ) {
     std::ifstream file(path);
     if (!file) {
-        throw std::runtime_error("cannot open " + path.string());
+        throw IoError("cannot open " + path.string());
     }
 
     AnalogyReport report;
@@ -255,31 +255,6 @@ AnalogyReport EvaluateAnalogies(
 }
 
 
-void PrintAnalogyReport(const AnalogyReport& report) {
-    auto printRow = [](const AnalogyStats& stats) {
-        std::cout << "  " << std::setw(28) << std::left << stats.name << std::right
-                  << std::setw(7) << stats.asked
-                  << std::setw(7) << stats.skipped
-                  << std::setw(9) << std::fixed << std::setprecision(2)
-                  << 100. * stats.accuracyAdd()
-                  << std::setw(9) << 100. * stats.accuracyMul() << '\n';
-    };
-
-    std::cout << "  " << std::setw(28) << std::left << "category" << std::right
-              << std::setw(7) << "asked" << std::setw(7) << "skip"
-              << std::setw(9) << "3CosAdd" << std::setw(9) << "3CosMul" << '\n';
-
-    for (const auto& category : report.categories) {
-        printRow(category);
-    }
-
-    std::cout << '\n';
-    printRow(report.semantic);
-    printRow(report.syntactic);
-    printRow(report.overall);
-}
-
-
 SimilarityReport EvaluateSimilarity(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
@@ -288,7 +263,7 @@ SimilarityReport EvaluateSimilarity(
 ) {
     std::ifstream file(path);
     if (!file) {
-        throw std::runtime_error("cannot open " + path.string());
+        throw IoError("cannot open " + path.string());
     }
 
     SimilarityReport report;
@@ -335,15 +310,6 @@ SimilarityReport EvaluateSimilarity(
     report.pearson = PearsonOf(human, model);
     report.spearman = PearsonOf(RanksOf(human), RanksOf(model));
     return report;
-}
-
-
-void PrintSimilarityReport(const std::string& name, const SimilarityReport& report) {
-    std::cout << "  " << std::setw(16) << std::left << name << std::right
-              << "pairs " << std::setw(5) << report.asked
-              << "  skipped " << std::setw(5) << report.skipped
-              << "  spearman " << std::fixed << std::setprecision(4) << report.spearman
-              << "  pearson " << report.pearson << '\n';
 }
 
 }

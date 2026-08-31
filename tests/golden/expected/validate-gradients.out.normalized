@@ -1,0 +1,46 @@
+=== Model init ===
+vocab: 1400, dim: 100
+memory: 1 MB
+
+output all zero:  passed
+input mean:       1.794e-06  (expected ~0)
+input stddev:     2.889e-03  (expected 2.887e-03)
+input max |x|:    5.000e-03  (bound 5.000e-03)
+bound respected:  passed
+rows distinct:    passed
+initial score:    0.000e+00  (must be exactly 0)
+
+learning rate schedule:
+  0.00 -> 2.50e-02
+  0.25 -> 1.88e-02
+  0.50 -> 1.25e-02
+  0.75 -> 6.25e-03
+  1.00 -> 2.50e-06
+
+=== Gradient check ===
+      matrix     row  comp      analytic       numeric     rel.err
+     W_in[c]       7     0    2.7286e-02    2.7403e-02  4.2800e-03
+     W_in[c]       7     1    9.8571e-03    9.9010e-03  4.4304e-03
+     W_in[c]       7     2   -5.1156e-02   -5.1375e-02  4.2649e-03
+    W_out[o]      42     0    1.4726e-02    1.4721e-02  3.2562e-04
+    W_out[o]      42     1    4.9057e-03    4.9043e-03  2.9550e-04
+    W_out[o]      42     2   -2.8668e-02   -2.8658e-02  3.3326e-04
+   W_out[n0]      13     0   -1.4637e-02   -1.4723e-02  5.8683e-03
+   W_out[n0]      13     1   -4.8764e-03   -4.9049e-03  5.8075e-03
+   W_out[n0]      13     2    2.8495e-02    2.8662e-02  5.8323e-03
+   W_out[n2]     999     0   -1.4637e-02   -1.4723e-02  5.8728e-03
+   W_out[n2]     999     1   -4.8764e-03   -4.9049e-03  5.8114e-03
+   W_out[n2]     999     2    2.8495e-02    2.8662e-02  5.8363e-03
+
+worst relative error: 5.8728e-03  passed
+
+=== Loss behaviour ===
+initial loss:  4.158883   expected 4.158883  passed
+
+overfitting a single pair:
+  step  10:  4.157220
+  step  20:  4.152983
+  step  30:  4.139514
+  step  40:  4.096032
+  step  50:  3.959744
+monotone decrease: passed
