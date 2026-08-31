@@ -92,6 +92,13 @@ set(
     # Generator
     core/generator/trainer.cpp
 
+    # Words
+    core/words/utils/inspect.cpp
+    core/words/vocabulary.cpp
+    core/words/corpus.cpp
+    core/words/subsampler.cpp
+    core/words/negativesampler.cpp
+
     # Other
     matrix/matrix.cpp
     png/pngreader.cpp
@@ -142,6 +149,13 @@ if(BUILD_CLI)
         core/main_headless_gan.cpp
     )
 
+    add_executable(
+        ${PROJECT_NAME}_words
+        ${CORE_SOURCES}
+        core/main_words.cpp
+    )
+
     target_include_directories(${PROJECT_NAME}_headless PUBLIC contrib)
     target_include_directories(${PROJECT_NAME}_gan PUBLIC contrib)
+    target_include_directories(${PROJECT_NAME}_words PUBLIC contrib)
 endif()
