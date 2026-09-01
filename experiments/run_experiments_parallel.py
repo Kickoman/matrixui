@@ -48,8 +48,8 @@ BINARY = "./MatrixGui_headless"
 # Base arguments AFTER the binary (no --network here; it is added per run).
 BASE_ARGS = [
     "train",
-    "--train-dataset", os.path.expanduser("~/Documents/projects/mnist-pngs/train"),
-    "--test-dataset", os.path.expanduser("~/Documents/projects/mnist-pngs/test"),
+    "--train-dataset", os.path.expanduser("~/Documents/Personal/fashion-png-numeric/train"),
+    "--test-dataset", os.path.expanduser("~/Documents/Personal/fashion-png-numeric/test"),
 ]
 
 # Default values for the learning config JSON (overridden where listed in PARAM_GRID)
@@ -59,7 +59,7 @@ BASE_CONFIG = {
     "initialLearningRate": 0.001,
     "innerEpochs": 1,
     "learningRateDecay": 0.8,
-    "maxEpochs": 500,           # kept constant (as requested)
+    "maxEpochs": 100,           # kept constant (as requested)
     "minLearningRate": 0.0001,
     "patience": 5
 }
@@ -69,17 +69,17 @@ PARAM_GRID = {
     "layers": [
         "784,10",
         "784,50,10",
-        "784,100,10",
         "784,256,10",
         "784,256,70,10",
         "784,512,128,10",
-        "784,256,128,64,10"
+        "784,256,128,64,10",
+        "784,256,500,256,10",
     ],
     # "initialLearningRate": [0.005, 0.01, 0.001],
     # "dropoutRate": [0.0, 0.1, 0.2],
     # "patience": [5, 10],
     # "learningRateDecay": [0.5, 0.8, 0.9],
-    "datasetLimitPerLabel": [100, 500, 1000, 4000]
+    # "datasetLimitPerLabel": [100, 500, 1000, 4000]
 }
 
 SUMMARY_CSV = "experiment_results.csv"
