@@ -140,7 +140,10 @@ picker) with three sub-tabs sharing one terminal:
   corpus, train with live probe-loss and speed charts, save/load embeddings.
 - **Explore** — neighbours, the default battery, vector expressions,
   odd-one-out and axis projection. Results print into the terminal through the
-  same `report/` functions the CLI uses, so the output is identical.
+  same `report/` functions the CLI uses, so the output is identical. A model
+  trained elsewhere is loaded right on this tab: Load vocabulary…, then Load
+  embeddings… (embeddings are indexed by the vocabulary's word ids, so the
+  vocabulary comes first).
 - **Evaluate** — analogy and similarity datasets. Analogy evaluation runs on a
   worker thread and cannot be cancelled once started.
 

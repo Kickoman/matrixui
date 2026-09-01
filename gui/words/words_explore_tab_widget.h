@@ -4,6 +4,7 @@
 
 #include <QWidget>
 
+class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
@@ -19,6 +20,10 @@ public:
 
 private:
     WordsController* controller = nullptr;
+
+    QLabel* statusLabel = nullptr;
+    QPushButton* loadVocabularyButton = nullptr;
+    QPushButton* loadEmbeddingsButton = nullptr;
 
     QLineEdit* neighboursWordEdit = nullptr;
     QSpinBox* neighboursCountSpin = nullptr;

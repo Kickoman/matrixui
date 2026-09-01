@@ -1,7 +1,9 @@
 #include "gui/words/words_explore_tab_widget.h"
 
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSpinBox>
@@ -10,6 +12,12 @@
 WordsExploreTabWidget::WordsExploreTabWidget(QWidget* parent)
     : QWidget(parent)
 {
+    // A model trained elsewhere is loaded right here, so someone who came only
+    // to explore does not have to discover the Data & Training tab first.
+    statusLabel = new QLabel(this);
+    loadVocabularyButton = new QPushButton("Load vocabulary...", this);
+    loadEmbeddingsButton = new QPushButton("Load embeddings...", this);
+
     neighboursWordEdit = new QLineEdit(this);
     neighboursWordEdit->setPlaceholderText("king");
     neighboursCountSpin = new QSpinBox(this);
@@ -74,15 +82,45 @@ WordsExploreTabWidget::WordsExploreTabWidget(QWidget* parent)
     rightColumn->addLayout(axisForm);
     rightColumn->addStretch();
 
-    auto* layout = new QHBoxLayout();
-    layout->addLayout(leftColumn);
-    layout->addLayout(rightColumn);
+    auto* modelRow = new QHBoxLayout();
+    modelRow->addWidget(loadVocabularyButton);
+    modelRow->addWidget(loadEmbeddingsButton);
+    modelRow->addWidget(statusLabel, 1);
+
+    auto* columns = new QHBoxLayout();
+    columns->addLayout(leftColumn);
+    columns->addLayout(rightColumn);
+
+    auto* layout = new QVBoxLayout();
+    layout->addLayout(modelRow);
+    layout->addLayout(columns);
     setLayout(layout);
 }
 
 void WordsExploreTabWidget::setController(WordsController* newController)
 {
     controller = newController;
+
+    connect(loadVocabularyButton, &QPushButton::clicked, [this] {
+        const auto path = QFileDialog::getOpenFileName(
+            this, "Load vocabulary", controller->getInfo().vocabularyPath,
+            "Vocabulary (*.voc);;All files (*)");
+        if (path.isEmpty()) {
+            return;
+        }
+        controller->setVocabularyPath(path);
+        controller->loadVocabulary();
+    });
+    connect(loadEmbeddingsButton, &QPushButton::clicked, [this] {
+        const auto path = QFileDialog::getOpenFileName(
+            this, "Load embeddings", controller->getInfo().embeddingsPath,
+            "Embeddings (*.emb);;All files (*)");
+        if (path.isEmpty()) {
+            return;
+        }
+        controller->setEmbeddingsPath(path);
+        controller->loadEmbeddings();
+    });
 
     connect(neighboursButton, &QPushButton::clicked, [this] {
         controller->queryNeighbours(neighboursWordEdit->text(), neighboursCountSpin->value());
@@ -109,6 +147,21 @@ void WordsExploreTabWidget::setController(WordsController* newController)
 
 void WordsExploreTabWidget::updateInfo(const WordsController::Info& info)
 {
+    const bool idle = !info.busy;
+    loadVocabularyButton->setEnabled(idle);
+    loadEmbeddingsButton->setEnabled(idle && info.hasVocabulary);
+
+    if (info.hasIndex) {
+        statusLabel->setText(QString("Model ready: %1 words, dim %2")
+            .arg(info.vocabularySize).arg(info.embeddingDim));
+    } else if (info.hasVocabulary) {
+        statusLabel->setText(QString("Vocabulary loaded (%1 words) -- now load embeddings")
+            .arg(info.vocabularySize));
+    } else {
+        statusLabel->setText(
+            "No model -- load a vocabulary and embeddings, or train one on Data & Training");
+    }
+
     // Deliberately not gated on info.busy: the index is an immutable snapshot
     // only swapped on the GUI thread, so querying while a background task runs
     // is coherent.
