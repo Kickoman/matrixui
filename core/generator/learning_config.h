@@ -6,34 +6,24 @@
 namespace Neural {
 namespace GAN {
 
-/*
-    TIPS
-
-    Keep **discriminator** learning rate lower than **generator** learning rate,
-    because discriminator converges faster
-
-*/
-
-// Adaptive learning rate: dynamically adjusts dLr and gLr each epoch based
-// on EMA-smoothed D(real) and D(G(z)) to counteract discriminator or
-// generator domination. Off by default — existing behaviour unchanged.
+// Adjusts dLr and gLr each epoch based on EMA-smoothed D(real) and D(G(z)),
+// to counteract discriminator or generator domination.
 struct AdaptiveLrConfig {
     bool enabled = false;
     double lrEmaAlpha = 0.9;
-    double dRealTargetLow = 0.30;
-    double dRealTargetHigh = 0.80;
-    double dFakeTargetLow = 0.30;
-    double dFakeTargetHigh = 0.60;
+    double dRealTargetLow = 0.30;    // D(real) below this => D collapsed
+    double dRealTargetHigh = 0.80;   // D(real) above this => D dominating
+    double dFakeTargetLow = 0.30;    // D(G(z)) below this => D dominating
+    double dFakeTargetHigh = 0.60;   // D(G(z)) above this => G dominating
     double lrAdjustFactor = 1.05;
     double lrMin = 1e-6;
     double lrMax = 1e-2;
     std::size_t lrWarmupEpochs = 5;
 };
 
-// Flatness detection: when both EMA signals are barely moving for
-// flatnessWindow consecutive epochs, apply a kick to escape the plateau.
-// Kick = raise D dropout + spike G lr for flatnessKickDuration epochs,
-// then restore. Adaptive lr is suspended during the kick. Off by default.
+// When both EMA signals are barely moving for `window` consecutive epochs,
+// kick to escape the plateau: raise D dropout and spike G lr for
+// `kickDuration` epochs, then restore. Adaptive lr is suspended during a kick.
 struct FlatnessDetectionConfig {
     bool enabled = false;
     double threshold = 0.005; // Max |ema_delta| per epoch to count as flat
@@ -98,5 +88,5 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
     flatnessDetection
 );
 
-} // namespace GAN
-} // namespace Neural
+}  // namespace GAN
+}  // namespace Neural

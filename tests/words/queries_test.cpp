@@ -1,10 +1,8 @@
-// Tests for the algorithms that used to exist only inside print functions.
-
 #include <doctest/doctest.h>
 
-#include "core/words/queries.h"
-#include "core/words/similarity.h"
-#include "core/words/vocabulary.h"
+#include "core/words/query/queries.h"
+#include "core/words/query/similarity.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 
 #include <cmath>
@@ -22,7 +20,7 @@ struct Fixture {
     Fixture() : vocabulary(Tests::ToyVocabulary(dir, 1)), index(Build()) {}
 
     // Unit vectors at known angles; ids follow the toy vocabulary
-    // (a, b, c, d, f, e -- the e/f tie resolves to f -> 4, e -> 5).
+    // (a, b, c, d, e, f -- the e/f count tie breaks alphabetically).
     static EmbeddingIndex Build() {
         constexpr std::size_t words = 6;
         constexpr std::size_t dim = 2;
@@ -189,14 +187,6 @@ TEST_CASE("DefaultBatteryWords is the list the battery actually queries") {
     for (const auto& neighbours : report.neighbours) {
         CHECK_FALSE(neighbours.status.ok);
     }
-}
-
-TEST_CASE("SplitWords lowercases and splits on whitespace") {
-    const auto words = SplitWords("  King   MAN\twoman ");
-    REQUIRE(words.size() == 3);
-    CHECK(words[0] == "king");
-    CHECK(words[1] == "man");
-    CHECK(words[2] == "woman");
 }
 
 TEST_CASE("Normalized scales a vector to unit length") {

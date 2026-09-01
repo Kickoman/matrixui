@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include "core/words/corpus.h"
-#include "core/words/vocabulary.h"
+#include "core/words/data/corpus.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 #include "tests/support/temp_dir.h"
 

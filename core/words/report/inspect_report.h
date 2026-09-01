@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/words/utils/inspect.h"
+#include "core/words/data/inspect.h"
 
 #include <iosfwd>
 

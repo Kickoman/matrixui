@@ -124,14 +124,13 @@ int runPredictImage(
     return 0;
 }
 
-} // namespace
+}  // namespace
 
 
 int main(int argc, char** argv) {
     CLI::App app{"MatrixGui headless classifier CLI"};
     app.require_subcommand(1);
 
-    // ---- predict ----
     CLI::App* predictCmd = app.add_subcommand("predict", "Classify a single PNG image using a trained network");
 
     std::string predictNetworkPath;
@@ -146,13 +145,13 @@ int main(int argc, char** argv) {
         ->required()
         ->check(CLI::ExistingFile);
     predictCmd->add_option("--dataset-img-width", imageWidth, "Width of test images in pixels.")
+        ->group("Dataset")
         ->capture_default_str();
     predictCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
         ->group("Dataset")
         ->capture_default_str();
 
 
-    // ---- train ----
     CLI::App* trainCmd = app.add_subcommand("train", "Train (or continue training) a classifier network on a directory dataset");
 
     std::string trainNetworkPath;
@@ -165,10 +164,8 @@ int main(int argc, char** argv) {
     netConfig.layersSizes = {28 * 28, 50, 20, 10};
     std::size_t testFileLimit = 0;
 
-    // --learning-config/--network-config load their respective structs from JSON files (as
-    // written by this command's own config dump) before the per-field options below are
-    // registered, so the loaded values become the new defaults: any per-field flag passed on
-    // the command line still overrides just that field.
+    // Loaded before the per-field options are registered, so a config file supplies
+    // the new defaults and a per-field flag still overrides just that field.
     const auto findOptionValue = [argc, argv](const std::string& flag) -> std::string {
         const std::string eqPrefix = flag + "=";
         for (int i = 1; i < argc; ++i) {
@@ -280,7 +277,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    // *trainCmd
     std::string trainingPath = !trainDatasetPath.empty() ? trainDatasetPath : datasetPath;
     std::string testingPath  = !testDatasetPath.empty()  ? testDatasetPath  : datasetPath;
 
@@ -368,7 +364,6 @@ int main(int argc, char** argv) {
     const auto currentWorkingPath = std::filesystem::path(workingDirectoryPath) / currentRunDirectoryName;
     std::filesystem::create_directories(currentWorkingPath);
 
-    // Save configs
     {
         std::ofstream learningConfigDump(currentWorkingPath / "learning-config.json");
         std::ofstream neuralNetworkConfigDump(currentWorkingPath / "network-config.json");

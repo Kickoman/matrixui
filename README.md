@@ -1,21 +1,30 @@
 # MatrixGui
 
-Neural network tooling for handwritten digit recognition and generation. The project ships a Qt-based GUI and headless CLI tools for training and inference without a display.
+Neural network tooling built from scratch, for learning how neural networks
+actually work. It covers handwritten digit recognition and generation plus word
+embeddings, and ships both a Qt desktop application and headless CLI tools that
+train and run inference without a display.
+
+**This is not a production solution.** It is a study project: an attempt to build
+a framework for models, training and inference from nothing.
 
 ## Modes
 
-| Mode | GUI tab | CLI binary | Description |
-|------|---------|------------|-------------|
-| Classifier | Classifier | `MatrixGui_headless` | Train a network to classify digits 0–9 |
-| Recognizer | Recognizer | `MatrixGui_headless --predict-image` | Draw or load a digit and classify it |
-| Generator (GAN) | Generator | `MatrixGui_gan` | Train a conditional GAN and generate synthetic digit images |
-| Words | Words | `MatrixGui_words` | Train SGNS word embeddings and explore them (neighbours, analogies, evaluation) |
+| Mode | CLI binary | Description |
+|------|------------|-------------|
+| Classifier | `MatrixGui_headless train` | Train a network to classify images into N labelled classes (digits 0–9 in the shipped examples) |
+| Recognizer | `MatrixGui_headless predict` | Draw or load an image and classify it |
+| Generator (GAN) | `MatrixGui_gan` | Train a conditional GAN and generate synthetic digit images |
+| Words | `MatrixGui_words` | Train SGNS word embeddings and explore them (neighbours, analogies, evaluation) |
+
+All four are also available as modes in the GUI.
 
 ## Quick start
 
 **Build everything:**
 
 ```bash
+git submodule update --init
 cmake -B build
 cmake --build build
 ```
@@ -23,7 +32,7 @@ cmake --build build
 **Train a classifier:**
 
 ```bash
-./build/MatrixGui_headless \
+./build/MatrixGui_headless train \
   --network models/digits.wgt \
   --dataset /path/to/mnist_split
 ```
@@ -31,15 +40,15 @@ cmake --build build
 **Classify a single image:**
 
 ```bash
-./build/MatrixGui_headless \
+./build/MatrixGui_headless predict \
   --network models/digits.wgt \
-  --predict-image samples/seven.png
+  --image samples/seven.png
 ```
 
 **Train a GAN** (requires a trained classifier):
 
 ```bash
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/mnist_split
 ```
@@ -47,15 +56,26 @@ cmake --build build
 **Generate digit images:**
 
 ```bash
-./build/MatrixGui_gan \
-  --generate --label 7 \
+./build/MatrixGui_gan generate \
+  --label 7 \
   --generator models/generator.wgt \
   --output samples/seven.png
 ```
 
+**Train word embeddings:**
+
+```bash
+./build/MatrixGui_words buildvoc --input-file corpus.txt --output-file built.voc
+./build/MatrixGui_words buildcor --input-file corpus.txt --vocabulary built.voc --output-file built.cor
+./build/MatrixGui_words train --vocabulary built.voc --corpus built.cor --output-file emb.bin
+./build/MatrixGui_words neighbours --vocabulary built.voc --embeddings emb.bin --word king
+```
+
 ## Dataset layout
 
-Training and testing expect a root directory whose immediate subdirectories are named `0` through `9`, each containing PNG images of that digit class:
+Training and testing expect a root directory whose immediate subdirectories are
+named `0` through `N-1`, where `N` is the network's output size, each containing
+PNG images of that class:
 
 ```
 data/mnist_split/
@@ -65,17 +85,24 @@ data/mnist_split/
   9/  *.png
 ```
 
-Images are loaded at 28×28 pixels and flattened to a 784-element input vector.
+Images are read at 28×28 pixels by default and flattened into a single input
+vector of 784 elements. Both dimensions are configurable with
+`--dataset-img-width` and `--dataset-img-height`, as long as `width × height`
+matches the network's input layer.
 
 ## Documentation
 
-- [Building](docs/building.md) — CMake options, build targets, dependencies
-- [Word embeddings](docs/words.md) — SGNS pipeline, module layout, CLI reference
+- [Building](docs/building.md) — CMake options, build targets, dependencies, tests
 - [Classifier](docs/classifier.md) — Training and inference CLI reference
 - [GAN](docs/gan.md) — GAN training and image generation CLI reference
+- [Word embeddings](docs/words.md) — SGNS pipeline, module layout, CLI reference
 - [Hyperparameters](docs/hyperparameters.md) — Learning rate schedules, architecture guidance, GAN stability tricks
+- [GUI](docs/gui.md) — The desktop application: modes, threading, the shared terminal
 
 ---
+
+<details>
+<summary><b>Pa-biełarusku (Łacinka)</b></summary>
 
 # MatrixGUI
 
@@ -86,17 +113,21 @@ Tut jość nabor klasaŭ dlia vykarystańńia ŭ svaich pragramach, jość versi
 
 ## Režymy
 
-| Režym | Kartka interfejsu | Binarnik CLI | Apisańnie |
-|------|---------|------------|-------------|
-| Klasifikatar | Classifier | `MatrixGui_headless` | Navučaje madeĺ dlia klasifikacyi ličbaŭ ad 1 da 9 |
-| Raspaznavaĺnik | Recognizer | `MatrixGui_headless --predict-image` | Klasifikuje zadadzienuju vyjavu (z fajlu) |
-| Generatar GAN | Generator | `MatrixGui_gan` | Navučaje cGAN-madeĺ i generuje syntetyčnyja vyjavy ličbaŭ |
+| Režym | Binarnik CLI | Apisańnie |
+|-------|--------------|-----------|
+| Klasifikatar | `MatrixGui_headless train` | Navučaje madeĺ dlia klasifikacyi vyjavaŭ pa N klasach (ličby ad 0 da 9 u prykładach) |
+| Raspaznavaĺnik | `MatrixGui_headless predict` | Klasifikuje zadadzienuju vyjavu (z fajlu) |
+| Generatar GAN | `MatrixGui_gan` | Navučaje cGAN-madeĺ i generuje syntetyčnyja vyjavy ličbaŭ |
+| Słovy | `MatrixGui_words` | Navučaje viektarnyja pradstaŭleńni słovaŭ (SGNS) i dazvalaje ich dasledavać |
+
+Usie čatyry režymy dostupnyja taksama ŭ grafičnym interfejsie.
 
 ## Chutki start
 
 **Zborka ŭsiaho prajektu:**
 
 ```bash
+git submodule update --init
 cmake -B build
 cmake --build build
 ```
@@ -104,19 +135,19 @@ cmake --build build
 **Navučyć ulasny klasifikatar:**
 
 ```bash
-./build/MatrixGui_headless \
-  --network models/digits.wgt \  # vaš šliach da novaj madeli
+./build/MatrixGui_headless train \
+  --network models/digits.wgt \
   --dataset /path/to/dataset
 ```
 
-Pra farmat datasetu hliadzi nižej.
+Dzie `--network` — heta vaš šliach da novaj madeli. Pra farmat datasetu hliadzi nižej.
 
 **Klasifikavać (raspaznać) vyjavu:**
 
 ```bash
-./build/MatrixGui_headless \
+./build/MatrixGui_headless predict \
   --network models/digits.wgt \
-  --predict-image samples/seven.png
+  --image samples/seven.png
 ```
 
 **Navučyć generatar (GAN)**:
@@ -124,7 +155,7 @@ Pra farmat datasetu hliadzi nižej.
 Patrabuje navučany klasifikatar!
 
 ```bash
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/mnist_split
 ```
@@ -132,15 +163,24 @@ Patrabuje navučany klasifikatar!
 **Zgeneravać vyjavu ličby:**
 
 ```bash
-./build/MatrixGui_gan \
-  --generate --label 7 \
+./build/MatrixGui_gan generate \
+  --label 7 \
   --generator models/generator.wgt \
   --output samples/seven.png
 ```
 
+**Navučyć viektarnyja pradstaŭleńni słovaŭ:**
+
+```bash
+./build/MatrixGui_words buildvoc --input-file corpus.txt --output-file built.voc
+./build/MatrixGui_words buildcor --input-file corpus.txt --vocabulary built.voc --output-file built.cor
+./build/MatrixGui_words train --vocabulary built.voc --corpus built.cor --output-file emb.bin
+./build/MatrixGui_words neighbours --vocabulary built.voc --embeddings emb.bin --word king
+```
+
 ## Farmat datasetu
 
-Navučaĺny i testavy dataset musić być dyrektoryjaj, čyje niepasrednyja pad-dyrektoryi nazvanyja ad `0` da `9`, kožnaja ź jakich utrymoŭvaje PNG-vyjavy adpaviednaj ličby:
+Navučaĺny i testavy dataset musić być dyrektoryjaj, čyje niepasrednyja pad-dyrektoryi nazvanyja ad `0` da `N-1`, dzie `N` — pamier vyjściovaha słoja sietki. Kožnaja ź ich utrymoŭvaje PNG-vyjavy adpaviednaha kłasu:
 
 ```
 data/mnist_split/
@@ -150,11 +190,15 @@ data/mnist_split/
   9/  *.png
 ```
 
-Vyjavy čakajucca ŭ pamiery 28x28 pikseliaŭ, jakija potym transfarmujucca va ŭvachodny adnamierny vektar pamieram u 784 elementy.
+Pa zmoŭčańni vyjavy čytajucca ŭ pamiery 28×28 pikseliaŭ i transfarmujucca va ŭvachodny adnamierny vektar pamieram u 784 elementy. Abodva pamiery naładžvajucca praz `--dataset-img-width` i `--dataset-img-height` — hałoŭnaje, kab `šyrynia × vyšynia` supadała z uvachodnym słojem sietki.
 
 ## Dakumentacyja (pa-angieĺsku)
 
-- [Zborka](docs/building.md) — opcyi CMake, mety zborki, zaliežnaści
+- [Zborka](docs/building.md) — opcyi CMake, mety zborki, zaliežnaści, testy
 - [Klasifikatar](docs/classifier.md) — apisańnie navučańnia i inferensu ŭtylitaj kamandnaha radku
 - [GAN](docs/gan.md) — navučańnie GAN i generacyja vyjaŭ utylitaj kamandnaha radku
-- [Hiperparametry](docs/hyperparameters.md) — rasklad uzroŭniu navyčańnia (learning rate), dapamožnik pa architektury, parady dlia stabilizacyi GAN
+- [Viektarnyja pradstaŭleńni słovaŭ](docs/words.md) — kanvejer SGNS, struktura moduliaŭ, apisańnie CLI
+- [Hiperparametry](docs/hyperparameters.md) — rasklad uzroŭniu navučańnia (learning rate), dapamožnik pa architektury, parady dlia stabilizacyi GAN
+- [Grafičny interfejs](docs/gui.md) — režymy, patoki, supolny terminał
+
+</details>

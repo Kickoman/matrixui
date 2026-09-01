@@ -1,16 +1,5 @@
 #pragma once
 
-// The body of each subcommand.
-//
-// Every handler takes the stream to write to. Failures are reported by
-// throwing Words::Error (missing/broken files, impossible configs), which
-// main() turns into a message and a non-zero exit code; bad user input such as
-// an unknown word comes back as data inside the printed report and is not a
-// failure.
-//
-// These live outside CORE_SOURCES: that list is compiled into the Qt GUI too,
-// and there is no reason to pull CLI11 in there.
-
 #include "core/words_cli/options.h"
 
 #include <iosfwd>

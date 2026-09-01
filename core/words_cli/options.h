@@ -1,11 +1,5 @@
 #pragma once
 
-// One option struct per subcommand.
-//
-// main_words.cpp used to declare ~25 mutable locals shared by all fifteen
-// subcommands, so `--input-file` meant a different thing depending on which
-// one ran. Each command now binds to its own fields.
-
 #include "core/words/config.h"
 
 #include <cstddef>

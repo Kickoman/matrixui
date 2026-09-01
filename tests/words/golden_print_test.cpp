@@ -1,19 +1,15 @@
-// Characterization tests for the printing that is still wired directly to
-// std::cout inside core/words.
-//
-// These pin the CURRENT output byte for byte so the phase that moves printing
-// behind std::ostream& can be shown not to have changed anything. They are
-// deliberately brittle: when the output format is intentionally reworked, the
-// expected strings here are meant to be updated in the same commit.
+// These pin the printers' output byte for byte, and are deliberately brittle:
+// when the output format is intentionally reworked, the expected strings here
+// are meant to be updated in the same commit.
 
 #include <doctest/doctest.h>
 
-#include "core/words/evaluate.h"
-#include "core/words/queries.h"
+#include "core/words/query/evaluate.h"
+#include "core/words/query/queries.h"
 #include "core/words/report/evaluate_report.h"
 #include "core/words/report/query_report.h"
-#include "core/words/similarity.h"
-#include "core/words/vocabulary.h"
+#include "core/words/query/similarity.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/capture.h"
 #include "tests/support/fixtures.h"
 
@@ -25,11 +21,11 @@ using namespace Words;
 
 namespace {
 
-// Toy vocabulary (a, b, c, d, f, e by id) paired with unit vectors at fixed
+// Toy vocabulary (a, b, c, d, e, f by id) paired with unit vectors at fixed
 // angles, so every printed number is analytically determined.
 //
-// Note ids 4 and 5: "e" and "f" both occur twice, and the tie resolves to
-// f -> 4, e -> 5.
+// Ids 4 and 5: "e" and "f" both occur twice, and equal counts break
+// alphabetically, so e -> 4 and f -> 5.
 struct Fixture {
     Tests::TempDir dir;
     Vocabulary vocabulary;
@@ -99,8 +95,8 @@ TEST_CASE("PrintAnalogy output is stable") {
     CHECK(output ==
         "b - a + c:\n"
         "    d                 0.9296\n"
-        "    f                 0.6207\n"
-        "    e                 0.1456\n"
+        "    e                 0.6207\n"
+        "    f                 0.1456\n"
         "\n");
 }
 
@@ -130,13 +126,13 @@ TEST_CASE("RunExpression prints both 3CosAdd and 3CosMul for an analogy") {
         "\n"
         "  3CosAdd:\n"
         "    d                 0.9296\n"
-        "    f                 0.6207\n"
-        "    e                 0.1456\n"
+        "    e                 0.6207\n"
+        "    f                 0.1456\n"
         "\n"
         "  3CosMul:\n"
         "    d                 1.0205\n"
-        "    f                 0.8785\n"
-        "    e                 0.6554\n");
+        "    e                 0.8785\n"
+        "    f                 0.6554\n");
 }
 
 TEST_CASE("RunExpression reports an unparseable expression") {
@@ -194,9 +190,9 @@ TEST_CASE("RunAxis projects an explicit word list") {
     CHECK(output ==
         "axis: a - e\n"
         "\n"
-        "  +0.7660  b\n"
-        "  +0.5000  c\n"
-        "  +0.0000  d\n");
+        "  +0.5736  b\n"
+        "  +0.2588  c\n"
+        "  -0.2588  d\n");
 }
 
 TEST_CASE("RunAxis scans the vocabulary and prints both ends") {
@@ -212,12 +208,12 @@ TEST_CASE("RunAxis scans the vocabulary and prints both ends") {
         "axis: a - e\n"
         "\n"
         "  positive end:\n"
-        "  +0.8660  a\n"
-        "  +0.7660  b\n"
+        "  +0.7071  a\n"
+        "  +0.5736  b\n"
         "\n"
         "  negative end:\n"
-        "  -0.8660  e\n"
-        "  -0.5000  f\n");
+        "  -0.9659  f\n"
+        "  -0.7071  e\n");
 }
 
 TEST_CASE("PrintSimilarityReport output is stable") {

@@ -18,7 +18,7 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
 
     const bool resizeNecessary = targetHeight != height || targetWidth != width;
 
-    unsigned char* resized = img;  // by default, the image does not need recize
+    unsigned char* resized = img;
     if (resizeNecessary) {
         resized = new unsigned char[targetHeight * targetWidth];
         stbir_resize_uint8_linear(img, width, height, 0, resized, targetWidth, targetHeight, 0, STBIR_1CHANNEL);

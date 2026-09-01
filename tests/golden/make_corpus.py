@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate a deterministic synthetic corpus for golden/regression tests.
 
-Needs >= 1000 surviving words: the gradient/loss validators hardcode word ids
-up to 999 (Pair{7,42}, negatives {13,200,999}, warmup rng.nextInteger(1000)).
+Needs >= 1000 surviving words. Regenerating this file invalidates every
+expectation under tests/golden/expected/ -- see docs/words.md#tests.
 """
 import random
 

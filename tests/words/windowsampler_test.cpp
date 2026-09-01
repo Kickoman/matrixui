@@ -1,9 +1,9 @@
 #include <doctest/doctest.h>
 
 #include "core/lib/random.h"
-#include "core/words/subsampler.h"
-#include "core/words/vocabulary.h"
-#include "core/words/windowsampler.h"
+#include "core/words/train/subsampler.h"
+#include "core/words/data/vocabulary.h"
+#include "core/words/train/windowsampler.h"
 #include "tests/support/fixtures.h"
 
 #include <set>

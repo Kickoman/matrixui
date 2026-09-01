@@ -2,12 +2,12 @@
 
 #include "core/words/config_json.h"
 #include "core/words/error.h"
-#include "core/words/evaluate.h"
-#include "core/words/queries.h"
+#include "core/words/query/evaluate.h"
+#include "core/words/query/queries.h"
 #include "core/words/report/evaluate_report.h"
 #include "core/words/report/inspect_report.h"
 #include "core/words/report/query_report.h"
-#include "core/words/utils/inspect.h"
+#include "core/words/data/inspect.h"
 
 #include <QFileInfo>
 
@@ -94,7 +94,6 @@ std::ostream& WordsController::out()
     return std::cerr << "[controller] ";
 }
 
-// --- settings ---------------------------------------------------------------
 
 void WordsController::loadSettings()
 {
@@ -140,7 +139,6 @@ void WordsController::saveSettings()
     settings.setValue("words_config", QString::fromStdString(nlohmann::json(config).dump()));
 }
 
-// --- trivial state ----------------------------------------------------------
 
 void WordsController::setConfig(const Words::WordsConfig& value) { config = value; }
 void WordsController::setMinCount(const std::size_t value) { minCount = value; }
@@ -160,7 +158,6 @@ void WordsController::setEmbeddingsPath(const QString& path) { embeddingsPath = 
 void WordsController::setAnalogiesPath(const QString& path) { analogiesPath = path; emit infoUpdated(); }
 void WordsController::setSimilarityPath(const QString& path) { similarityPath = path; emit infoUpdated(); }
 
-// --- the single worker ------------------------------------------------------
 
 void WordsController::runTask(const QString& label, const bool isTraining, std::function<void()> task)
 {
@@ -201,7 +198,6 @@ void WordsController::requestStop()
     trainer.requestStop();
 }
 
-// --- data pipeline ----------------------------------------------------------
 
 void WordsController::inspectDump()
 {
@@ -309,7 +305,6 @@ void WordsController::loadCorpus()
     });
 }
 
-// --- training ---------------------------------------------------------------
 
 void WordsController::startTraining()
 {
@@ -395,7 +390,7 @@ void WordsController::loadEmbeddings()
     });
 }
 
-// --- queries (GUI thread) ---------------------------------------------------
+// The query functions below run synchronously on the GUI thread (milliseconds).
 
 bool WordsController::requireIndex()
 {
@@ -455,7 +450,7 @@ void WordsController::queryAxis(
     Words::PrintAxisReport(out(), *vocabulary, report);
 }
 
-// --- evaluation (worker thread) ---------------------------------------------
+// The evaluation functions below run on the worker thread.
 
 void WordsController::evaluateAnalogies()
 {

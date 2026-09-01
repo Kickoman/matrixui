@@ -90,7 +90,7 @@ Matrix& Matrix::operator-=(const Matrix& other) {
 }
 
 Matrix Matrix::multiplyOptimized(const Matrix& other) const {
-    return *this * other; // Eigen already uses optimized multiplication
+    return *this * other;
 }
 
 Matrix Matrix::hadamard(const Matrix& other) const {
@@ -149,7 +149,7 @@ Matrix Matrix::transform(const size_t rows, const size_t cols) const {
         throw std::invalid_argument("New size should have the same number of cells");
     }
 
-    // Manually reshape in row-major order to match naive implementation
+    // Row-major reshape; Eigen is column-major by default.
     Matrix result(rows, cols);
     size_t new_row = 0;
     size_t new_col = 0;

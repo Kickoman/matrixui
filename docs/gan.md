@@ -1,22 +1,36 @@
 # GAN (Generator)
 
-The GAN mode trains a conditional generative adversarial network that learns to produce synthetic digit images. The generator is conditioned on a digit class label, so it can be directed to generate a specific digit.
+This mode trains a conditional generative adversarial network that produces
+synthetic digit images. "Conditional" means the generator takes a class label
+alongside its random noise, so you can ask it for a specific digit rather than
+whatever it feels like drawing.
 
-The CLI binary is `MatrixGui_gan`. The GUI provides the same functionality through the **Generator** tab.
+The CLI binary is `MatrixGui_gan`, with two subcommands: `train` and `generate`.
+The GUI offers the same through its **Generator** mode.
 
 ## How it works
 
-Training requires a pre-trained and frozen classifier alongside real digit images. The discriminator learns to distinguish real images from generator output; the generator is rewarded both for fooling the discriminator and for producing images the classifier recognises as the requested digit class.
+Three networks are involved. The **discriminator** learns to tell real images
+from generated ones. The **generator** tries to fool it. A third network — a
+**frozen, pre-trained classifier** — grades whether the generated image actually
+looks like the digit that was requested, and that grade is folded into the
+generator's loss. Without it the generator would happily produce convincing
+digits of the wrong class.
 
-**Prerequisite:** train a classifier first (see [classifier.md](classifier.md)) and keep its `.wgt` file.
+**Prerequisite:** train a classifier first (see [classifier.md](classifier.md))
+and keep its `.wgt` file.
 
 ---
 
 ## Training mode
 
+```bash
+./build/MatrixGui_gan train --classifier models/digits.wgt --dataset /path/to/data
+```
+
 **Required**
 
-- `--classifier <path.wgt>` — Frozen classifier used to compute the generator's class loss.
+- `--classifier <path.wgt>` — Frozen classifier used to compute the generator's class loss. Its output size also sets the number of classes.
 - `--dataset <dir>` — Real training images root (`0/`–`9/` subdirectories of PNGs, same layout as the classifier).
 
 **Network paths** (created fresh if the file does not exist)
@@ -25,14 +39,6 @@ Training requires a pre-trained and frozen classifier alongside real digit image
 |------|---------|-------------|
 | `--generator <path.wgt>` | `generator.wgt` | Generator save path |
 | `--discriminator <path.wgt>` | `discriminator.wgt` | Discriminator save path |
-
-**Network topology** (used only when creating new networks; ignored when loading existing)
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--latent-dim <n>` | `100` | Size of the random noise vector fed to the generator |
-| `--gen-layers <n,n,...>` | `256,512` | Generator hidden layer sizes (input and output are inferred) |
-| `--disc-layers <n,n,...>` | `512,256` | Discriminator hidden layer sizes (input is 784, output is 1) |
 
 **GAN training**
 
@@ -45,25 +51,66 @@ Training requires a pre-trained and frozen classifier alongside real digit image
 | `--disc-steps <n>` | `3` | Discriminator updates per generator update |
 | `--dropout <x>` | `0.3` | Discriminator dropout rate |
 | `--classifier-weight <x>` | `1.0` | Weight of the classifier loss in the generator update |
-| `--num-classes <n>` | `10` | Number of digit classes |
 | `--dataset-limit <n>` | `0` (all) | Max real images per label to load |
 
-**Adaptive learning rate** (disabled by default)
+<details>
+<summary>Network topology — used only when creating new networks</summary>
 
-Enable with `--adaptive-lr`. Each epoch the discriminator scores `D(real)` and `D(G(z))` are tracked with an EMA; learning rates are adjusted when the discriminator or generator dominates.
+Ignored when the `.wgt` files load successfully.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--latent-dim <n>` | `100` | Size of the random noise vector fed to the generator |
+| `--gen-layers <n,n,...>` | `256,512` | Generator hidden layer sizes (input and output are inferred) |
+| `--disc-layers <n,n,...>` | `512,256` | Discriminator hidden layer sizes (input is the image size, output is 1) |
+| `--dataset-img-width <n>` | `28` | Width real images are read at, and the width the generator emits |
+| `--dataset-img-height <n>` | `28` | Height real images are read at, and the height the generator emits |
+
+The generator's input layer is `--latent-dim` plus the class count (the label
+arrives one-hot encoded), and its output layer is `width × height`.
+
+</details>
+
+<details>
+<summary>Adaptive learning rate — off by default</summary>
+
+Enable with `--adaptive-lr`. Each epoch, the discriminator's scores on real
+images `D(real)` and on generated ones `D(G(z))` are smoothed with an EMA. When
+either network starts running away with the game, the learning rates are nudged
+in opposite directions to bring it back.
+
+The four target bands decide what "running away" means. They select the three
+branches in `core/generator/trainer.cpp:194-206`:
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--adaptive-lr` | off | Enable adaptive LR adjustment |
 | `--lr-ema-alpha <x>` | `0.9` | EMA smoothing factor; higher = slower reaction |
+| `--d-real-target-low <x>` | `0.30` | `D(real)` below this (with `D(G(z))` also low) ⇒ discriminator collapsed |
+| `--d-real-target-high <x>` | `0.80` | `D(real)` above this (with `D(G(z))` low) ⇒ discriminator dominating |
+| `--gen-fool-target-low <x>` | `0.30` | `D(G(z))` below this ⇒ the generator is not fooling anyone |
+| `--gen-fool-target-high <x>` | `0.60` | `D(G(z))` above this ⇒ generator dominating |
 | `--lr-adjust-factor <x>` | `1.05` | Multiplicative LR step per epoch (~5%) |
 | `--lr-min <x>` | `1e-6` | Lower LR clamp |
 | `--lr-max <x>` | `1e-2` | Upper LR clamp |
 | `--lr-warmup-epochs <n>` | `5` | Epochs to skip before adjustments begin |
 
-**Flatness detection** (disabled by default)
+The bands are deliberately asymmetric: the healthy range for `D(real)` is wider
+than for `D(G(z))`. Widening them further makes the scheduler intervene less
+often.
 
-Enable with `--flatness-detection`. When both EMA signals plateau for several consecutive epochs a "kick" is applied: the discriminator dropout is boosted and the generator LR is spiked temporarily to escape the plateau.
+</details>
+
+<details>
+<summary>Flatness detection — off by default</summary>
+
+Enable with `--flatness-detection`. When both EMA signals barely move for
+`--flatness-window` consecutive epochs, training has stalled, and a "kick" is
+applied: the discriminator's dropout is boosted and the generator's learning rate
+is spiked for a few epochs, then everything is restored.
+
+Adaptive LR is **suspended while a kick is active**, so the two mechanisms do not
+fight each other.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -74,12 +121,14 @@ Enable with `--flatness-detection`. When both EMA signals plateau for several co
 | `--flatness-dropout-boost <x>` | `2.0` | Multiply discriminator dropout by this during kick |
 | `--flatness-gen-lr-boost <x>` | `3.0` | Multiply generator LR by this during kick |
 
+</details>
+
 ### Training examples
 
 Basic run with defaults:
 
 ```bash
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/data/mnist_split
 ```
@@ -87,7 +136,7 @@ Basic run with defaults:
 Longer run with adaptive LR and flatness detection:
 
 ```bash
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/data/mnist_split \
   --generator models/generator.wgt \
@@ -97,10 +146,11 @@ Longer run with adaptive LR and flatness detection:
   --flatness-detection
 ```
 
-Custom architecture:
+<details>
+<summary>Custom architecture</summary>
 
 ```bash
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/data/mnist_split \
   --latent-dim 64 \
@@ -108,17 +158,19 @@ Custom architecture:
   --disc-layers 512,256,128
 ```
 
+</details>
+
 ---
 
 ## Generation mode
 
-Load a trained generator and produce sample images. No dataset or discriminator is needed.
+Load a trained generator and produce sample images. No dataset or discriminator
+is needed.
 
 **Required**
 
-- `--generate` — Activate generation mode.
-- `--label <n>` — Digit class to generate (0–9).
-- `--generator <path.wgt>` — Generator weights to load.
+- `--label <n>` — Class to generate.
+- `--generator <path.wgt>` — Generator weights to load. Defaults to `generator.wgt` in the current directory.
 
 **Optional**
 
@@ -127,15 +179,16 @@ Load a trained generator and produce sample images. No dataset or discriminator 
 | `--num-samples <n>` | `1` | Number of images to generate |
 | `--output <path.png>` | `generated.png` | Output file path; a counter is inserted before the extension when generating multiple samples (e.g. `digit_0.png`, `digit_1.png`) |
 | `--classifier <path.wgt>` | — | If provided, the classifier's predicted label is printed next to each saved file |
-| `--num-classes <n>` | `10` | Must match the value used during training |
+| `--num-classes <n>` | `10` | Class count the generator was trained with. **Ignored when `--classifier` is given** — the classifier's output size wins |
+| `--dataset-img-width <n>` | `28` | Width of the emitted image; must match training |
+| `--dataset-img-height <n>` | `28` | Height of the emitted image; must match training |
 
 ### Generation examples
 
 Generate one image of the digit 7:
 
 ```bash
-./build/MatrixGui_gan \
-  --generate \
+./build/MatrixGui_gan generate \
   --label 7 \
   --generator models/generator.wgt \
   --output samples/seven.png
@@ -144,8 +197,7 @@ Generate one image of the digit 7:
 Generate 10 images of the digit 3, with classifier verification:
 
 ```bash
-./build/MatrixGui_gan \
-  --generate \
+./build/MatrixGui_gan generate \
   --label 3 \
   --generator models/generator.wgt \
   --classifier models/digits.wgt \
@@ -159,20 +211,19 @@ Generate 10 images of the digit 3, with classifier verification:
 
 ```bash
 # 1. Train the classifier
-./build/MatrixGui_headless \
+./build/MatrixGui_headless train \
   --network models/digits.wgt \
   --dataset /path/to/mnist_split
 
 # 2. Train the GAN
-./build/MatrixGui_gan \
+./build/MatrixGui_gan train \
   --classifier models/digits.wgt \
   --dataset /path/to/mnist_split \
   --generator models/generator.wgt \
   --discriminator models/discriminator.wgt
 
 # 3. Generate samples
-./build/MatrixGui_gan \
-  --generate \
+./build/MatrixGui_gan generate \
   --label 5 \
   --generator models/generator.wgt \
   --classifier models/digits.wgt \
@@ -182,8 +233,24 @@ Generate 10 images of the digit 3, with classifier verification:
 
 ---
 
+## Exit codes
+
+| Code | Situation |
+|------|-----------|
+| `0` | Success |
+| `2` | The generator or the classifier failed to load |
+| `4` | An exception during generation |
+| `106` | Command line did not parse: no subcommand, a missing required option, or an unknown flag |
+
+Note that `--generator` has a default value, and the "file must exist" check does
+not apply to defaults — so running `generate` in a directory without a
+`generator.wgt` gives you `2`, not `106`.
+
+---
+
 ## See also
 
 - [Hyperparameters guide](hyperparameters.md) — GAN stability, adaptive LR, flatness kicks
-- `core/generator/gan_config.h` — default values with inline explanations
+- [GUI guide](gui.md) — the Generator mode
+- `core/generator/learning_config.h` — default values
 - `core/main_headless_gan.cpp` — argument parsing

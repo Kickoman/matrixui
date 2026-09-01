@@ -69,4 +69,4 @@ void centerOfMassAlign(QImage& img) {
     img = shifted;
 }
 
-} // namespace reader
+}  // namespace reader

@@ -88,6 +88,6 @@ private:
 };
 
 
-} // Classifier
+}  // namespace Classifier
 
-} // Neural
+}  // namespace Neural

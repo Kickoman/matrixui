@@ -1,6 +1,6 @@
 #include "gui/classifier/digits_classifier_controller.h"
 
-#include "core/classifier//learning_config.h"
+#include "core/classifier/learning_config.h"
 #include "core/classifier/trainer.h"
 
 #include "core/lib/directory_dataset.h"

@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
 #include "core/lib/random.h"
-#include "core/words/negativesampler.h"
-#include "core/words/vocabulary.h"
+#include "core/words/train/negativesampler.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 
 #include <cmath>
@@ -18,10 +18,9 @@ constexpr std::size_t kTableSize = 200'000;
 }  // namespace
 
 TEST_CASE("The draw distribution passes a chi-squared test on a large vocabulary") {
-    // Ported from the former validate-negative-sampler diagnostic: a reduced
-    // chi-squared over every word with enough expected mass is a much stronger
-    // statement than per-word tolerances -- it catches a systematically skewed
-    // table even when each individual word looks close enough.
+    // A reduced chi-squared over every word with enough expected mass is a
+    // stronger statement than per-word tolerances: it catches a systematically
+    // skewed table even when each individual word looks close enough.
     const Tests::TempDir dir;
     const auto path = dir.write("zipf.txt", Tests::ZipfCorpusText(1200, 120'000));
     const auto vocabulary = Vocabulary::Build(path, 1);

@@ -1,12 +1,5 @@
 #pragma once
 
-// JSON bindings for the words configuration structs.
-//
-// Kept apart from config.h on purpose: nlohmann/json.hpp is ~25k lines, and
-// config.h is included (via model.h and trainer.h) by most of the module.
-// Only the layers that actually serialise -- a CLI --config flag, or the GUI's
-// QSettings persistence -- need to include this.
-
 #include "core/words/config.h"
 
 #include <nlohmann/json.hpp>

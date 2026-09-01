@@ -87,7 +87,7 @@ QImage matrixToQImage(const Matrix& flat, const std::size_t height, const std::s
     return img;
 }
 
-} // namespace
+}  // namespace
 
 
 DigitsGeneratorController::DigitsGeneratorController(QObject* parent)
@@ -194,7 +194,7 @@ void DigitsGeneratorController::run() {
         activeTrainer.store(&trainer, std::memory_order_release);
 
         trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {
-            // Save after each epoch (same pattern as classifier)
+            // Save after each epoch.
             Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(),     generatorPath.toStdString());
             Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath.toStdString());
 
@@ -391,7 +391,8 @@ bool DigitsGeneratorController::loadProject() {
         return false;
     }
 
-    // The order is important for validation
+    // Classifier first: it fixes the class count, and loadDiscriminator /
+    // loadGenerator both refuse to run without it.
     resetProject();
     if (!loadClassifier()) {
         out() << "Classifier is not loaded. Stopping." << std::endl;

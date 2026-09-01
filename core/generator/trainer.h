@@ -68,5 +68,5 @@ private:
     std::mt19937 rng{std::random_device{}()};
 };
 
-} // GAN
-} // Neural
+}  // namespace GAN
+}  // namespace Neural

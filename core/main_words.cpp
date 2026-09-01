@@ -1,10 +1,3 @@
-// Command-line front end for the words pipeline.
-//
-// Registration only: every command body lives in core/words_cli/commands.cpp,
-// and each subcommand carries its own options struct. CLI11 invokes the right
-// handler through ->callback(), so there is no dispatch chain to keep in sync
-// with the registrations.
-
 #include "core/words/error.h"
 #include "core/words_cli/commands.h"
 #include "core/words_cli/options.h"
@@ -16,6 +9,7 @@
 namespace {
 
 // Exit codes: 0 success, 1 a reported error, 2 a bug.
+// CLI11 returns 106 of its own accord when the command line does not parse.
 constexpr int kSuccess = 0;
 constexpr int kFailure = 1;
 constexpr int kInternalError = 2;
@@ -26,7 +20,6 @@ int main(int argc, char** argv) {
     CLI::App app{"Words embedder"};
     app.require_subcommand(1);
 
-    // --- raw text -----------------------------------------------------------
     WordsCli::InspectOptions inspect;
     auto* inspectCmd = app.add_subcommand("inspect", "Summarise a raw text dump");
     inspectCmd->add_option("--input-file", inspect.input, "Raw text file")
@@ -37,7 +30,6 @@ int main(int argc, char** argv) {
         WordsCli::Inspect(std::cout, inspect);
     });
 
-    // --- vocabulary ---------------------------------------------------------
     WordsCli::BuildVocabularyOptions buildVocabulary;
     auto* buildVocabularyCmd = app.add_subcommand("buildvoc", "Build vocabulary");
     buildVocabularyCmd->add_option("--input-file", buildVocabulary.input, "Prepared input file path")
@@ -58,7 +50,6 @@ int main(int argc, char** argv) {
         WordsCli::LoadVocabulary(std::cout, loadVocabulary);
     });
 
-    // --- corpus -------------------------------------------------------------
     WordsCli::BuildCorpusOptions buildCorpus;
     auto* buildCorpusCmd = app.add_subcommand("buildcor", "Build corpus info");
     buildCorpusCmd->add_option("--input-file", buildCorpus.input, "Prepared corpus file path")
@@ -79,7 +70,6 @@ int main(int argc, char** argv) {
         WordsCli::LoadCorpus(std::cout, loadCorpus);
     });
 
-    // --- training -----------------------------------------------------------
     WordsCli::TrainOptions train;
     auto* trainCmd = app.add_subcommand("train", "Train SGNS embeddings");
     trainCmd->add_option("--vocabulary", train.vocabulary, "Built vocabulary path")
@@ -99,7 +89,6 @@ int main(int argc, char** argv) {
         WordsCli::Train(std::cout, train);
     });
 
-    // --- queries ------------------------------------------------------------
     WordsCli::NeighboursOptions neighbours;
     auto* neighboursCmd = app.add_subcommand("neighbours", "Show nearest neighbours");
     neighboursCmd->add_option("--vocabulary", neighbours.vocabulary, "Built vocabulary path")

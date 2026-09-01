@@ -27,26 +27,40 @@ MatrixGui_words neighbours --vocabulary built.voc --embeddings emb.bin --word ki
 
 ## Module layout
 
-| Directory | Contains |
-|---|---|
-| `core/words/` | The pipeline: vocabulary, corpus, samplers, model, trainer, queries, evaluation |
-| `core/words/report/` | **All** console formatting |
-| `core/words_cli/` | Subcommand option structs and bodies (CLI-only, not in `CORE_SOURCES`) |
+| Directory | Contains | Reference |
+|---|---|---|
+| `core/words/` | Configuration and the exception taxonomy | [README](../core/words/README.md) |
+| `core/words/data/` | Raw-dump survey; the vocabulary, corpus and embedding matrix, and their file formats | [README](../core/words/data/README.md) |
+| `core/words/train/` | Samplers, the SGNS model, the trainer | [README](../core/words/train/README.md) |
+| `core/words/query/` | Nearest neighbours, expressions, the evaluation benchmarks | [README](../core/words/query/README.md) |
+| `core/words/report/` | **All** console formatting | [README](../core/words/report/README.md) |
+| `core/words_cli/` | Subcommand option structs and bodies (CLI-only, not in `CORE_SOURCES`) | [README](../core/words_cli/README.md) |
+| `gui/words/` | The Qt Words mode: controller, three tabs, config editor | [README](../gui/words/README.md) |
+
+Each README is the file-level reference for its folder — what every unit
+exposes, what it guarantees, and what will bite. This page stays the narrative:
+the pipeline, the CLI, and the behaviour that spans folders. Everything the
+source files used to say in comments is in the READMEs.
 
 ### The one rule
 
-> No `#include <iostream>` anywhere under `core/words/` except in `core/words/report/`.
+> No `#include <iostream>` anywhere under `core/words/`.
 
 Checked with a single grep:
 
 ```bash
-grep -rln 'include <iostream>' core/words/ | grep -v '^core/words/report/'
+grep -rln 'include <iostream>' core/words/    # must print nothing
 ```
 
 Everything that produces output takes an explicit `std::ostream&`. That is what
 lets the same code serve the CLI and a GUI: a Qt tab can point the stream at
 `ThreadSafeTerminalOStream` (`gui_common/advanced_terminal.h`), or ignore the
 `report/` layer entirely and render the report structs into widgets.
+
+The rule used to carve out `core/words/report/`, which needed `std::cerr` for a
+default log stream. That plumbing moved to `core/lib/stream_format.h`
+(`NullStream`, `DefaultLogStream`, `StreamFormatGuard`), so the carve-out is
+gone and the grep above is exact.
 
 `core/words_cli/` is deliberately outside `CORE_SOURCES`, because that list is
 compiled into the Qt binary too and CLI11 does not belong there.
@@ -61,8 +75,8 @@ const auto report = Words::QueryNeighbours(vocabulary, index, "king", 10);
 Words::PrintNeighbourReport(std::cout, vocabulary, report);   // optional
 ```
 
-This holds for queries (`queries.h`), evaluation (`evaluate.h`) and training
-(`TrainProgress` / `TrainSummary`).
+This holds for queries (`query/queries.h`), evaluation (`query/evaluate.h`) and
+training (`TrainProgress` / `TrainSummary` in `train/trainer.h`).
 
 ## Errors
 
@@ -73,13 +87,18 @@ Two mechanisms, chosen by whose fault it is:
 | Missing/truncated/wrong-format file, impossible config | throw `Words::Error` (`IoError`, `VocabularyError`, `ConfigError`) |
 | Word not in the vocabulary, unparseable expression, too few words | `QueryStatus` on the result struct |
 
+Loading an artifact that is missing, unreadable or truncated throws. It does not
+quietly hand back an empty vocabulary or a zero-filled embedding matrix, which
+would otherwise surface much later as a model that trains but learns nothing.
+
 Bad user input is not exceptional: an expression box would otherwise throw on
 every half-typed word. `QueryStatus` renders as an inline message; an exception
 renders as a dialog. The CLI catches `Words::Error` once, in `main`, and exits
 non-zero.
 
 Exit codes: `0` success, `1` a failed check or reported error, `2` an internal
-error.
+error, `106` a command line that did not parse (no subcommand, a missing required
+option, an unknown flag, or a file that does not exist).
 
 ## Training
 
@@ -110,7 +129,17 @@ Two things to know:
   verbose and therefore still prints.
 
 `requestStop()` is honoured at chunk granularity (~1000 corpus tokens) and sets
-`TrainSummary::stopped`.
+`TrainSummary::stopped`. The cancellation check deliberately sits at the chunk
+boundary rather than inside the pair loop: generating pairs is the innermost
+loop of the whole trainer, and a test on every pair would cost a branch there for
+no user-visible benefit. A chunk is small enough that cancellation still feels
+immediate.
+
+**`--sample 0` disables subsampling**, and that path needs care. With subsampling
+off there are no keep-probabilities to sum, so a naive token estimate would come
+back as zero — and since `EstimateTotalPairs` feeds the learning-rate schedule, a
+total of zero would pin progress at 0 and the rate would never decay. `Subsampler`
+special-cases it and reports the whole corpus instead.
 
 ### Known race
 
@@ -119,6 +148,181 @@ rows (Hogwild-style lock-free updates through a `mutable` model). This is
 formally a data race and ThreadSanitizer will report it. It is left as-is
 deliberately: the reported loss is a progress indicator, and the contention-free
 updates are the point of the design.
+
+## CLI reference
+
+`MatrixGui_words` takes a subcommand. Each one binds to its own options struct in
+`core/words_cli/options.h`, and its body lives in `core/words_cli/commands.cpp` —
+CLI11 calls the right handler through `->callback()`, so there is no dispatch
+chain to keep in step with the registrations.
+
+Follow the pipeline order: `inspect` to see what you have, `buildvoc` and
+`buildcor` to prepare it, `train`, then any of the query commands.
+
+<details>
+<summary><code>inspect</code> — summarise a raw text dump</summary>
+
+Counts tokens and types and lists the most frequent words. Use it to pick a
+`--min-count` for `buildvoc` before committing to a build.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input-file <path>` | *required* | Raw text file |
+| `--top <n>` | `15` | How many frequent words to list |
+
+</details>
+
+<details>
+<summary><code>buildvoc</code> / <code>loadvoc</code> — the vocabulary</summary>
+
+`buildvoc` scans a raw dump and writes a `.voc` file; `loadvoc` reads one back
+and prints its statistics.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input-file <path>` | *required* | Raw text file |
+| `--output-file <path>` | *required* | Where to write the vocabulary |
+| `--min-count <n>` | `5` | Drop words occurring fewer times than this |
+
+`loadvoc` takes only `--input-file`, pointing at a built `.voc`.
+
+</details>
+
+<details>
+<summary><code>buildcor</code> / <code>loadcor</code> — the corpus</summary>
+
+`buildcor` encodes a raw dump into word ids using an existing vocabulary, writing
+a `.cor` file. Because the ids belong to that vocabulary, a corpus and the
+vocabulary it was built against must always be used together.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input-file <path>` | *required* | Raw text file |
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--output-file <path>` | *required* | Where to write the corpus |
+
+`loadcor` takes only `--input-file`, pointing at a built `.cor`.
+
+</details>
+
+<details>
+<summary><code>train</code> — train the embeddings</summary>
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--corpus <path>` | *required* | Built corpus |
+| `--output-file <path>` | *required* | Where to write the embeddings |
+| `--dim <n>` | `100` | Embedding dimension |
+| `--negatives <n>` | `5` | Negative samples drawn per pair |
+| `--window <n>` | `5` | Maximum window radius |
+| `--epochs <n>` | `5` | Passes over the corpus |
+| `--sample <x>` | `1e-4` | Subsampling threshold; `0` disables subsampling |
+| `--lr <x>` | `0.025` | Initial learning rate |
+| `--threads <n>` | `0` | Worker threads; `0` uses the hardware concurrency |
+
+</details>
+
+<details>
+<summary><code>neighbours</code> — nearest words</summary>
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--embeddings <path>` | *required* | Trained embeddings |
+| `--word <w>` | *(empty)* | Query word. Leaving it empty runs a default battery of words |
+| `--count <n>` | `10` | How many neighbours to show |
+
+</details>
+
+<details>
+<summary><code>expression</code> — free-form vector arithmetic</summary>
+
+Takes the expression as a positional argument.
+
+```bash
+MatrixGui_words expression "king - man + woman" \
+  --vocabulary built.voc --embeddings emb.bin
+```
+
+| Argument / flag | Default | Description |
+|------|---------|-------------|
+| `<expression>` | *required* | Positional, e.g. `"king - man + woman"` |
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--embeddings <path>` | *required* | Trained embeddings |
+| `--count <n>` | `10` | How many results |
+
+When the terms form a three-word analogy, the 3CosMul reranking is reported
+alongside the plain vector result.
+
+</details>
+
+<details>
+<summary><code>oddone</code> — the odd word out</summary>
+
+Takes the word list as one positional argument.
+
+```bash
+MatrixGui_words oddone "breakfast cereal lunch dinner" \
+  --vocabulary built.voc --embeddings emb.bin
+```
+
+| Argument / flag | Default | Description |
+|------|---------|-------------|
+| `<words>` | *required* | Positional, a quoted space-separated list |
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--embeddings <path>` | *required* | Trained embeddings |
+
+</details>
+
+<details>
+<summary><code>axis</code> — project onto a semantic axis</summary>
+
+Builds a direction from two words and ranks words along it.
+
+```bash
+MatrixGui_words axis "good - bad" \
+  --vocabulary built.voc --embeddings emb.bin
+```
+
+| Argument / flag | Default | Description |
+|------|---------|-------------|
+| `<axis>` | *required* | Positional, e.g. `"good - bad"` |
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--embeddings <path>` | *required* | Trained embeddings |
+| `--words <list>` | *(empty)* | Words to project; empty scans the vocabulary |
+| `--restrict-to <n>` | `30000` | Scan only the top-N most frequent words; `0` = all |
+| `--count <n>` | `10` | How many to show at each end |
+
+</details>
+
+<details>
+<summary><code>evaluate</code> — analogy and similarity benchmarks</summary>
+
+Give it at least one of `--analogies` or `--similarity`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--vocabulary <path>` | *required* | Built vocabulary |
+| `--embeddings <path>` | *required* | Trained embeddings |
+| `--analogies <path>` | — | A `questions-words.txt`-style file |
+| `--similarity <path>` | — | A WordSim/SimLex-style file |
+| `--score-column <n>` | `2` | 0-based column holding the human score in the similarity file |
+| `--restrict-to <n>` | `30000` | Search only the top-N most frequent words; `0` = all |
+| `--threads <n>` | `0` | Worker threads; `0` uses the hardware concurrency |
+
+</details>
+
+<details>
+<summary>Memory notes</summary>
+
+Building a vocabulary streams the whole raw dump into an `unordered_map`, which
+is pre-sized for roughly a million distinct words so it never rehashes
+mid-stream. That is the right trade for a wiki-scale corpus, but it means
+`buildvoc` allocates on the order of 10 MB of buckets even for a tiny test
+corpus. It is a fixed floor, not a leak.
+
+</details>
 
 ## Configuration
 
@@ -132,8 +336,10 @@ JSON bindings are in `config_json.h`, kept separate so that including
 
 ## GUI
 
-The `MatrixGui` application has a Words mode (the fourth button on the mode
-picker) with three sub-tabs sharing one terminal:
+The `MatrixGui` application has a Words mode — the **Word embeddings (SGNS)**
+button on the mode picker — with three sub-tabs sharing one terminal. For the
+shell around it (threading rules, the terminal, themes) see [gui.md](gui.md);
+what follows is specific to this mode:
 
 - **Data & Training** — inspect a raw dump, build/load the vocabulary and
   corpus, train with live probe-loss and speed charts, save/load embeddings.

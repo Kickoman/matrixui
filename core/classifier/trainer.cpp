@@ -230,5 +230,5 @@ void Trainer::setOutputStream(std::ostream* stream) {
     this->stream = stream;
 }
 
-} // Classifier
-} // Trainer
+}  // namespace Classifier
+}  // namespace Neural

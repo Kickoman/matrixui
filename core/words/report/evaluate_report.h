@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/words/evaluate.h"
+#include "core/words/query/evaluate.h"
 
 #include <iosfwd>
 #include <string>

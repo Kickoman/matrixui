@@ -261,5 +261,5 @@ void GanTrainer::requestStop() {
 const NeuralNetworkApplier& GanTrainer::getGenerator() const { return generator; }
 const NeuralNetworkApplier& GanTrainer::getDiscriminator() const { return discriminator; }
 
-} // namespace GAN
-} // namespace Neural
+}  // namespace GAN
+}  // namespace Neural

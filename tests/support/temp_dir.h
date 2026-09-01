@@ -10,9 +10,7 @@
 
 namespace Tests {
 
-// A scratch directory removed on destruction. Tests that need real files
-// (every Save/Load round-trip in the words module goes through the filesystem)
-// build them here instead of polluting the working directory.
+// A scratch directory removed on destruction.
 class TempDir {
 public:
     TempDir() {

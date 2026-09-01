@@ -41,7 +41,7 @@ void PushActivationLayers(
     }
 }
 
-} // namespace
+}  // namespace
 
 
 void SaveNetwork(const NeuralNetwork& network, const std::filesystem::path& filename) {

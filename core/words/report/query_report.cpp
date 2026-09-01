@@ -1,7 +1,7 @@
 #include "core/words/report/query_report.h"
 
-#include "core/words/report/format.h"
-#include "core/words/vocabulary.h"
+#include "core/lib/stream_format.h"
+#include "core/words/data/vocabulary.h"
 
 #include <iomanip>
 #include <ostream>
@@ -10,8 +10,6 @@ namespace Words {
 
 namespace {
 
-// The indented "word  score" rows shared by the neighbour, analogy and
-// expression reports.
 template <typename Rows, typename Score>
 void PrintScoreRows(std::ostream& out, const Vocabulary& vocabulary, const Rows& rows, Score score) {
     for (const auto& row : rows) {
@@ -23,7 +21,6 @@ void PrintScoreRows(std::ostream& out, const Vocabulary& vocabulary, const Rows&
 double SimilarityOf(const Neighbour& neighbour) { return neighbour.similarity; }
 double ScoreOf(const ScoredWord& word) { return word.score; }
 
-// The signed "score  word" rows used by the axis report.
 void PrintSignedRows(std::ostream& out, const Vocabulary& vocabulary, const std::vector<ScoredWord>& rows) {
     for (const auto& row : rows) {
         out << "  " << std::setw(6) << std::right << std::showpos << std::fixed

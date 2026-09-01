@@ -151,8 +151,6 @@ Matrix SoftmaxLayer::forward(const Matrix& input) const {
 }
 
 Matrix SoftmaxLayer::forward(const Matrix& input, const ForwardContext&) const {
-    // outputCache = forward(input);
-    // return outputCache;
     return forward(input);
 }
 

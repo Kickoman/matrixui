@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
-#include "core/words/expressions.h"
-#include "core/words/similarity.h"
-#include "core/words/vocabulary.h"
+#include "core/words/query/expressions.h"
+#include "core/words/query/similarity.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 
 using namespace Words;

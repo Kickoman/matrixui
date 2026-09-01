@@ -32,5 +32,5 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
 );
 
 
-} // namespace Classifier
-} // namespace Neural
+}  // namespace Classifier
+}  // namespace Neural

@@ -19,9 +19,6 @@
 #include <CLI11/CLI11.hpp>
 
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 namespace {
 
 Neural::NeuralNetwork loadOrCreate(
@@ -49,7 +46,9 @@ int runGenerate(
     const std::string& generatorPath,
     const std::string& outputPath,
     std::size_t numSamples,
-    const std::string& classifierPath
+    const std::string& classifierPath,
+    std::size_t imageWidth,
+    std::size_t imageHeight
 ) {
     auto generatorNet = Neural::LoadNetwork(generatorPath);
     if (!generatorNet) {
@@ -76,9 +75,9 @@ int runGenerate(
     for (std::size_t i = 0; i < numSamples; ++i) {
         const auto flat = Neural::GAN::Generate(generator, numClasses, label, latentDim, rng);
 
-        // Reshape flat 1x784 row into a 28x28 matrix for saving.
-        const Matrix image(28, 28, [&](std::size_t row, std::size_t col) {
-            return flat(0, row * 28 + col);
+        // Reshape the flat generator output into a height x width image.
+        const Matrix image(imageHeight, imageWidth, [&](std::size_t row, std::size_t col) {
+            return flat(0, row * imageWidth + col);
         });
 
         const std::string path = (numSamples == 1) ? outputPath : indexedPath(outputPath, i);
@@ -97,17 +96,13 @@ int runGenerate(
     return 0;
 }
 
-} // namespace
+}  // namespace
 
 
-// ---------------------------------------------------------------------------
-// main
-// ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
     CLI::App app{"MatrixGui GAN CLI (generator/discriminator training & sampling)"};
     app.require_subcommand(1);
 
-    // ---- generate ----
     CLI::App* generateCmd = app.add_subcommand("generate", "Generate sample images from a trained generator");
 
     std::size_t genLabel = 0;
@@ -136,7 +131,6 @@ int main(int argc, char** argv) {
     generateCmd->add_option("--dataset-img-height", imageHeight, "Height of test images in pixels.")
         ->capture_default_str();
 
-    // ---- train ----
     CLI::App* trainCmd = app.add_subcommand("train", "Train generator+discriminator against a frozen classifier");
 
     std::string classifierPath;
@@ -230,14 +224,15 @@ int main(int argc, char** argv) {
 
     if (*generateCmd) {
         try {
-            return runGenerate(genLabel, genNumClasses, generatorPathArg, outputPath, numSamples, classifierPathArg);
+            return runGenerate(
+                genLabel, genNumClasses, generatorPathArg, outputPath, numSamples,
+                classifierPathArg, imageWidth, imageHeight);
         } catch (const std::exception& e) {
             std::cerr << e.what() << "\n";
             return 4;
         }
     }
 
-    // Load classifier (frozen)
     auto classifierNet = Neural::LoadNetwork(classifierPath);
     if (!classifierNet) {
         std::cerr << "Failed to load classifier: " << classifierPath << "\n";
@@ -261,21 +256,18 @@ int main(int argc, char** argv) {
         return layers;
     };
 
-    // Load or create generator
     Neural::NeuralNetworkConfiguration genConfig;
     genConfig.layersSizes      = buildGenLayers();
     genConfig.hiddenActivation = Neural::ActivationType::ReLU;
     genConfig.outputActivation = Neural::ActivationType::Sigmoid;
     Neural::NeuralNetworkApplier generator(loadOrCreate(generatorPath, genConfig));
 
-    // Load or create discriminator
     Neural::NeuralNetworkConfiguration discConfig;
     discConfig.layersSizes      = buildDiscLayers();
     discConfig.hiddenActivation = Neural::ActivationType::LeakyReLU;
     discConfig.outputActivation = Neural::ActivationType::Sigmoid;
     Neural::NeuralNetworkApplier discriminator(loadOrCreate(discriminatorPath, discConfig));
 
-    // Load real training samples
     cache::LRUCache<std::filesystem::path, Matrix> pngCache;
     const auto reader = [&pngCache, imageWidth, imageHeight](const std::filesystem::path& path) {
         if (const auto cached = pngCache.get(path); cached.has_value()) {
@@ -310,11 +302,9 @@ int main(int argc, char** argv) {
               << "  disc-lr: " << ganConfig.discriminatorLearningRate
               << "\n\n";
 
-    // Train
     Neural::GAN::GanTrainer trainer(std::move(generator), std::move(discriminator), std::move(classifier));
     trainer.train(realImages, ganConfig, &std::cout);
 
-    // Save
     Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(), generatorPath);
     Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath);
     std::cout << "Saved generator to " << generatorPath << "\n";

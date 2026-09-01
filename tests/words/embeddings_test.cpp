@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "core/lib/random.h"
-#include "core/words/embeddings.h"
+#include "core/words/data/embeddings.h"
 #include "tests/support/temp_dir.h"
 
 #include <cmath>

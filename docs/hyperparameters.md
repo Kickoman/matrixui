@@ -1,6 +1,11 @@
 # Hyperparameters
 
-Practical guidance on the knobs exposed by both the classifier and the GAN. All defaults are defined in `core/classifier/learning_config.h` and `core/generator/gan_config.h`.
+This page is advice, not reference: what each knob does to training, and which
+way to turn it when something goes wrong. The full flag tables live in
+[classifier.md](classifier.md) and [gan.md](gan.md).
+
+Defaults are defined in `core/classifier/learning_config.h` and
+`core/generator/learning_config.h`.
 
 ---
 
@@ -24,15 +29,21 @@ The classifier uses a simple decay-on-plateau schedule. The LR starts at `--init
 
 ### Architecture
 
-The default `784,50,20,10` is deliberately small for fast iteration. The input (784) and output (10) sizes are fixed by the 28×28 image format and the 10-class task.
+The default `784,50,20,10` is deliberately small for fast iteration. The first
+and last layer sizes are not free: the input must equal
+`--dataset-img-width × --dataset-img-height` (784 for the default 28×28), and the
+output must equal the number of class subdirectories in your dataset.
 
-**Reasonable starting points:**
+<details>
+<summary>Reasonable starting points</summary>
 
 | Goal | `--layers` suggestion |
 |------|-----------------------|
 | Fast baseline | `784,50,20,10` (default) |
 | More capacity | `784,128,64,10` |
 | Deeper | `784,256,128,64,10` |
+
+</details>
 
 `relu` hidden + `softmax` output is a solid default for multi-class classification. Use `sigmoid` output only if you have a specific reason; `softmax` produces a proper probability distribution over classes.
 
@@ -83,12 +94,25 @@ Enable with `--adaptive-lr`. The scheduler tracks `D(real)` (how well the discri
 
 **When to enable:** runs of 500+ epochs where you want the balance to self-correct. Not needed for short experiments.
 
+<details>
+<summary>Every adaptive-LR knob</summary>
+
 | Parameter | Default | Meaning |
 |-----------|---------|---------|
 | `--lr-ema-alpha` | `0.9` | Higher = slower EMA reaction. Lower (e.g. `0.7`) makes the scheduler react faster but noisier |
 | `--lr-adjust-factor` | `1.05` | Multiplicative step (~5% per epoch). Reduce to `1.02` for a gentler schedule |
 | `--lr-warmup-epochs` | `5` | Hold LRs fixed for this many epochs while the EMA stabilises |
 | `--lr-min` / `--lr-max` | `1e-6` / `1e-2` | Hard clamps; keep `lr-max` well below `0.1` to avoid divergence |
+| `--d-real-target-low` / `--d-real-target-high` | `0.30` / `0.80` | The healthy band for `D(real)`. Widen it to make the scheduler intervene less often |
+| `--gen-fool-target-low` / `--gen-fool-target-high` | `0.30` / `0.60` | The healthy band for `D(G(z))`. Deliberately narrower than the `D(real)` band |
+
+The bands decide what counts as "out of balance". Three situations are
+recognised: both signals low (the discriminator has collapsed), `D(real)` high
+with `D(G(z))` low (the discriminator is dominating), and `D(G(z))` high (the
+generator is dominating). Each nudges the two learning rates in opposite
+directions.
+
+</details>
 
 ---
 
@@ -100,7 +124,13 @@ Enable with `--flatness-detection`. When both EMA signals change by less than `-
 2. Generator LR is multiplied by `--flatness-gen-lr-boost` (encourages G to explore).
 3. After `--flatness-kick-duration` epochs both are restored.
 
+Adaptive LR is suspended for as long as a kick is active, so the two mechanisms
+do not pull against each other.
+
 **When to enable:** long runs (1000+ epochs) on challenging datasets where training visually flatlines. For shorter runs the overhead is rarely worth it.
+
+<details>
+<summary>Every flatness knob</summary>
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
@@ -109,3 +139,45 @@ Enable with `--flatness-detection`. When both EMA signals change by less than `-
 | `--flatness-kick-duration` | `5` | Raise to `10` if a single kick isn't enough to restart progress |
 | `--flatness-dropout-boost` | `2.0` | Multiplies the current dropout rate — don't set this so high it pushes dropout above `0.8` |
 | `--flatness-gen-lr-boost` | `3.0` | Multiplies the current generator LR — ensure `gen-lr * boost` stays below `lr-max` |
+
+</details>
+
+---
+
+## Sweeping automatically
+
+Rather than guessing one setting at a time, `experiments/` holds a small harness
+that runs the classifier across a grid of hyperparameters and analyses the
+results.
+
+```bash
+pip install -r experiments/requirements.txt
+python3 experiments/run_experiments.py          # or run_experiments_parallel.py
+python3 experiments/analyze.py
+```
+
+<details>
+<summary>How the harness works</summary>
+
+`run_experiments.py` holds a `PARAM_GRID` near the top of the file. For each
+combination it writes a temporary learning-config JSON, invokes
+`MatrixGui_headless train --learning-config …` with a unique network file so
+every run starts from scratch, and collects that run's `log.jsonl` and
+`testing-log.jsonl`. `run_experiments_parallel.py` does the same across several
+processes at once.
+
+`analyze.py` then reads those logs and produces `enriched_results.csv`,
+a set of plots under `analysis_plots/`, and a written `analysis_report.md`.
+
+**One thing to watch:** the runner's summary CSV records only *train* accuracy,
+which is a poor criterion for choosing hyperparameters — bigger networks, more
+data and less dropout nearly always raise train accuracy while hurting
+generalisation. `analyze.py` exists partly to correct for this: it makes test
+accuracy the primary metric and reports the train/test gap so overfitting is
+visible. Select on its output, not on the raw CSV.
+
+The scripts assume a dataset at `~/Documents/projects/mnist-pngs/{train,test}`;
+edit `BASE_CMD` if yours lives elsewhere. Everything under `experiments/` except
+the scripts themselves is gitignored.
+
+</details>

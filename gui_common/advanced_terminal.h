@@ -30,11 +30,9 @@ public:
     AdvancedTerminalStream& operator<<(const T& t) {
         std::lock_guard<std::mutex> lock(bufferMutex);
         buffer << t;
-        // Show every completed line right away. Without this, text arriving
-        // through the std::ostream facade (ThreadSafeTerminalBuffer::xsputn)
-        // was only buffered: std::endl reaches a streambuf as '\n' + sync(),
-        // never as a manipulator, so output that ends lines with plain '\n'
-        // (the report printers do) sat invisible until someone else flushed.
+        // Flush every completed line: std::endl reaches a streambuf as '\n'
+        // plus sync(), never as a manipulator, so output that ends lines with a
+        // plain '\n' (the report printers do) would otherwise stay invisible.
         checkAndFlush();
         return *this;
     }

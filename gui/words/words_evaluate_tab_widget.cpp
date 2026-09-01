@@ -56,8 +56,7 @@ void WordsEvaluateTabWidget::setController(WordsController* newController)
 {
     controller = newController;
 
-    // Seeded once here, never in updateInfo -- setValue would re-fire
-    // valueChanged and loop through infoUpdated.
+    // Seeded once; see the read-at-click-time rule in words_controller.h.
     const auto info = controller->getInfo();
     scoreColumnSpin->setValue(static_cast<int>(info.scoreColumn));
     restrictSpin->setValue(static_cast<int>(info.restrictTo));

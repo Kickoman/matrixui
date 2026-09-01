@@ -1,6 +1,6 @@
 #include "core/words/report/inspect_report.h"
 
-#include "core/words/report/format.h"
+#include "core/lib/stream_format.h"
 
 #include <ostream>
 

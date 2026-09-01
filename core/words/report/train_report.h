@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/words/trainer.h"
+#include "core/words/train/trainer.h"
 
 #include <iosfwd>
 
@@ -9,7 +9,6 @@ namespace Words {
 class Vocabulary;
 class WindowSampler;
 
-// The banner printed before training starts.
 void PrintTrainBanner(
     std::ostream& out,
     const ModelConfig& modelConfig,
@@ -21,10 +20,8 @@ void PrintTrainBanner(
     double initialLoss
 );
 
-// One progress tick.
 void PrintTrainProgress(std::ostream& out, const TrainProgress& progress);
 
-// The closing summary.
 void PrintTrainSummary(std::ostream& out, const TrainSummary& summary);
 
 }  // namespace Words

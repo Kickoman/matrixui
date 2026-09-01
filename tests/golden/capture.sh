@@ -2,9 +2,6 @@
 # Capture stdout+stderr and exit code of every MatrixGui_words subcommand.
 #
 # Usage: tests/golden/capture.sh <output-dir> [binary]
-#
-# Used twice: once to record the baseline before refactoring, then again after
-# each phase to diff against it.
 set -u
 
 OUT="${1:?usage: capture.sh <output-dir> [binary]}"

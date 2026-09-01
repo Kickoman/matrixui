@@ -2,7 +2,7 @@
 
 #include "core/words/error.h"
 #include "core/words/report/inspect_report.h"
-#include "core/words/utils/inspect.h"
+#include "core/words/data/inspect.h"
 #include "tests/support/fixtures.h"
 
 #include <sstream>

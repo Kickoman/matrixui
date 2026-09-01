@@ -16,7 +16,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(BUILD_GUI "Build GUI version" ON)
 option(BUILD_CLI "Build CLI version" ON)
-option(BUILD_READER "Build Reader version" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 
 # Qt options
@@ -31,16 +30,9 @@ if (BUILD_GUI)
     add_subdirectory(contrib/qt-dark-theme)
 endif()
 
-option(USE_EIGEN "Use Eigen matrix" ON) # Enabled by default
-if(USE_EIGEN)
-    message("Using Eigen't matrix implementation")
-    add_definitions(-DUSE_EIGEN)
-    # Hide warnings for eigen
-    set_directory_properties(PATH eigen PROPERTIES
-        COMPILE_OPTIONS "-w"  # For GCC/Clang
-        # COMPILE_OPTIONS "/w"  # For MSVC
-    )
-endif(USE_EIGEN)
+# Eigen is a hard dependency (matrix/matrix.h includes it unconditionally).
+# Hide its own warnings so they do not drown the project's -Wall -Wextra.
+set_directory_properties(PATH eigen PROPERTIES COMPILE_OPTIONS "-w")
 
 set(GUI_SOURCES
     gui/lib/theme.cpp
@@ -93,6 +85,9 @@ set(
     core/lib/neural_network_applier.cpp
     core/lib/dataset.cpp
     core/lib/directory_dataset.cpp
+    core/lib/stream_format.cpp
+    core/lib/text.cpp
+    core/lib/stats.cpp
 
     # Classifier
     core/classifier/trainer.cpp
@@ -101,22 +96,27 @@ set(
     core/generator/trainer.cpp
 
     # Words
-    core/words/utils/inspect.cpp
     core/words/config.cpp
-    core/words/vocabulary.cpp
-    core/words/corpus.cpp
-    core/words/subsampler.cpp
-    core/words/negativesampler.cpp
-    core/words/embeddings.cpp
-    core/words/model.cpp
-    core/words/trainer.cpp
-    core/words/similarity.cpp
-    core/words/evaluate.cpp
-    core/words/expressions.cpp
-    core/words/queries.cpp
+
+    # Words: data preparation and on-disk artifacts
+    core/words/data/inspect.cpp
+    core/words/data/vocabulary.cpp
+    core/words/data/corpus.cpp
+    core/words/data/embeddings.cpp
+
+    # Words: training
+    core/words/train/subsampler.cpp
+    core/words/train/negativesampler.cpp
+    core/words/train/model.cpp
+    core/words/train/trainer.cpp
+
+    # Words: querying a trained model
+    core/words/query/similarity.cpp
+    core/words/query/expressions.cpp
+    core/words/query/queries.cpp
+    core/words/query/evaluate.cpp
 
     # Words: console rendering
-    core/words/report/format.cpp
     core/words/report/inspect_report.cpp
     core/words/report/query_report.cpp
     core/words/report/evaluate_report.cpp
@@ -129,9 +129,8 @@ set(
 
 include_directories(eigen)
 
-# One compilation of the framework-free core, shared by every executable and by
-# the test binary. Previously CORE_SOURCES was compiled separately into each of
-# the four targets. Nothing here uses Qt, so the autogen steps are turned off.
+# The framework-free core, shared by every executable and the test binary.
+# Nothing here uses Qt, so the autogen steps are turned off.
 add_library(matrixgui_core STATIC ${CORE_SOURCES})
 target_include_directories(matrixgui_core PUBLIC contrib)
 set_target_properties(matrixgui_core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
@@ -215,6 +214,9 @@ if(BUILD_TESTS)
         tests/words/config_test.cpp
         tests/words/inspect_test.cpp
         tests/words/queries_test.cpp
+        tests/lib/stream_format_test.cpp
+        tests/lib/text_test.cpp
+        tests/lib/stats_test.cpp
     )
 
     add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})

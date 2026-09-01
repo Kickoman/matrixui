@@ -1,16 +1,16 @@
 #include "core/words_cli/commands.h"
 
-#include "core/words/corpus.h"
-#include "core/words/embeddings.h"
-#include "core/words/evaluate.h"
-#include "core/words/queries.h"
+#include "core/words/data/corpus.h"
+#include "core/words/data/embeddings.h"
+#include "core/words/query/evaluate.h"
+#include "core/words/query/queries.h"
 #include "core/words/report/evaluate_report.h"
 #include "core/words/report/inspect_report.h"
 #include "core/words/report/query_report.h"
-#include "core/words/similarity.h"
-#include "core/words/utils/inspect.h"
-#include "core/words/trainer.h"
-#include "core/words/vocabulary.h"
+#include "core/words/query/similarity.h"
+#include "core/words/data/inspect.h"
+#include "core/words/train/trainer.h"
+#include "core/words/data/vocabulary.h"
 
 #include <algorithm>
 #include <memory>

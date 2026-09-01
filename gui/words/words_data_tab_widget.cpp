@@ -161,8 +161,7 @@ void WordsDataTabWidget::setController(WordsController* newController)
         if (controller->getInfo().training) {
             controller->requestStop();
         } else {
-            // Config is read at click time, never on valueChanged -- avoids
-            // the setValue -> valueChanged -> infoUpdated re-entrancy loop.
+            // Read at click time; see the rule in words_controller.h.
             controller->setConfig(configWidget->getConfig());
             controller->setMinCount(static_cast<std::size_t>(minCountSpin->value()));
             controller->startTraining();

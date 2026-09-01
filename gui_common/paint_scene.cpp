@@ -6,7 +6,7 @@
 namespace {
 constexpr int BRUSH_SIZE = 40;
 constexpr double BRUSH_RADIUS = BRUSH_SIZE / 2.0;
-} // namespace
+}  // namespace
 
 PaintScene::PaintScene(QObject* parent)
     : QGraphicsScene(parent)

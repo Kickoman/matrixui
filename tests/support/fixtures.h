@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/lib/random.h"
-#include "core/words/corpus.h"
-#include "core/words/embeddings.h"
-#include "core/words/vocabulary.h"
+#include "core/words/data/corpus.h"
+#include "core/words/data/embeddings.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/temp_dir.h"
 
 #include <cmath>

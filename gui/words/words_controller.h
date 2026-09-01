@@ -1,11 +1,11 @@
 #pragma once
 
 #include "core/words/config.h"
-#include "core/words/corpus.h"
-#include "core/words/embeddings.h"
-#include "core/words/similarity.h"
-#include "core/words/trainer.h"
-#include "core/words/vocabulary.h"
+#include "core/words/data/corpus.h"
+#include "core/words/data/embeddings.h"
+#include "core/words/query/similarity.h"
+#include "core/words/train/trainer.h"
+#include "core/words/data/vocabulary.h"
 
 #include "gui/lib/mode_controller.h"
 #include "gui/lib/mode_settings.h"
@@ -21,9 +21,6 @@
 
 Q_DECLARE_METATYPE(Words::TrainProgress)
 
-// Drives the words pipeline for the GUI: raw text -> vocabulary -> corpus ->
-// training -> queries/evaluation.
-//
 // Threading contract: every member is written on the GUI thread only. Worker
 // lambdas capture immutable snapshots (shared_ptr, copies of paths) up front
 // and publish results back through QMetaObject::invokeMethod. One worker
@@ -72,7 +69,8 @@ public:
     void saveSettings();
     void setLogger(std::ostream* stream);
 
-    // Read from the widgets at click time (never on valueChanged).
+    // Read from the widgets at click time, never on valueChanged: that would
+    // loop through setValue -> valueChanged -> infoUpdated. See docs/gui.md.
     void setConfig(const Words::WordsConfig& value);
     void setMinCount(std::size_t value);
     void setEvaluateParams(std::size_t scoreColumn, std::size_t restrictTo, std::size_t threads);

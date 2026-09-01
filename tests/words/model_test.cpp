@@ -1,9 +1,9 @@
 #include <doctest/doctest.h>
 
 #include "core/lib/random.h"
-#include "core/words/model.h"
-#include "core/words/negativesampler.h"
-#include "core/words/vocabulary.h"
+#include "core/words/train/model.h"
+#include "core/words/train/negativesampler.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 
 #include <algorithm>
@@ -20,10 +20,8 @@ Vocabulary ManyWordVocabulary(const Tests::TempDir& dir, const std::size_t disti
     return Vocabulary::Build(path, 1);
 }
 
-// --- gradient-check helpers -------------------------------------------------
-//
-// applyUpdate mutates the centre row and every touched output row, so each
-// probe has to run against a saved copy and then restore it.
+// Gradient-check helpers. applyUpdate mutates the centre row and every touched
+// output row, so each probe has to run against a saved copy and then restore it.
 
 using RowSnapshot = std::vector<std::vector<TFloat>>;
 

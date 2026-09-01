@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "core/words/vocabulary.h"
+#include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
 #include "tests/support/temp_dir.h"
 
@@ -85,5 +85,47 @@ TEST_CASE("Vocabulary survives a Save/Load round-trip") {
     for (TWordId id = 0; id < original.getSize(); ++id) {
         CHECK(loaded.getWord(id) == original.getWord(id));
         CHECK(loaded.getCount(id) == original.getCount(id));
+    }
+}
+
+TEST_CASE("Words with equal counts are ordered alphabetically") {
+    const Tests::TempDir dir;
+    // Four words at the same count, written in an order that is neither
+    // alphabetical nor its reverse, so a stable sort alone cannot pass this.
+    const auto path = dir.write("ties.txt", "pear apple fig banana pear apple fig banana");
+    const auto vocabulary = Vocabulary::Build(path, 1);
+
+    REQUIRE(vocabulary.getSize() == 4);
+    for (TWordId id = 0; id < 4; ++id) {
+        CHECK(vocabulary.getCount(id) == 2);
+    }
+
+    CHECK(vocabulary.getWord(0) == "apple");
+    CHECK(vocabulary.getWord(1) == "banana");
+    CHECK(vocabulary.getWord(2) == "fig");
+    CHECK(vocabulary.getWord(3) == "pear");
+}
+
+TEST_CASE("Count still outranks the alphabetical tiebreak") {
+    const Tests::TempDir dir;
+    const auto path = dir.write("mixed.txt", "zebra zebra zebra apple apple mango");
+    const auto vocabulary = Vocabulary::Build(path, 1);
+
+    REQUIRE(vocabulary.getSize() == 3);
+    CHECK(vocabulary.getWord(0) == "zebra");   // 3
+    CHECK(vocabulary.getWord(1) == "apple");   // 2
+    CHECK(vocabulary.getWord(2) == "mango");   // 1
+}
+
+TEST_CASE("Building the same dump twice gives identical ids") {
+    const Tests::TempDir dir;
+    const auto path = dir.write("repeat.txt", "one two three one two three four five");
+
+    const auto first = Vocabulary::Build(path, 1);
+    const auto second = Vocabulary::Build(path, 1);
+
+    REQUIRE(first.getSize() == second.getSize());
+    for (TWordId id = 0; id < first.getSize(); ++id) {
+        CHECK(first.getWord(id) == second.getWord(id));
     }
 }

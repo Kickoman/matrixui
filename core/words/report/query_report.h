@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/words/queries.h"
+#include "core/words/query/queries.h"
 
 #include <iosfwd>
 
