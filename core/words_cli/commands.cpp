@@ -1,11 +1,9 @@
 #include "core/words_cli/commands.h"
 
 #include "core/words/corpus.h"
-#include "core/words/diagnostics/diagnostics.h"
 #include "core/words/embeddings.h"
 #include "core/words/evaluate.h"
 #include "core/words/queries.h"
-#include "core/words/report/diagnostics_report.h"
 #include "core/words/report/evaluate_report.h"
 #include "core/words/report/inspect_report.h"
 #include "core/words/report/query_report.h"
@@ -41,93 +39,32 @@ void PrintCorpusInfo(std::ostream& out, const Words::TCorpus& corpus) {
 
 }  // namespace
 
-bool Inspect(std::ostream& out, const InspectOptions& options) {
+void Inspect(std::ostream& out, const InspectOptions& options) {
     Words::PrintCorpusStatistics(out, Words::InspectDump(options.input, options.topN));
-    return true;
 }
 
-bool BuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
+void BuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
     const auto vocabulary = Words::Vocabulary::Build(options.input, options.minCount);
     PrintVocabularyInfo(out, vocabulary);
     Words::Vocabulary::Save(vocabulary, options.output);
-    return true;
 }
 
-bool LoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) {
+void LoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) {
     PrintVocabularyInfo(out, Words::Vocabulary::Load(options.input));
-    return true;
 }
 
-bool BuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
+void BuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto corpus = Words::EncodeCorpus(options.input, vocabulary);
     PrintCorpusInfo(out, corpus);
     Words::SaveCorpus(options.output, corpus);
-    return true;
 }
 
-bool LoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
+void LoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
     PrintCorpusInfo(out, Words::LoadCorpus(options.input));
-    return true;
 }
 
-bool ValidateSubsampler(std::ostream& out, const ValidateSubsamplerOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto corpus = Words::LoadCorpus(options.corpus);
-
-    const auto report = Words::Diagnostics::CheckSubsampler(vocabulary, corpus, options.sample);
-    Words::Diagnostics::PrintSubsamplerReport(out, vocabulary, report);
-    return report.allPassed();
-}
-
-bool ValidateWindowSampler(std::ostream& out, const ValidateWindowSamplerOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto corpus = Words::LoadCorpus(options.corpus);
-
-    const auto report = Words::Diagnostics::CheckWindowSampler(vocabulary, corpus);
-    Words::Diagnostics::PrintWindowSamplerReport(out, vocabulary, report);
-    return report.allPassed();
-}
-
-bool ValidateNegativeSampler(std::ostream& out, const ValidateVocabularyOnlyOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-
-    const auto report = Words::Diagnostics::CheckNegativeSampler(vocabulary);
-    Words::Diagnostics::PrintNegativeSamplerReport(out, vocabulary, report);
-    return report.allPassed();
-}
-
-bool ValidateModel(std::ostream& out, const ValidateVocabularyOnlyOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-
-    Words::ModelConfig config;
-    config.dim = 100;
-
-    const auto report = Words::Diagnostics::CheckModelInit(vocabulary, config);
-    Words::Diagnostics::PrintModelInitReport(out, report);
-    return report.allPassed();
-}
-
-bool ValidateGradients(std::ostream& out, const ValidateVocabularyOnlyOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-
-    Words::ModelConfig config;
-    config.dim = 100;
-
-    const auto init = Words::Diagnostics::CheckModelInit(vocabulary, config);
-    Words::Diagnostics::PrintModelInitReport(out, init);
-    out << '\n';
-
-    const auto gradients = Words::Diagnostics::CheckGradients(vocabulary);
-    Words::Diagnostics::PrintGradientReport(out, gradients);
-
-    const auto loss = Words::Diagnostics::CheckLossBehaviour(vocabulary);
-    Words::Diagnostics::PrintLossBehaviourReport(out, loss);
-
-    return init.allPassed() && gradients.allPassed() && loss.allPassed();
-}
-
-bool Train(std::ostream& out, const TrainOptions& options) {
+void Train(std::ostream& out, const TrainOptions& options) {
     auto vocabulary =
         std::make_shared<const Words::Vocabulary>(Words::Vocabulary::Load(options.vocabulary));
     auto corpus = std::make_shared<const Words::TCorpus>(Words::LoadCorpus(options.corpus));
@@ -149,10 +86,9 @@ bool Train(std::ostream& out, const TrainOptions& options) {
 
     Words::Embeddings::Save(trainer.getInputEmbeddings(), options.output);
     out << "saved embeddings to " << options.output << '\n';
-    return true;
 }
 
-bool Neighbours(std::ostream& out, const NeighboursOptions& options) {
+void Neighbours(std::ostream& out, const NeighboursOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto index = Words::EmbeddingIndex::Load(options.embeddings);
 
@@ -164,10 +100,9 @@ bool Neighbours(std::ostream& out, const NeighboursOptions& options) {
         Words::PrintNeighbourReport(
             out, vocabulary, Words::QueryNeighbours(vocabulary, index, options.word, options.count));
     }
-    return true;
 }
 
-bool Evaluate(std::ostream& out, const EvaluateOptions& options) {
+void Evaluate(std::ostream& out, const EvaluateOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto index = Words::EmbeddingIndex::Load(options.embeddings);
 
@@ -188,29 +123,26 @@ bool Evaluate(std::ostream& out, const EvaluateOptions& options) {
             options.similarity.filename().string(),
             Words::EvaluateSimilarity(vocabulary, index, options.similarity, options.scoreColumn));
     }
-    return true;
 }
 
-bool Expression(std::ostream& out, const ExpressionOptions& options) {
+void Expression(std::ostream& out, const ExpressionOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto index = Words::EmbeddingIndex::Load(options.embeddings);
 
     Words::PrintExpressionReport(
         out, vocabulary,
         Words::QueryExpression(vocabulary, index, options.expression, options.count));
-    return true;
 }
 
-bool OddOne(std::ostream& out, const OddOneOptions& options) {
+void OddOne(std::ostream& out, const OddOneOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto index = Words::EmbeddingIndex::Load(options.embeddings);
 
     Words::PrintOddOneOutReport(
         out, vocabulary, Words::QueryOddOneOut(vocabulary, index, options.words));
-    return true;
 }
 
-bool Axis(std::ostream& out, const AxisOptions& options) {
+void Axis(std::ostream& out, const AxisOptions& options) {
     const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
     const auto index = Words::EmbeddingIndex::Load(options.embeddings);
 
@@ -218,7 +150,6 @@ bool Axis(std::ostream& out, const AxisOptions& options) {
         out, vocabulary,
         Words::QueryAxis(vocabulary, index, options.axis, options.words,
                          options.restrictTo, options.count));
-    return true;
 }
 
 }  // namespace WordsCli

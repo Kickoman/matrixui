@@ -30,7 +30,6 @@ MatrixGui_words neighbours --vocabulary built.voc --embeddings emb.bin --word ki
 | Directory | Contains |
 |---|---|
 | `core/words/` | The pipeline: vocabulary, corpus, samplers, model, trainer, queries, evaluation |
-| `core/words/diagnostics/` | Self-checks; each returns a report struct |
 | `core/words/report/` | **All** console formatting |
 | `core/words_cli/` | Subcommand option structs and bodies (CLI-only, not in `CORE_SOURCES`) |
 
@@ -62,8 +61,8 @@ const auto report = Words::QueryNeighbours(vocabulary, index, "king", 10);
 Words::PrintNeighbourReport(std::cout, vocabulary, report);   // optional
 ```
 
-This holds for queries (`queries.h`), evaluation (`evaluate.h`), diagnostics
-(`diagnostics/diagnostics.h`) and training (`TrainProgress` / `TrainSummary`).
+This holds for queries (`queries.h`), evaluation (`evaluate.h`) and training
+(`TrainProgress` / `TrainSummary`).
 
 ## Errors
 
@@ -166,11 +165,22 @@ Two layers:
   fixed seeds, whole suite under three seconds. `tests/support/fixtures.h`
   builds toy vocabularies and embeddings whose neighbours are analytically
   known.
-- **A CLI snapshot** (`tests/golden/`) running all sixteen subcommands against a
+- **A CLI snapshot** (`tests/golden/`) running every subcommand against a
   generated corpus and diffing stdout and exit codes. `capture.sh` records,
   `compare.sh` checks. Regenerate the corpus with `make_corpus.py`; it is seeded,
   and the expectations are pinned to its exact bytes.
 
+The `validate-*` subcommands that once self-checked the samplers and the model
+are gone: they predate the test suite, and every invariant they verified
+(gradient check, chi-squared draw distribution, initialisation statistics,
+window invariants) now lives in the unit tests, which assert instead of
+printing "passed".
+
 The snapshot normalises the training log: progress ticks are sampled on a
 wall-clock timer, so both their values and their number vary between runs. The
 banner and the final summary are reproducible and are compared.
+
+CI (`.github/workflows/ci.yml`) builds the core and runs the unit tests on
+every push to master and on every pull request into it, plus compiles the Qt
+GUI in a second job. The golden snapshot stays local: its expectations pin
+float output of a trained model, which is not bit-portable across CPUs.

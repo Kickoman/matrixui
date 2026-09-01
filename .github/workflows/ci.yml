@@ -1,0 +1,69 @@
+# Build and test on every push to master and on every pull request into it.
+#
+# Two jobs:
+#   - tests: the framework-free core, the CLI binaries and the doctest suite.
+#     No Qt involved (BUILD_GUI=OFF), so it stays fast.
+#   - gui-build: compiles the Qt6 application as well, to catch GUI build
+#     breaks. Nothing is executed there.
+#
+# The golden CLI snapshot (tests/golden/compare.sh) intentionally does NOT run
+# here: its expectations pin float output of a trained model recorded on the
+# developer machine, and -O3/-march=native accumulate floats in a different
+# order on a different CPU, so the 4th decimal of losses and similarities is
+# not portable. It remains a local pre-commit tool; the unit tests carry the
+# same invariants with tolerances.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Core build & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (with the eigen submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure
+        run: cmake -B build -DBUILD_GUI=OFF -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+  gui-build:
+    name: GUI build (Qt6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (with the eigen submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Qt6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-declarative-dev qt6-charts-dev
+
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"

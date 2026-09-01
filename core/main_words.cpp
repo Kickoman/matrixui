@@ -15,7 +15,7 @@
 
 namespace {
 
-// Exit codes: 0 success, 1 a failed check or a reported error, 2 a bug.
+// Exit codes: 0 success, 1 a reported error, 2 a bug.
 constexpr int kSuccess = 0;
 constexpr int kFailure = 1;
 constexpr int kInternalError = 2;
@@ -26,8 +26,6 @@ int main(int argc, char** argv) {
     CLI::App app{"Words embedder"};
     app.require_subcommand(1);
 
-    bool succeeded = true;
-
     // --- raw text -----------------------------------------------------------
     WordsCli::InspectOptions inspect;
     auto* inspectCmd = app.add_subcommand("inspect", "Summarise a raw text dump");
@@ -36,7 +34,7 @@ int main(int argc, char** argv) {
     inspectCmd->add_option("--top", inspect.topN, "How many frequent words to list")
         ->capture_default_str();
     inspectCmd->callback([&] {
-        succeeded = WordsCli::Inspect(std::cout, inspect);
+        WordsCli::Inspect(std::cout, inspect);
     });
 
     // --- vocabulary ---------------------------------------------------------
@@ -49,7 +47,7 @@ int main(int argc, char** argv) {
     buildVocabularyCmd->add_option("--min-count", buildVocabulary.minCount, "Drop words below this count")
         ->capture_default_str();
     buildVocabularyCmd->callback([&] {
-        succeeded = WordsCli::BuildVocabulary(std::cout, buildVocabulary);
+        WordsCli::BuildVocabulary(std::cout, buildVocabulary);
     });
 
     WordsCli::LoadVocabularyOptions loadVocabulary;
@@ -57,7 +55,7 @@ int main(int argc, char** argv) {
     loadVocabularyCmd->add_option("--input-file", loadVocabulary.input, "Built vocabulary file")
         ->required()->check(CLI::ExistingFile);
     loadVocabularyCmd->callback([&] {
-        succeeded = WordsCli::LoadVocabulary(std::cout, loadVocabulary);
+        WordsCli::LoadVocabulary(std::cout, loadVocabulary);
     });
 
     // --- corpus -------------------------------------------------------------
@@ -70,7 +68,7 @@ int main(int argc, char** argv) {
     buildCorpusCmd->add_option("--vocabulary", buildCorpus.vocabulary, "Built vocabulary path")
         ->required()->check(CLI::ExistingFile);
     buildCorpusCmd->callback([&] {
-        succeeded = WordsCli::BuildCorpus(std::cout, buildCorpus);
+        WordsCli::BuildCorpus(std::cout, buildCorpus);
     });
 
     WordsCli::LoadCorpusOptions loadCorpus;
@@ -78,54 +76,7 @@ int main(int argc, char** argv) {
     loadCorpusCmd->add_option("--input-file", loadCorpus.input, "Built corpus file path")
         ->required()->check(CLI::ExistingFile);
     loadCorpusCmd->callback([&] {
-        succeeded = WordsCli::LoadCorpus(std::cout, loadCorpus);
-    });
-
-    // --- validators ---------------------------------------------------------
-    WordsCli::ValidateSubsamplerOptions validateSubsampler;
-    auto* validateSubsamplerCmd = app.add_subcommand("validate-subsampler", "Validate subsampler");
-    validateSubsamplerCmd->add_option("--vocabulary", validateSubsampler.vocabulary, "Built vocabulary path")
-        ->required()->check(CLI::ExistingFile);
-    validateSubsamplerCmd->add_option("--corpus", validateSubsampler.corpus, "Prepared corpus file")
-        ->required()->check(CLI::ExistingFile);
-    validateSubsamplerCmd->add_option("--sample", validateSubsampler.sample, "Sample size")
-        ->capture_default_str();
-    validateSubsamplerCmd->callback([&] {
-        succeeded = WordsCli::ValidateSubsampler(std::cout, validateSubsampler);
-    });
-
-    WordsCli::ValidateWindowSamplerOptions validateWindowSampler;
-    auto* validateWindowSamplerCmd = app.add_subcommand("validate-window-sampler", "Validate window sampler");
-    validateWindowSamplerCmd->add_option("--vocabulary", validateWindowSampler.vocabulary, "Built vocabulary path")
-        ->required()->check(CLI::ExistingFile);
-    validateWindowSamplerCmd->add_option("--corpus", validateWindowSampler.corpus, "Prepared corpus file")
-        ->required()->check(CLI::ExistingFile);
-    validateWindowSamplerCmd->callback([&] {
-        succeeded = WordsCli::ValidateWindowSampler(std::cout, validateWindowSampler);
-    });
-
-    WordsCli::ValidateVocabularyOnlyOptions validateNegativeSampler;
-    auto* validateNegativeSamplerCmd = app.add_subcommand("validate-negative-sampler", "Validate negative sampler");
-    validateNegativeSamplerCmd->add_option("--vocabulary", validateNegativeSampler.vocabulary, "Built vocabulary path")
-        ->required()->check(CLI::ExistingFile);
-    validateNegativeSamplerCmd->callback([&] {
-        succeeded = WordsCli::ValidateNegativeSampler(std::cout, validateNegativeSampler);
-    });
-
-    WordsCli::ValidateVocabularyOnlyOptions validateSgnsModel;
-    auto* validateSgnsModelCmd = app.add_subcommand("validate-sgns", "Validate SGNS model");
-    validateSgnsModelCmd->add_option("--vocabulary", validateSgnsModel.vocabulary, "Built vocabulary path")
-        ->required()->check(CLI::ExistingFile);
-    validateSgnsModelCmd->callback([&] {
-        succeeded = WordsCli::ValidateModel(std::cout, validateSgnsModel);
-    });
-
-    WordsCli::ValidateVocabularyOnlyOptions validateGradients;
-    auto* validateGradientsCmd = app.add_subcommand("validate-gradients", "Validate gradients");
-    validateGradientsCmd->add_option("--vocabulary", validateGradients.vocabulary, "Built vocabulary path")
-        ->required()->check(CLI::ExistingFile);
-    validateGradientsCmd->callback([&] {
-        succeeded = WordsCli::ValidateGradients(std::cout, validateGradients);
+        WordsCli::LoadCorpus(std::cout, loadCorpus);
     });
 
     // --- training -----------------------------------------------------------
@@ -145,7 +96,7 @@ int main(int argc, char** argv) {
     trainCmd->add_option("--lr", train.config.model.initialLearningRate, "Initial learning rate")->capture_default_str();
     trainCmd->add_option("--threads", train.config.train.threads, "Worker threads (0 = auto)")->capture_default_str();
     trainCmd->callback([&] {
-        succeeded = WordsCli::Train(std::cout, train);
+        WordsCli::Train(std::cout, train);
     });
 
     // --- queries ------------------------------------------------------------
@@ -158,7 +109,7 @@ int main(int argc, char** argv) {
     neighboursCmd->add_option("--word", neighbours.word, "Query word (empty runs a default battery)");
     neighboursCmd->add_option("--count", neighbours.count, "How many neighbours")->capture_default_str();
     neighboursCmd->callback([&] {
-        succeeded = WordsCli::Neighbours(std::cout, neighbours);
+        WordsCli::Neighbours(std::cout, neighbours);
     });
 
     WordsCli::EvaluateOptions evaluate;
@@ -175,7 +126,7 @@ int main(int argc, char** argv) {
     evaluateCmd->add_option("--restrict-to", evaluate.restrictTo, "Search top-N words only (0 = all)")->capture_default_str();
     evaluateCmd->add_option("--threads", evaluate.threads, "Worker threads (0 = auto)")->capture_default_str();
     evaluateCmd->callback([&] {
-        succeeded = WordsCli::Evaluate(std::cout, evaluate);
+        WordsCli::Evaluate(std::cout, evaluate);
     });
 
     WordsCli::ExpressionOptions expression;
@@ -187,7 +138,7 @@ int main(int argc, char** argv) {
         ->required()->check(CLI::ExistingFile);
     expressionCmd->add_option("--count", expression.count, "How many results")->capture_default_str();
     expressionCmd->callback([&] {
-        succeeded = WordsCli::Expression(std::cout, expression);
+        WordsCli::Expression(std::cout, expression);
     });
 
     WordsCli::OddOneOptions oddOne;
@@ -198,7 +149,7 @@ int main(int argc, char** argv) {
     oddOneCmd->add_option("--embeddings", oddOne.embeddings, "Trained embeddings")
         ->required()->check(CLI::ExistingFile);
     oddOneCmd->callback([&] {
-        succeeded = WordsCli::OddOne(std::cout, oddOne);
+        WordsCli::OddOne(std::cout, oddOne);
     });
 
     WordsCli::AxisOptions axis;
@@ -212,7 +163,7 @@ int main(int argc, char** argv) {
     axisCmd->add_option("--restrict-to", axis.restrictTo, "Scan top-N words (0 = all)")->capture_default_str();
     axisCmd->add_option("--count", axis.count, "How many per end")->capture_default_str();
     axisCmd->callback([&] {
-        succeeded = WordsCli::Axis(std::cout, axis);
+        WordsCli::Axis(std::cout, axis);
     });
 
     // CLI11_PARSE cannot be used here: the handlers run inside parse(), and its
@@ -229,5 +180,5 @@ int main(int argc, char** argv) {
         return kInternalError;
     }
 
-    return succeeded ? kSuccess : kFailure;
+    return kSuccess;
 }

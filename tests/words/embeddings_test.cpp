@@ -38,7 +38,7 @@ TEST_CASE("initializeZero zeroes every element") {
 }
 
 TEST_CASE("initializeUniform respects the 0.5/dim bound and varies per row") {
-    constexpr std::size_t words = 64;
+    constexpr std::size_t words = 256;
     constexpr std::size_t dim = 16;
     const double bound = 0.5 / dim;
 
@@ -47,17 +47,24 @@ TEST_CASE("initializeUniform respects the 0.5/dim bound and varies per row") {
     embeddings.initializeUniform(rng);
 
     double sum = 0.;
+    double sumSquares = 0.;
     std::size_t count = 0;
     for (TWordId id = 0; id < words; ++id) {
         for (std::size_t i = 0; i < dim; ++i) {
             const double value = embeddings.row(id)[i];
             CHECK(std::abs(value) < bound);
             sum += value;
+            sumSquares += value * value;
             ++count;
         }
     }
     // Centred on zero.
-    CHECK(sum / count == doctest::Approx(0.).epsilon(0.05).scale(bound));
+    const double mean = sum / count;
+    CHECK(mean == doctest::Approx(0.).epsilon(0.05).scale(bound));
+
+    // Standard deviation of a uniform(-b, b) distribution is b / sqrt(3).
+    const double stddev = std::sqrt(sumSquares / count - mean * mean);
+    CHECK(stddev == doctest::Approx(bound / std::sqrt(3.)).epsilon(0.05));
 
     // Distinct rows.
     CHECK(!std::equal(embeddings.row(0), embeddings.row(0) + dim, embeddings.row(1)));

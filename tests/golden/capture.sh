@@ -35,13 +35,6 @@ run loadvoc   loadvoc  --input-file "$VOC"
 run buildcor  buildcor --input-file "$TEXT" --vocabulary "$VOC" --output-file "$COR"
 run loadcor   loadcor  --input-file "$COR"
 
-# --- validators (deterministic on fixed seeds) ---
-run validate-subsampler       validate-subsampler       --vocabulary "$VOC" --corpus "$COR"
-run validate-window-sampler   validate-window-sampler   --vocabulary "$VOC" --corpus "$COR"
-run validate-negative-sampler validate-negative-sampler --vocabulary "$VOC"
-run validate-sgns             validate-sgns             --vocabulary "$VOC"
-run validate-gradients        validate-gradients        --vocabulary "$VOC"
-
 # --- training (1 epoch, 1 thread so pair scheduling is deterministic) ---
 run train train --vocabulary "$VOC" --corpus "$COR" --output-file "$EMB" \
     --dim 32 --epochs 1 --threads 1

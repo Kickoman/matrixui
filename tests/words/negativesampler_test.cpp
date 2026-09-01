@@ -17,6 +17,61 @@ constexpr std::size_t kTableSize = 200'000;
 
 }  // namespace
 
+TEST_CASE("The draw distribution passes a chi-squared test on a large vocabulary") {
+    // Ported from the former validate-negative-sampler diagnostic: a reduced
+    // chi-squared over every word with enough expected mass is a much stronger
+    // statement than per-word tolerances -- it catches a systematically skewed
+    // table even when each individual word looks close enough.
+    const Tests::TempDir dir;
+    const auto path = dir.write("zipf.txt", Tests::ZipfCorpusText(1200, 120'000));
+    const auto vocabulary = Vocabulary::Build(path, 1);
+    const NegativeSampler sampler(vocabulary, kTableSize);
+
+    constexpr std::size_t draws = 400'000;
+    constexpr double power = 0.75;
+    constexpr double minExpectedHits = 50.;
+
+    std::vector<std::size_t> hits(vocabulary.getSize(), 0);
+    XorShift rng(2);
+    for (std::size_t i = 0; i < draws; ++i) {
+        ++hits[sampler.sample(rng)];
+    }
+
+    double total = 0.;
+    std::vector<double> weights(vocabulary.getSize());
+    for (TWordId id = 0; id < vocabulary.getSize(); ++id) {
+        weights[id] = std::pow(static_cast<double>(vocabulary.getCount(id)), power);
+        total += weights[id];
+    }
+
+    double chiSquare = 0.;
+    std::size_t counted = 0;
+    double maxAbsZ = 0.;
+
+    for (TWordId id = 0; id < vocabulary.getSize(); ++id) {
+        const double p = weights[id] / total;
+        const double expected = p * static_cast<double>(draws);
+        if (expected < minExpectedHits) {
+            continue;
+        }
+
+        const double sigma = std::sqrt(expected * (1. - p));
+        const double z = (static_cast<double>(hits[id]) - expected) / sigma;
+        chiSquare += z * z;
+        maxAbsZ = std::max(maxAbsZ, std::abs(z));
+        ++counted;
+    }
+
+    REQUIRE(counted > 100);   // the test is meaningless on a handful of words
+
+    const double reduced = chiSquare / static_cast<double>(counted);
+    const double tolerance = 4. * std::sqrt(2. / static_cast<double>(counted));
+    CHECK(std::abs(reduced - 1.) < tolerance);
+
+    const double typicalMax = std::sqrt(2. * std::log(2. * static_cast<double>(counted)));
+    CHECK(maxAbsZ < 2. * typicalMax);
+}
+
 TEST_CASE("NegativeSampler rejects impossible configurations") {
     const Tests::TempDir dir;
     const auto vocabulary = Tests::ToyVocabulary(dir, 1);

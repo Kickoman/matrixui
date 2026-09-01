@@ -39,21 +39,6 @@ struct LoadCorpusOptions {
     std::filesystem::path input;
 };
 
-struct ValidateSubsamplerOptions {
-    std::filesystem::path vocabulary;
-    std::filesystem::path corpus;
-    double sample{1e-4};
-};
-
-struct ValidateWindowSamplerOptions {
-    std::filesystem::path vocabulary;
-    std::filesystem::path corpus;
-};
-
-struct ValidateVocabularyOnlyOptions {
-    std::filesystem::path vocabulary;
-};
-
 struct TrainOptions {
     std::filesystem::path vocabulary;
     std::filesystem::path corpus;

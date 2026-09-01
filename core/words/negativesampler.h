@@ -19,7 +19,8 @@ public:
     TWordId sampleExcluding(TWordId wordId, XorShift& rng) const;
     std::size_t getTableSize() const { return table.size(); }
 
-    // Used by the negative-sampler diagnostics.
+    // The probability the table assigns to a word (a full scan; used by the
+    // sampler's tests, not by training).
     double getProbability(TWordId wordId) const;
 
 private:

@@ -115,17 +115,12 @@ set(
     core/words/expressions.cpp
     core/words/queries.cpp
 
-    # Words: diagnostics and console rendering
-    core/words/diagnostics/sampler_checks.cpp
-    core/words/diagnostics/negative_sampler_checks.cpp
-    core/words/diagnostics/model_checks.cpp
-    core/words/diagnostics/gradient_checks.cpp
+    # Words: console rendering
     core/words/report/format.cpp
     core/words/report/inspect_report.cpp
     core/words/report/query_report.cpp
     core/words/report/evaluate_report.cpp
     core/words/report/train_report.cpp
-    core/words/report/diagnostics_report.cpp
 
     # Other
     matrix/matrix.cpp
@@ -217,7 +212,6 @@ if(BUILD_TESTS)
         tests/words/evaluate_test.cpp
         tests/words/golden_print_test.cpp
         tests/words/trainer_test.cpp
-        tests/words/diagnostics_test.cpp
         tests/words/config_test.cpp
         tests/words/inspect_test.cpp
         tests/words/queries_test.cpp
