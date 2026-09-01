@@ -131,6 +131,24 @@ them surface from a sampler constructor after a worker thread has started.
 JSON bindings are in `config_json.h`, kept separate so that including
 `config.h` does not pull nlohmann into every translation unit.
 
+## GUI
+
+The `MatrixGui` application has a Words mode (the fourth button on the mode
+picker) with three sub-tabs sharing one terminal:
+
+- **Data & Training** — inspect a raw dump, build/load the vocabulary and
+  corpus, train with live probe-loss and speed charts, save/load embeddings.
+- **Explore** — neighbours, the default battery, vector expressions,
+  odd-one-out and axis projection. Results print into the terminal through the
+  same `report/` functions the CLI uses, so the output is identical.
+- **Evaluate** — analogy and similarity datasets. Analogy evaluation runs on a
+  worker thread and cannot be cancelled once started.
+
+After an in-session training run the query index is built in memory
+(`EmbeddingIndex` from the trainer's embeddings) — no save/load round-trip is
+needed before exploring. Reloading or rebuilding the vocabulary resets the
+loaded corpus, since its encoded ids belong to the old vocabulary.
+
 ## Tests
 
 ```bash

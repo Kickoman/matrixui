@@ -6,6 +6,8 @@
 #include "gui/recognizer/digits_recognizer_mode_controller.h"
 #include "gui/generator/digits_generator_controller.h"
 #include "gui/generator/digits_generator_mode_widget.h"
+#include "gui/words/words_controller.h"
+#include "gui/words/words_mode_widget.h"
 
 #include <stdexcept>
 
@@ -25,6 +27,17 @@ namespace {
     Mode CreateDigitsRecognizerMode() {
         auto* controller = new DigitsRecognizerModeController();
         auto* view = new DigitsRecognizerModeWidget();
+        view->setController(controller);
+        return {
+            .controller = controller,
+            .view = view,
+        };
+    }
+
+    Mode CreateWordsMode() {
+        auto* controller = new WordsController();
+        auto* view = new WordsModeWidget();
+        controller->setLogger(view->getTerminalStream());
         view->setController(controller);
         return {
             .controller = controller,
@@ -53,6 +66,8 @@ Mode CreateMode(ModeType mode) {
             return CreateDigitsRecognizerMode();
         case ModeType::DigitsGenerator:
             return CreateDigitsGeneratorMode();
+        case ModeType::Words:
+            return CreateWordsMode();
     }
     throw std::runtime_error("Unsupported mode");
 }

@@ -16,6 +16,11 @@ public:
     TimeChart(QWidget* parent = nullptr);
 
     void setTitle(const QString& title);
+
+    // When enabled, the Y axis grows to fit every value seen so far (with a
+    // small margin) instead of staying at the fixed 0..100 percent range the
+    // existing modes rely on. Off by default.
+    void setAutoScaleY(bool enabled);
     QChart* getChart();
     QValueAxis* getAxisX();
     QValueAxis* getAxisY();
@@ -31,4 +36,9 @@ private:
     QValueAxis* axisX = nullptr;
     QValueAxis* axisY = nullptr;
     QDateTime startTime;
+
+    bool autoScaleY = false;
+    bool hasObservedValue = false;
+    double observedMin = 0.;
+    double observedMax = 0.;
 };

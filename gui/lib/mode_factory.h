@@ -9,6 +9,7 @@ enum class ModeType {
     DigitsClassifier,
     DigitsRecognizer,
     DigitsGenerator,
+    Words,
 };
 
 

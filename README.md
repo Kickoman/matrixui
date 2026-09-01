@@ -9,6 +9,7 @@ Neural network tooling for handwritten digit recognition and generation. The pro
 | Classifier | Classifier | `MatrixGui_headless` | Train a network to classify digits 0–9 |
 | Recognizer | Recognizer | `MatrixGui_headless --predict-image` | Draw or load a digit and classify it |
 | Generator (GAN) | Generator | `MatrixGui_gan` | Train a conditional GAN and generate synthetic digit images |
+| Words | Words | `MatrixGui_words` | Train SGNS word embeddings and explore them (neighbours, analogies, evaluation) |
 
 ## Quick start
 

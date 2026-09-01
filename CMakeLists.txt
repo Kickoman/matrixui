@@ -64,6 +64,13 @@ set(GUI_SOURCES
     gui/generator/digits_generator_mode_widget.cpp
     gui/generator/gan_config_widget.cpp
 
+    gui/words/words_controller.cpp
+    gui/words/words_mode_widget.cpp
+    gui/words/words_data_tab_widget.cpp
+    gui/words/words_explore_tab_widget.cpp
+    gui/words/words_evaluate_tab_widget.cpp
+    gui/words/words_train_config_widget.cpp
+
     gui/main_controller.cpp
     gui/main_window.cpp
 )
