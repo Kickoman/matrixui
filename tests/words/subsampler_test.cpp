@@ -10,8 +10,7 @@
 using namespace Words;
 
 TEST_CASE("A disabled subsampler keeps everything") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 0.);
 
     XorShift rng(1);
@@ -28,8 +27,7 @@ TEST_CASE("A disabled subsampler keeps everything") {
 }
 
 TEST_CASE("Keep probability is non-decreasing as words get rarer") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 1e-2);
 
     // Ids are ordered most- to least-frequent, so keep probability must rise.
@@ -39,8 +37,7 @@ TEST_CASE("Keep probability is non-decreasing as words get rarer") {
 }
 
 TEST_CASE("Keep probability follows sqrt(t/f) + t/f, capped at one") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     constexpr double sample = 1e-2;
     const Subsampler subsampler(vocabulary, sample);
 
@@ -52,8 +49,7 @@ TEST_CASE("Keep probability follows sqrt(t/f) + t/f, capped at one") {
 }
 
 TEST_CASE("Only words above the threshold are affected") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 1e-2);
 
     std::size_t affected = 0;
@@ -68,8 +64,7 @@ TEST_CASE("Only words above the threshold are affected") {
 }
 
 TEST_CASE("shouldKeep is deterministic for a fixed seed") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 1e-3);
 
     const auto sample = [&] {
@@ -85,8 +80,7 @@ TEST_CASE("shouldKeep is deterministic for a fixed seed") {
 }
 
 TEST_CASE("Expected corpus length predicts the observed survival rate") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 1e-2);
 
     const double expected = subsampler.getExpectedCorpusLength(vocabulary);

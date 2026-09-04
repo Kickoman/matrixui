@@ -2,13 +2,12 @@
 
 #include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
-#include "tests/support/temp_dir.h"
+#include <sstream>
 
 using namespace Words;
 
 TEST_CASE("Vocabulary::Build counts tokens and orders ids by frequency") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     REQUIRE(vocabulary.getSize() == 6);
 
@@ -29,8 +28,7 @@ TEST_CASE("Vocabulary::Build counts tokens and orders ids by frequency") {
 }
 
 TEST_CASE("Vocabulary::Build drops words below minCount") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 5);
+    const auto vocabulary = Tests::ToyVocabulary(5);
 
     // e and f occur twice, d four times -- all below 5.
     CHECK(vocabulary.getSize() == 3);
@@ -40,8 +38,7 @@ TEST_CASE("Vocabulary::Build drops words below minCount") {
 }
 
 TEST_CASE("Vocabulary::getId returns nullopt for an unknown word") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir);
+    const auto vocabulary = Tests::ToyVocabulary();
 
     CHECK(vocabulary.getId("definitely-not-present") == std::nullopt);
     REQUIRE(vocabulary.getId("a").has_value());
@@ -49,20 +46,18 @@ TEST_CASE("Vocabulary::getId returns nullopt for an unknown word") {
 }
 
 TEST_CASE("Vocabulary token accounting distinguishes raw from kept") {
-    const Tests::TempDir dir;
-    const auto all = Tests::ToyVocabulary(dir, 1);
+    const auto all = Tests::ToyVocabulary(1);
     CHECK(all.getRawTokens() == 64);
     CHECK(all.getKeptTokens() == 64);
 
-    const auto pruned = Tests::ToyVocabulary(dir, 5);
+    const auto pruned = Tests::ToyVocabulary(5);
     CHECK(pruned.getRawTokens() == 64);
     // a + b + c survive: 32 + 16 + 8.
     CHECK(pruned.getKeptTokens() == 56);
 }
 
 TEST_CASE("Vocabulary frequencies sum to one") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     double total = 0.;
     for (TWordId id = 0; id < vocabulary.getSize(); ++id) {
@@ -72,12 +67,11 @@ TEST_CASE("Vocabulary frequencies sum to one") {
 }
 
 TEST_CASE("Vocabulary survives a Save/Load round-trip") {
-    const Tests::TempDir dir;
-    const auto original = Tests::ToyVocabulary(dir, 1);
+    const auto original = Tests::ToyVocabulary(1);
 
-    const auto path = dir.file("round.voc");
-    Vocabulary::Save(original, path);
-    const auto loaded = Vocabulary::Load(path);
+    std::stringstream stream;
+    Vocabulary::Save(stream, original);
+    const auto loaded = Vocabulary::Load(stream);
 
     REQUIRE(loaded.getSize() == original.getSize());
     CHECK(loaded.getRawTokens() == original.getRawTokens());
@@ -89,11 +83,10 @@ TEST_CASE("Vocabulary survives a Save/Load round-trip") {
 }
 
 TEST_CASE("Words with equal counts are ordered alphabetically") {
-    const Tests::TempDir dir;
     // Four words at the same count, written in an order that is neither
     // alphabetical nor its reverse, so a stable sort alone cannot pass this.
-    const auto path = dir.write("ties.txt", "pear apple fig banana pear apple fig banana");
-    const auto vocabulary = Vocabulary::Build(path, 1);
+    const auto vocabulary =
+        Tests::VocabularyFromText("pear apple fig banana pear apple fig banana", 1);
 
     REQUIRE(vocabulary.getSize() == 4);
     for (TWordId id = 0; id < 4; ++id) {
@@ -107,9 +100,7 @@ TEST_CASE("Words with equal counts are ordered alphabetically") {
 }
 
 TEST_CASE("Count still outranks the alphabetical tiebreak") {
-    const Tests::TempDir dir;
-    const auto path = dir.write("mixed.txt", "zebra zebra zebra apple apple mango");
-    const auto vocabulary = Vocabulary::Build(path, 1);
+    const auto vocabulary = Tests::VocabularyFromText("zebra zebra zebra apple apple mango", 1);
 
     REQUIRE(vocabulary.getSize() == 3);
     CHECK(vocabulary.getWord(0) == "zebra");   // 3
@@ -118,11 +109,10 @@ TEST_CASE("Count still outranks the alphabetical tiebreak") {
 }
 
 TEST_CASE("Building the same dump twice gives identical ids") {
-    const Tests::TempDir dir;
-    const auto path = dir.write("repeat.txt", "one two three one two three four five");
+    const std::string text = "one two three one two three four five";
 
-    const auto first = Vocabulary::Build(path, 1);
-    const auto second = Vocabulary::Build(path, 1);
+    const auto first = Tests::VocabularyFromText(text, 1);
+    const auto second = Tests::VocabularyFromText(text, 1);
 
     REQUIRE(first.getSize() == second.getSize());
     for (TWordId id = 0; id < first.getSize(); ++id) {

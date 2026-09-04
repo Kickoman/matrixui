@@ -3,7 +3,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
+#include <istream>
 #include <vector>
 
 constexpr bool IsLittleEndian() {
@@ -33,7 +33,7 @@ inline std::uint64_t SwapBytes(std::uint64_t val) {
 }
 
 template<typename T>
-void WriteBinaryLE(std::ofstream& file, T value) {
+void WriteBinaryLE(std::ostream& file, T value) {
     if constexpr (!IsLittleEndian()) {
         if constexpr (sizeof(T) == 2) {
             value = SwapBytes(static_cast<std::uint16_t>(value));
@@ -47,7 +47,7 @@ void WriteBinaryLE(std::ofstream& file, T value) {
 }
 
 template<typename T>
-void ReadBinaryLE(std::ifstream& file, T& value) {
+void ReadBinaryLE(std::istream& file, T& value) {
     file.read(reinterpret_cast<char*>(&value), sizeof(T));
 
     if constexpr (!IsLittleEndian()) {
@@ -62,21 +62,21 @@ void ReadBinaryLE(std::ifstream& file, T& value) {
 }
 
 template<>
-inline void WriteBinaryLE(std::ofstream& file, double value) {
+inline void WriteBinaryLE(std::ostream& file, double value) {
     std::uint64_t temp;
     std::memcpy(&temp, &value, sizeof(double));
     WriteBinaryLE(file, temp);
 }
 
 template<>
-inline void ReadBinaryLE(std::ifstream& file, double& value) {
+inline void ReadBinaryLE(std::istream& file, double& value) {
     std::uint64_t temp;
     ReadBinaryLE(file, temp);
     std::memcpy(&value, &temp, sizeof(double));
 }
 
 template<typename T>
-inline void WriteBulkLE(std::ofstream& file, const std::vector<T>& values) {
+inline void WriteBulkLE(std::ostream& file, const std::vector<T>& values) {
     if constexpr (IsLittleEndian()) {
         file.write(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(T));
     } else {
@@ -87,7 +87,7 @@ inline void WriteBulkLE(std::ofstream& file, const std::vector<T>& values) {
 }
 
 template<typename T>
-inline void ReadBulkLE(std::ifstream& file, std::vector<T>& values) {
+inline void ReadBulkLE(std::istream& file, std::vector<T>& values) {
     if constexpr (IsLittleEndian()) {
         file.read(reinterpret_cast<char*>(values.data()), values.size() * sizeof(T));
     } else {

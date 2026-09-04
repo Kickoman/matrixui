@@ -32,7 +32,7 @@ config — see [`../README.md`](../README.md).
 struct Neighbour { TWordId id; double similarity; };
 
 explicit EmbeddingIndex(Embeddings embeddings);         // normalises in place
-static EmbeddingIndex Load(const std::filesystem::path&);
+static EmbeddingIndex Load(std::istream& in);
 
 std::vector<Neighbour> nearest(TWordId id, std::size_t count) const;
 std::vector<Neighbour> nearestToVector(std::span<const TFloat> query,
@@ -135,11 +135,13 @@ expression reads.
 ## `evaluate.h` / `evaluate.cpp`
 
 ```cpp
-AnalogyReport    EvaluateAnalogies(vocabulary, index, path, restrictTo, threads);
-SimilarityReport EvaluateSimilarity(vocabulary, index, path, scoreColumn);
+AnalogyReport    EvaluateAnalogies(vocabulary, index, file, restrictTo, threads);
+SimilarityReport EvaluateSimilarity(vocabulary, index, file, scoreColumn);
 ```
 
-Both throw `IoError` when the dataset cannot be opened.
+`file` is an open `std::istream&` — the caller opens the dataset, normally via
+`Io::ReadFile` (`core/lib/file_stream.h`), which is what turns a missing file
+into an `Io::Error` naming it.
 
 ### Analogies
 

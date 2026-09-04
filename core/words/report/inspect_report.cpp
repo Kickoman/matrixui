@@ -6,10 +6,10 @@
 
 namespace Words {
 
-void PrintCorpusStatistics(std::ostream& out, const CorpusStatistics& statistics) {
+void PrintCorpusStatistics(std::ostream& out, const std::string& name, const CorpusStatistics& statistics) {
     const StreamFormatGuard guard(out);
 
-    out << "Processed " << statistics.path.string() << '\n';
+    out << "Processed " << name << '\n';
     out << "Symbols: " << statistics.symbols << '\n';
     out << "Words: " << statistics.totalWords << '\n';
     out << "Unique words: " << statistics.uniqueWords << '\n';

@@ -84,8 +84,14 @@ Two mechanisms, chosen by whose fault it is:
 
 | Situation | Mechanism |
 |---|---|
-| Missing/truncated/wrong-format file, impossible config | throw `Words::Error` (`IoError`, `VocabularyError`, `ConfigError`) |
+| Truncated/wrong-format file, impossible config | throw `Words::Error` (`IoError`, `VocabularyError`, `ConfigError`) |
+| A file that cannot be opened | throw `Io::Error` (`core/lib/file_stream.h`) |
 | Word not in the vocabulary, unparseable expression, too few words | `QueryStatus` on the result struct |
+
+Nothing under `core/words/` opens a file. Serialization takes `std::istream&` /
+`std::ostream&`; the front ends open the stream through `Io::ReadFile` /
+`Io::WriteFile`, which append the file name to whatever the core throws — so the
+messages users see still name the file.
 
 Loading an artifact that is missing, unreadable or truncated throws. It does not
 quietly hand back an empty vocabulary or a zero-filled embedding matrix, which

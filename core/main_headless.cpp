@@ -13,6 +13,7 @@
 #include "core/classifier/trainer.h"
 #include "core/classifier/learning_config.h"
 
+#include "core/lib/file_stream.h"
 #include "core/lib/cache.h"
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network_applier.h"
@@ -109,7 +110,7 @@ int runPredictImage(
     const std::size_t imageHeight,
     const std::size_t imageWidth
 ) {
-    auto loaded = Neural::LoadNetwork(networkPath);
+    auto loaded = Io::TryReadFile(networkPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!loaded) {
         std::cerr << "Failed to load network: " << networkPath << "\n";
         return 5;
@@ -316,7 +317,7 @@ int main(int argc, char** argv) {
     Neural::Classifier::Trainer recognizer;
 
     Neural::NeuralNetwork network;
-    if (auto loadedMaybe = Neural::LoadNetwork(trainNetworkPath); loadedMaybe.has_value()) {
+    if (auto loadedMaybe = Io::TryReadFile(trainNetworkPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary); loadedMaybe.has_value()) {
         network = *loadedMaybe;
     } else {
         network = Neural::CreateNetwork(netConfig);
@@ -379,8 +380,13 @@ int main(int argc, char** argv) {
     std::ofstream learningLog(currentWorkingPath / "log.jsonl", std::ios_base::app);
     std::ofstream testingLog(currentWorkingPath / "testing-log.jsonl", std::ios_base::app);
     recognizer.setEpochCallback([&] (const Neural::Classifier::EpochLog& log) {
-        Neural::SaveNetwork(recognizer.getNetwork(), trainNetworkPath);
-        Neural::SaveNetwork(recognizer.getNetwork(), currentWorkingPath / (std::string("backup-") + std::to_string(log.epochNumber)));
+        const auto saveNetwork = [&](const std::filesystem::path& target) {
+            Io::WriteFile(target, [&](std::ostream& file) {
+                Neural::SaveNetwork(file, recognizer.getNetwork());
+            }, std::ios::binary);
+        };
+        saveNetwork(trainNetworkPath);
+        saveNetwork(currentWorkingPath / (std::string("backup-") + std::to_string(log.epochNumber)));
         learningLog << nlohmann::json(log).dump() << std::endl;
 
         if ((log.epochNumber + 1) % 20 == 0) {

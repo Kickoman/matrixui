@@ -1,3 +1,4 @@
+#include "core/lib/file_stream.h"
 #include "core/words/error.h"
 #include "core/words_cli/commands.h"
 #include "core/words_cli/options.h"
@@ -161,6 +162,9 @@ int main(int argc, char** argv) {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& error) {
         return app.exit(error);
+    } catch (const Io::Error& error) {
+        std::cerr << "error: " << error.what() << '\n';
+        return kFailure;
     } catch (const Words::Error& error) {
         std::cerr << "error: " << error.what() << '\n';
         return kFailure;

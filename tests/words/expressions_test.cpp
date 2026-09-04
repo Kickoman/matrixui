@@ -8,8 +8,7 @@
 using namespace Words;
 
 TEST_CASE("ParseExpression resolves a sum of terms with their signs") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     std::string error;
     const auto terms = ParseExpression(vocabulary, "b - a + c", error);
@@ -25,8 +24,7 @@ TEST_CASE("ParseExpression resolves a sum of terms with their signs") {
 }
 
 TEST_CASE("ParseExpression handles a single bare word") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     std::string error;
     const auto terms = ParseExpression(vocabulary, "a", error);
@@ -37,8 +35,7 @@ TEST_CASE("ParseExpression handles a single bare word") {
 }
 
 TEST_CASE("ParseExpression reports an unknown word instead of throwing") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     std::string error;
     const auto terms = ParseExpression(vocabulary, "a + zzzznotaword", error);
@@ -48,8 +45,7 @@ TEST_CASE("ParseExpression reports an unknown word instead of throwing") {
 }
 
 TEST_CASE("ParseExpression reports an empty expression") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     std::string error;
     const auto terms = ParseExpression(vocabulary, "", error);
@@ -59,13 +55,8 @@ TEST_CASE("ParseExpression reports an empty expression") {
 }
 
 TEST_CASE("BuildExpressionVector applies each term's sign") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
-
-    const auto embeddings = Tests::AxisAlignedEmbeddings(6, 8);
-    const auto path = dir.file("expr.emb");
-    Embeddings::Save(embeddings, path);
-    const auto index = EmbeddingIndex::Load(path);
+    const auto vocabulary = Tests::ToyVocabulary(1);
+    const EmbeddingIndex index(Tests::AxisAlignedEmbeddings(6, 8));
 
     const std::vector<ExpressionTerm> terms{
         {0, 1.},

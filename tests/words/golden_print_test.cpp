@@ -27,12 +27,11 @@ namespace {
 // Ids 4 and 5: "e" and "f" both occur twice, and equal counts break
 // alphabetically, so e -> 4 and f -> 5.
 struct Fixture {
-    Tests::TempDir dir;
     Vocabulary vocabulary;
     EmbeddingIndex index;
 
     Fixture()
-        : vocabulary(Tests::ToyVocabulary(dir, 1))
+        : vocabulary(Tests::ToyVocabulary(1))
         , index(Build())
     {}
 

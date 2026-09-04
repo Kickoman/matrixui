@@ -3,7 +3,6 @@
 #include "core/words/query/similarity.h"
 #include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
-#include "tests/support/temp_dir.h"
 
 #include <cmath>
 
@@ -11,27 +10,21 @@ using namespace Words;
 
 namespace {
 
-// EmbeddingIndex has no public constructor, so a toy index has to go through
-// the filesystem. Keep words <= dim so no two rows collapse onto the same axis.
-EmbeddingIndex ToyIndex(const Tests::TempDir& dir, const std::size_t words = 6, const std::size_t dim = 8) {
-    const auto embeddings = Tests::AxisAlignedEmbeddings(words, dim);
-    const auto path = dir.file("toy.emb");
-    Embeddings::Save(embeddings, path);
-    return EmbeddingIndex::Load(path);
+// Keep words <= dim so no two rows collapse onto the same axis.
+EmbeddingIndex ToyIndex(const std::size_t words = 6, const std::size_t dim = 8) {
+    return EmbeddingIndex(Tests::AxisAlignedEmbeddings(words, dim));
 }
 
 }  // namespace
 
 TEST_CASE("The index reports the shape it was loaded with") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir, 6, 8);
+    const auto index = ToyIndex(6, 8);
     CHECK(index.getWords() == 6);
     CHECK(index.getDim() == 8);
 }
 
 TEST_CASE("Loading normalises every row to unit length") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     for (TWordId id = 0; id < index.getWords(); ++id) {
         CHECK(index.similarity(id, id) == doctest::Approx(1.).epsilon(1e-6));
@@ -39,8 +32,7 @@ TEST_CASE("Loading normalises every row to unit length") {
 }
 
 TEST_CASE("Similarity is symmetric and matches the hand-computed cosine") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     CHECK(index.similarity(0, 1) == doctest::Approx(index.similarity(1, 0)));
 
@@ -51,8 +43,7 @@ TEST_CASE("Similarity is symmetric and matches the hand-computed cosine") {
 }
 
 TEST_CASE("nearest returns the closest row and never the query itself") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     const auto neighbours = index.nearest(0, 3);
     REQUIRE(neighbours.size() == 3);
@@ -67,8 +58,7 @@ TEST_CASE("nearest returns the closest row and never the query itself") {
 }
 
 TEST_CASE("nearest returns results in descending similarity") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     const auto neighbours = index.nearest(1, 5);
     REQUIRE(neighbours.size() == 5);
@@ -78,15 +68,13 @@ TEST_CASE("nearest returns results in descending similarity") {
 }
 
 TEST_CASE("nearest caps the result at the number of candidates") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir, 4, 8);
+    const auto index = ToyIndex(4, 8);
     // 4 words, one excluded as the query itself.
     CHECK(index.nearest(0, 100).size() == 3);
 }
 
 TEST_CASE("nearestToVector honours the exclusion list") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     const std::vector<TFloat> query(index.getNormalized().row(0),
                                     index.getNormalized().row(0) + index.getDim());
@@ -99,8 +87,7 @@ TEST_CASE("nearestToVector honours the exclusion list") {
 }
 
 TEST_CASE("analogyVector computes b - a + c") {
-    const Tests::TempDir dir;
-    const auto index = ToyIndex(dir);
+    const auto index = ToyIndex();
 
     const auto result = index.analogyVector(0, 1, 2);
     REQUIRE(result.size() == index.getDim());

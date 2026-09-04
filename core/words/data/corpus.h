@@ -2,16 +2,16 @@
 
 #include "core/words/data/types.h"
 
+#include <iosfwd>
 #include <vector>
-#include <filesystem>
 
 namespace Words {
 
 class Vocabulary;
 using TCorpus = std::vector<TWordId>;
 
-TCorpus EncodeCorpus(const std::filesystem::path& dump, const Vocabulary& vocabulary);
-void SaveCorpus(const std::filesystem::path& path, const TCorpus& corpus);
-TCorpus LoadCorpus(const std::filesystem::path& path);
+TCorpus EncodeCorpus(std::istream& dump, const Vocabulary& vocabulary);
+void SaveCorpus(std::ostream& out, const TCorpus& corpus);
+TCorpus LoadCorpus(std::istream& in);
 
 }

@@ -21,9 +21,7 @@ TEST_CASE("The draw distribution passes a chi-squared test on a large vocabulary
     // A reduced chi-squared over every word with enough expected mass is a
     // stronger statement than per-word tolerances: it catches a systematically
     // skewed table even when each individual word looks close enough.
-    const Tests::TempDir dir;
-    const auto path = dir.write("zipf.txt", Tests::ZipfCorpusText(1200, 120'000));
-    const auto vocabulary = Vocabulary::Build(path, 1);
+    const auto vocabulary = Tests::VocabularyFromText(Tests::ZipfCorpusText(1200, 120'000), 1);
     const NegativeSampler sampler(vocabulary, kTableSize);
 
     constexpr std::size_t draws = 400'000;
@@ -72,16 +70,14 @@ TEST_CASE("The draw distribution passes a chi-squared test on a large vocabulary
 }
 
 TEST_CASE("NegativeSampler rejects impossible configurations") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     CHECK_THROWS_AS(NegativeSampler(vocabulary, /*tableSize=*/2), std::runtime_error);
     CHECK(NegativeSampler(vocabulary, kTableSize).getTableSize() == kTableSize);
 }
 
 TEST_CASE("Every word in the vocabulary is reachable") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const NegativeSampler sampler(vocabulary, kTableSize);
 
     std::unordered_set<TWordId> seen;
@@ -93,8 +89,7 @@ TEST_CASE("Every word in the vocabulary is reachable") {
 }
 
 TEST_CASE("Sampling frequency follows the count^0.75 distribution") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     constexpr double power = 0.75;
     const NegativeSampler sampler(vocabulary, kTableSize, power);
 
@@ -123,8 +118,7 @@ TEST_CASE("Sampling frequency follows the count^0.75 distribution") {
 }
 
 TEST_CASE("The ^0.75 exponent flattens the frequency distribution") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
 
     const auto top = vocabulary.getCount(0);
     const auto rare = vocabulary.getCount(vocabulary.getSize() - 1);
@@ -137,8 +131,7 @@ TEST_CASE("The ^0.75 exponent flattens the frequency distribution") {
 }
 
 TEST_CASE("sampleExcluding almost never returns the excluded word") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const NegativeSampler sampler(vocabulary, kTableSize);
 
     // Note: exclusion is best-effort. After 8 failed attempts the
@@ -158,8 +151,7 @@ TEST_CASE("sampleExcluding almost never returns the excluded word") {
 }
 
 TEST_CASE("getProbability agrees with the observed sampling rate") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const NegativeSampler sampler(vocabulary, kTableSize);
 
     constexpr std::size_t draws = 200'000;

@@ -3,10 +3,8 @@
 #include <string>
 #include <vector>
 
-// ASCII case folding. Bytes outside a-z/A-Z are left as they are, so UTF-8
-// sequences pass through unchanged rather than being mangled per byte.
+// ascii-only. utf-8 would be unchanged.
 std::string ToLower(std::string value);
 
-// Splits on any whitespace and lowercases each token. Leading, trailing and
-// repeated separators produce no empty entries.
+// split by whitespace
 std::vector<std::string> SplitWords(const std::string& text);

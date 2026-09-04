@@ -3,16 +3,14 @@
 #include "core/words/data/corpus.h"
 #include "core/words/data/vocabulary.h"
 #include "tests/support/fixtures.h"
-#include "tests/support/temp_dir.h"
+
+#include <sstream>
 
 using namespace Words;
 
 TEST_CASE("EncodeCorpus maps every token to its id") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
-    const auto text = dir.write("encode.txt", "a b a c");
-
-    const auto corpus = EncodeCorpus(text, vocabulary);
+    const auto vocabulary = Tests::ToyVocabulary(1);
+    const auto corpus = Tests::CorpusFromText("a b a c", vocabulary);
 
     REQUIRE(corpus.size() == 4);
     CHECK(corpus[0] == *vocabulary.getId("a"));
@@ -22,11 +20,8 @@ TEST_CASE("EncodeCorpus maps every token to its id") {
 }
 
 TEST_CASE("EncodeCorpus silently drops out-of-vocabulary tokens") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
-    const auto text = dir.write("oov.txt", "a zzz b qqq");
-
-    const auto corpus = EncodeCorpus(text, vocabulary);
+    const auto vocabulary = Tests::ToyVocabulary(1);
+    const auto corpus = Tests::CorpusFromText("a zzz b qqq", vocabulary);
 
     REQUIRE(corpus.size() == 2);
     CHECK(corpus[0] == *vocabulary.getId("a"));
@@ -34,45 +29,33 @@ TEST_CASE("EncodeCorpus silently drops out-of-vocabulary tokens") {
 }
 
 TEST_CASE("EncodeCorpus of the source text has exactly keptTokens entries") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 5);
-    const auto text = dir.write("full.txt", Tests::ToyCorpusText());
-
-    const auto corpus = EncodeCorpus(text, vocabulary);
+    const auto vocabulary = Tests::ToyVocabulary(5);
+    const auto corpus = Tests::CorpusFromText(Tests::ToyCorpusText(), vocabulary);
     CHECK(corpus.size() == vocabulary.getKeptTokens());
 }
 
-TEST_CASE("EncodeCorpus throws when the input is missing") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
-    CHECK_THROWS_AS(EncodeCorpus(dir.file("nope.txt"), vocabulary), std::runtime_error);
-}
-
 TEST_CASE("Corpus survives a Save/Load round-trip") {
-    const Tests::TempDir dir;
     const TCorpus original{4, 0, 1, 9, 2, 2, 7};
 
-    const auto path = dir.file("round.cor");
-    SaveCorpus(path, original);
-    const auto loaded = LoadCorpus(path);
+    std::stringstream stream;
+    SaveCorpus(stream, original);
+    const auto loaded = LoadCorpus(stream);
 
     CHECK(loaded == original);
 }
 
 TEST_CASE("An empty corpus round-trips") {
-    const Tests::TempDir dir;
-    const auto path = dir.file("empty.cor");
-    SaveCorpus(path, TCorpus{});
-    CHECK(LoadCorpus(path).empty());
+    std::stringstream stream;
+    SaveCorpus(stream, TCorpus{});
+    CHECK(LoadCorpus(stream).empty());
 }
 
-TEST_CASE("LoadCorpus rejects a file that is not a corpus") {
-    const Tests::TempDir dir;
-    const auto path = dir.write("garbage.cor", "this is definitely not a corpus file");
-    CHECK_THROWS_AS(LoadCorpus(path), std::runtime_error);
+TEST_CASE("LoadCorpus rejects a stream that does not hold a corpus") {
+    std::istringstream stream("this is definitely not a corpus file");
+    CHECK_THROWS_AS(LoadCorpus(stream), std::runtime_error);
 }
 
-TEST_CASE("LoadCorpus throws when the file is missing") {
-    const Tests::TempDir dir;
-    CHECK_THROWS_AS(LoadCorpus(dir.file("absent.cor")), std::runtime_error);
+TEST_CASE("LoadCorpus rejects a truncated header") {
+    std::istringstream stream("ab");
+    CHECK_THROWS_AS(LoadCorpus(stream), std::runtime_error);
 }

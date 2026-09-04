@@ -4,7 +4,8 @@
 #include "core/lib/write.h"
 #include "core/words/data/vocabulary.h"
 
-#include <fstream>
+#include <istream>
+#include <ostream>
 #include <stdexcept>
 
 namespace Words {
@@ -16,17 +17,12 @@ constexpr std::uint32_t CorpusVersion = 1;
 
 }
 
-TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabulary) {
-    std::ifstream file(dump);
-    if (!file) {
-        throw IoError("Can't open file for reading: " + dump.string());
-    }
-
+TCorpus EncodeCorpus(std::istream &dump, const Vocabulary &vocabulary) {
     TCorpus corpus;
     corpus.reserve(vocabulary.getKeptTokens());
 
     std::string word;
-    while (file >> word) {
+    while (dump >> word) {
         const auto id = vocabulary.getId(word);
         if (id.has_value()) {
             corpus.push_back(*id);
@@ -35,46 +31,34 @@ TCorpus EncodeCorpus(const std::filesystem::path &dump, const Vocabulary &vocabu
     return corpus;
 }
 
-void SaveCorpus(const std::filesystem::path &path, const TCorpus &corpus) {
-    std::ofstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for writing: " + path.string());
-    }
-    WriteBinaryLE(file, CorpusMagic);
-    WriteBinaryLE(file, CorpusVersion);
-    WriteBinaryLE(file, static_cast<std::uint64_t>(corpus.size()));
-    WriteBulkLE(file, corpus);
+void SaveCorpus(std::ostream &out, const TCorpus &corpus) {
+    WriteBinaryLE(out, CorpusMagic);
+    WriteBinaryLE(out, CorpusVersion);
+    WriteBinaryLE(out, static_cast<std::uint64_t>(corpus.size()));
+    WriteBulkLE(out, corpus);
 
-    file.flush();
-    if (!file) {
-        throw IoError("Failed while writing the corpus to " + path.string());
+    out.flush();
+    if (!out) {
+        throw IoError("Failed while writing the corpus");
     }
 }
 
-TCorpus LoadCorpus(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for reading: " + path.string());
-    }
-
+TCorpus LoadCorpus(std::istream& in) {
     std::uint32_t magic = 0;
     std::uint32_t version = 0;
-    ReadBinaryLE(file, magic);
-    ReadBinaryLE(file, version);
+    ReadBinaryLE(in, magic);
+    ReadBinaryLE(in, version);
     if (magic != CorpusMagic) {
-        throw IoError(
-            "Not a corpus file or built by an older version: " + path.string()
-            + ". Rebuild it with buildcor."
-        );
+        throw IoError("Not a corpus file or built by an older version (rebuild it with buildcor)");
     }
     if (version != CorpusVersion) {
-        throw IoError("Unsupported corpus version: " + path.string());
+        throw IoError("Unsupported corpus version");
     }
 
     std::uint64_t size = 0;
-    ReadBinaryLE(file, size);
+    ReadBinaryLE(in, size);
     TCorpus corpus(size);
-    ReadBulkLE(file, corpus);
+    ReadBulkLE(in, corpus);
     return corpus;
 }
 

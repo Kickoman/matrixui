@@ -34,12 +34,11 @@ A quick look at a raw text dump **before any vocabulary is built** — the only
 header in `core/words` with no dependency on the rest of the subtree.
 
 ```cpp
-CorpusStatistics InspectDump(const std::filesystem::path& dump, std::size_t topN = 15);
+CorpusStatistics InspectDump(std::istream& dump, std::size_t topN = 15);
 ```
 
 | `CorpusStatistics` field | Meaning |
 |---|---|
-| `path` | the dump that was read back, for the report header |
 | `symbols` | bytes in the file |
 | `totalWords` | whitespace-separated tokens |
 | `uniqueWords` | distinct tokens |
@@ -54,14 +53,12 @@ Tokenisation is `ifstream >> word` — whitespace only, no case folding, no
 punctuation stripping. It matches `Vocabulary::Build` and `EncodeCorpus`
 exactly, which is what makes the numbers predictive rather than indicative.
 
-Throws `IoError` if the dump cannot be opened.
-
 ## `vocabulary.h` / `vocabulary.cpp`
 
 ```cpp
-static Vocabulary Build(const std::filesystem::path& dump, std::size_t minCount = 5);
-static Vocabulary Load(const std::filesystem::path& vocabulary);
-static void       Save(const Vocabulary& vocabulary, const std::filesystem::path& path);
+static Vocabulary Build(std::istream& dump, std::size_t minCount = 5);
+static Vocabulary Load(std::istream& in);
+static void       Save(std::ostream& out, const Vocabulary& vocabulary);
 
 std::optional<TWordId> getId(const std::string& word) const;   // nullopt when absent
 const std::string&     getWord(TWordId id) const;              // unchecked
@@ -121,9 +118,9 @@ size × {
 ```cpp
 using TCorpus = std::vector<TWordId>;
 
-TCorpus EncodeCorpus(const std::filesystem::path& dump, const Vocabulary& vocabulary);
-void    SaveCorpus(const std::filesystem::path& path, const TCorpus& corpus);
-TCorpus LoadCorpus(const std::filesystem::path& path);
+TCorpus EncodeCorpus(std::istream& dump, const Vocabulary& vocabulary);
+void    SaveCorpus(std::ostream& out, const TCorpus& corpus);
+TCorpus LoadCorpus(std::istream& in);
 ```
 
 The dump reduced to a flat stream of ids. Words absent from the vocabulary are
@@ -161,8 +158,8 @@ std::size_t   getBytes() const;
 void          initializeUniform(XorShift& rng);
 void          initializeZero();
 
-static void       Save(const Embeddings&, const std::filesystem::path&);
-static Embeddings Load(const std::filesystem::path&);
+static void       Save(std::ostream& out, const Embeddings&);
+static Embeddings Load(std::istream& in);
 ```
 
 A row-major `words × dim` matrix of `float`, nothing more. `row(id)` hands back

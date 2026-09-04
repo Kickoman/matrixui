@@ -3,10 +3,11 @@
 #include "core/lib/random.h"
 #include "core/words/data/corpus.h"
 #include "core/words/data/embeddings.h"
+#include "core/words/data/inspect.h"
 #include "core/words/data/vocabulary.h"
-#include "tests/support/temp_dir.h"
 
 #include <cmath>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -39,9 +40,23 @@ inline std::string ToyCorpusText() {
     return text;
 }
 
-inline Words::Vocabulary ToyVocabulary(const TempDir& dir, const std::size_t minCount = 2) {
-    const auto path = dir.write("toy.txt", ToyCorpusText());
-    return Words::Vocabulary::Build(path, minCount);
+inline Words::Vocabulary VocabularyFromText(const std::string& text, const std::size_t minCount = 2) {
+    std::istringstream dump(text);
+    return Words::Vocabulary::Build(dump, minCount);
+}
+
+inline Words::TCorpus CorpusFromText(const std::string& text, const Words::Vocabulary& vocabulary) {
+    std::istringstream dump(text);
+    return Words::EncodeCorpus(dump, vocabulary);
+}
+
+inline Words::CorpusStatistics InspectText(const std::string& text, const std::size_t topN = 15) {
+    std::istringstream dump(text);
+    return Words::InspectDump(dump, topN);
+}
+
+inline Words::Vocabulary ToyVocabulary(const std::size_t minCount = 2) {
+    return VocabularyFromText(ToyCorpusText(), minCount);
 }
 
 // A larger synthetic corpus for tests that need >N distinct words.

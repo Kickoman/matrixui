@@ -2,25 +2,21 @@
 #include "core/words/data/vocabulary.h"
 #include "core/lib/write.h"
 
-#include <fstream>
+#include <istream>
+#include <ostream>
 #include <stdexcept>
 #include <algorithm>
 #include <limits>
 
 namespace Words {
 
-Vocabulary Vocabulary::Build(const std::filesystem::path &dump, const std::size_t minCount) {
-    std::ifstream file(dump);
-    if (!file) {
-        throw IoError("Cannot open file: " + dump.string());
-    }
-
+Vocabulary Vocabulary::Build(std::istream &dump, const std::size_t minCount) {
     std::unordered_map<std::string, std::size_t> frequencies;
     frequencies.reserve(1 << 20);
 
     std::size_t rawTokens = 0;
     std::string word;
-    while (file >> word) {
+    while (dump >> word) {
         ++frequencies[word];
         ++rawTokens;
     }
@@ -73,28 +69,23 @@ double Vocabulary::getFrequency(const TWordId id) const {
     return 1. * counts[id] / keptTokens;
 }
 
-Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for reading: " + path.string());
-    }
-
+Vocabulary Vocabulary::Load(std::istream &in) {
     std::uint64_t size = 0;
     std::size_t raw = 0;
     std::size_t kept = 0;
 
-    ReadBinaryLE(file, size);
-    ReadBinaryLE(file, raw);
-    ReadBinaryLE(file, kept);
+    ReadBinaryLE(in, size);
+    ReadBinaryLE(in, raw);
+    ReadBinaryLE(in, kept);
 
-    if (!file) {
-        throw IoError("Not a vocabulary file (header is truncated): " + path.string());
+    if (!in) {
+        throw IoError("Not a vocabulary file (header is truncated)");
     }
     if (size == 0) {
-        throw VocabularyError("Vocabulary file contains no words: " + path.string());
+        throw VocabularyError("Vocabulary file contains no words");
     }
     if (size > std::numeric_limits<TWordId>::max()) {
-        throw VocabularyError("vocabulary too large for TWordId: " + path.string());
+        throw VocabularyError("vocabulary too large for TWordId");
     }
 
     Vocabulary vocabulary;
@@ -106,14 +97,14 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
 
     for (TWordId i = 0; i < size; ++i) {
         std::size_t length = 0;
-        ReadBinaryLE(file, length);
+        ReadBinaryLE(in, length);
         std::string word(length, '\0');
-        file.read(word.data(), length);
+        in.read(word.data(), length);
         std::size_t count = 0;
-        ReadBinaryLE(file, count);
+        ReadBinaryLE(in, count);
 
-        if (!file) {
-            throw IoError("Vocabulary file is truncated: " + path.string());
+        if (!in) {
+            throw IoError("Vocabulary file is truncated");
         }
 
         vocabulary.word2id.emplace(word, i);
@@ -123,23 +114,19 @@ Vocabulary Vocabulary::Load(const std::filesystem::path &path) {
     return vocabulary;
 }
 
-void Vocabulary::Save(const Vocabulary &vocabulary, const std::filesystem::path &path) {
-    std::ofstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for writing: " + path.string());
-    }
-    WriteBinaryLE(file, static_cast<std::uint64_t>(vocabulary.getSize()));
-    WriteBinaryLE(file, vocabulary.rawTokens);
-    WriteBinaryLE(file, vocabulary.keptTokens);
+void Vocabulary::Save(std::ostream &out, const Vocabulary &vocabulary) {
+    WriteBinaryLE(out, static_cast<std::uint64_t>(vocabulary.getSize()));
+    WriteBinaryLE(out, vocabulary.rawTokens);
+    WriteBinaryLE(out, vocabulary.keptTokens);
     for (TWordId i = 0; i < vocabulary.getSize(); ++i) {
-        WriteBinaryLE(file, vocabulary.id2word[i].size());
-        file.write(vocabulary.id2word[i].data(), vocabulary.id2word[i].size());
-        WriteBinaryLE(file, vocabulary.counts[i]);
+        WriteBinaryLE(out, vocabulary.id2word[i].size());
+        out.write(vocabulary.id2word[i].data(), vocabulary.id2word[i].size());
+        WriteBinaryLE(out, vocabulary.counts[i]);
     }
 
-    file.flush();
-    if (!file) {
-        throw IoError("Failed while writing the vocabulary to " + path.string());
+    out.flush();
+    if (!out) {
+        throw IoError("Failed while writing the vocabulary");
     }
 }
 

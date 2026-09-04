@@ -129,8 +129,6 @@ set(
 
 include_directories(eigen)
 
-# The framework-free core, shared by every executable and the test binary.
-# Nothing here uses Qt, so the autogen steps are turned off.
 add_library(matrixgui_core STATIC ${CORE_SOURCES})
 target_include_directories(matrixgui_core PUBLIC contrib)
 set_target_properties(matrixgui_core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
@@ -179,8 +177,6 @@ if(BUILD_CLI)
     )
     target_link_libraries(${PROJECT_NAME}_gan matrixgui_core)
 
-    # words_cli is deliberately NOT in CORE_SOURCES: that list is compiled into
-    # the Qt GUI too, and CLI11 has no business being there.
     add_executable(
         ${PROJECT_NAME}_words
         core/main_words.cpp
@@ -214,6 +210,7 @@ if(BUILD_TESTS)
         tests/words/config_test.cpp
         tests/words/inspect_test.cpp
         tests/words/queries_test.cpp
+        tests/lib/file_stream_test.cpp
         tests/lib/stream_format_test.cpp
         tests/lib/text_test.cpp
         tests/lib/stats_test.cpp

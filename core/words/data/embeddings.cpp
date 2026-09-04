@@ -5,7 +5,9 @@
 #include "core/words/error.h"
 
 #include <algorithm>
-#include <fstream>
+#include <istream>
+#include <ostream>
+#include <string>
 
 namespace Words {
 
@@ -33,56 +35,51 @@ void Embeddings::initializeZero() {
     std::fill(data.begin(), data.end(), TFloat{0});
 }
 
-void Embeddings::Save(const Embeddings &embeddings, const std::filesystem::path &path) {
-    std::ofstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for writing: " + path.string());
-    }
-
+void Embeddings::Save(std::ostream &out, const Embeddings &embeddings) {
     const auto w = static_cast<std::uint64_t>(embeddings.words);
     const auto d = static_cast<std::uint64_t>(embeddings.dim);
-    WriteBinaryLE(file, w);
-    WriteBinaryLE(file, d);
-    WriteBulkLE(file, embeddings.data);
+    WriteBinaryLE(out, w);
+    WriteBinaryLE(out, d);
+    WriteBulkLE(out, embeddings.data);
 
-    file.flush();
-    if (!file) {
-        throw IoError("Failed while writing embeddings to " + path.string());
+    out.flush();
+    if (!out) {
+        throw IoError("Failed while writing embeddings");
     }
 }
 
-Embeddings Embeddings::Load(const std::filesystem::path &path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw IoError("Can't open file for reading: " + path.string());
-    }
-
+Embeddings Embeddings::Load(std::istream &in) {
     std::uint64_t w = 0;
     std::uint64_t d = 0;
-    ReadBinaryLE(file, w);
-    ReadBinaryLE(file, d);
-    if (!file) {
-        throw IoError("Not an embeddings file (header is truncated): " + path.string());
+    ReadBinaryLE(in, w);
+    ReadBinaryLE(in, d);
+    if (!in) {
+        throw IoError("Not an embeddings file (header is truncated)");
     }
 
     if (w == 0 || d == 0) {
-        throw IoError("Embeddings file declares an empty matrix: " + path.string());
+        throw IoError("Embeddings file declares an empty matrix");
     }
 
+    // Refuse to allocate for a header that the payload cannot back. Skipped
+    // when the stream cannot be positioned -- ReadBulkLE still catches it.
     const auto expectedBytes = static_cast<std::uintmax_t>(w) * d * sizeof(TFloat);
-    std::error_code ec;
-    const auto actualBytes = std::filesystem::file_size(path, ec);
-    if (!ec && actualBytes < expectedBytes + 2 * sizeof(std::uint64_t)) {
-        throw IoError(
-            "Embeddings file is shorter than its header claims: " + path.string()
-            + " (expected " + std::to_string(expectedBytes) + " bytes of data, file is "
-            + std::to_string(actualBytes) + " bytes)");
+    if (const auto position = in.tellg(); position >= 0) {
+        in.seekg(0, std::ios::end);
+        const auto available = in.tellg() - position;
+        in.seekg(position);
+        if (available >= 0 && static_cast<std::uintmax_t>(available) < expectedBytes) {
+            throw IoError(
+                "Embeddings file is shorter than its header claims (expected "
+                + std::to_string(expectedBytes) + " bytes of data, found "
+                + std::to_string(available) + ")");
+        }
     }
 
     Embeddings result(w, d);
-    ReadBulkLE(file, result.data);
-    if (!file) {
-        throw IoError("Embeddings file is truncated: " + path.string());
+    ReadBulkLE(in, result.data);
+    if (!in) {
+        throw IoError("Embeddings file is truncated");
     }
     return result;
 }

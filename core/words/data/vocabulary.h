@@ -2,9 +2,9 @@
 
 #include "core/words/data/types.h"
 
+#include <iosfwd>
 #include <vector>
 #include <string>
-#include <filesystem>
 #include <unordered_map>
 #include <optional>
 
@@ -13,7 +13,7 @@ namespace Words {
 class Vocabulary {
 public:
 
-    static Vocabulary Build(const std::filesystem::path& dump, std::size_t minCount = 5);
+    static Vocabulary Build(std::istream& dump, std::size_t minCount = 5);
 
     std::optional<TWordId> getId(const std::string& word) const;
     const std::string& getWord(TWordId id) const { return id2word[id]; }
@@ -24,8 +24,8 @@ public:
     std::size_t getRawTokens() const { return rawTokens; }
     double getFrequency(TWordId id) const;
 
-    static Vocabulary Load(const std::filesystem::path& vocabulary);
-    static void Save(const Vocabulary& vocabulary, const std::filesystem::path& path);
+    static Vocabulary Load(std::istream& in);
+    static void Save(std::ostream& out, const Vocabulary& vocabulary);
 private:
     std::vector<std::string> id2word;
     std::unordered_map<std::string, TWordId> word2id;

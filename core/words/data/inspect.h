@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstddef>
-#include <filesystem>
+#include <iosfwd>
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,7 +9,6 @@
 namespace Words {
 
 struct CorpusStatistics {
-    std::filesystem::path path;
     std::size_t symbols{0};
     std::size_t totalWords{0};
     std::size_t uniqueWords{0};
@@ -24,6 +23,6 @@ struct CorpusStatistics {
     std::vector<Entry> topByFrequency;
 };
 
-CorpusStatistics InspectDump(const std::filesystem::path& dump, std::size_t topN = 15);
+CorpusStatistics InspectDump(std::istream& dump, std::size_t topN = 15);
 
 }  // namespace Words

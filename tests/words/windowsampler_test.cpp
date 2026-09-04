@@ -107,8 +107,7 @@ TEST_CASE("getPairsPerToken bounds the average pair count") {
 }
 
 TEST_CASE("GeneratePairs honours the [from, to) range") {
-    const Tests::TempDir dir;
-    const auto vocabulary = Tests::ToyVocabulary(dir, 1);
+    const auto vocabulary = Tests::ToyVocabulary(1);
     const Subsampler subsampler(vocabulary, 0.);  // disabled: keep every token
     const WindowSampler windowSampler(2);
 

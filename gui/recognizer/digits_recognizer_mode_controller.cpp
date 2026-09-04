@@ -1,6 +1,7 @@
 #include "gui/recognizer/digits_recognizer_mode_controller.h"
 #include "gui/recognizer/digit_input_preprocess.h"
 
+#include "core/lib/file_stream.h"
 #include "core/lib/neural_network_loader.h"
 
 #include <QImage>
@@ -57,7 +58,7 @@ void DigitsRecognizerModeController::processUpdates(const QImage& image) {
 }
 
 bool DigitsRecognizerModeController::loadNetwork(const QString& networkName) {
-    auto loaded = Neural::LoadNetwork(networkName.toStdString());
+    auto loaded = Io::TryReadFile(networkName.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!loaded.has_value())
         return false;
     network.initializeNetwork(std::move(*loaded));

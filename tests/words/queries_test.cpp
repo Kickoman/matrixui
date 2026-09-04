@@ -13,11 +13,10 @@ using namespace Words;
 namespace {
 
 struct Fixture {
-    Tests::TempDir dir;
     Vocabulary vocabulary;
     EmbeddingIndex index;
 
-    Fixture() : vocabulary(Tests::ToyVocabulary(dir, 1)), index(Build()) {}
+    Fixture() : vocabulary(Tests::ToyVocabulary(1)), index(Build()) {}
 
     // Unit vectors at known angles; ids follow the toy vocabulary
     // (a, b, c, d, e, f -- the e/f count tie breaks alphabetically).

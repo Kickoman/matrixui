@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "core/lib/file_stream.h"
 #include "core/lib/neural_network_loader.h"
 #include "core/lib/neural_network_applier.h"
 #include "core/lib/directory_dataset.h"
@@ -26,7 +27,7 @@ Neural::NeuralNetwork loadOrCreate(
     const Neural::NeuralNetworkConfiguration& config
 ) {
     if (!path.empty()) {
-        auto loaded = Neural::LoadNetwork(path);
+        auto loaded = Io::TryReadFile(path, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
         if (loaded) return std::move(*loaded);
     }
     return Neural::CreateNetwork(config);
@@ -50,7 +51,7 @@ int runGenerate(
     std::size_t imageWidth,
     std::size_t imageHeight
 ) {
-    auto generatorNet = Neural::LoadNetwork(generatorPath);
+    auto generatorNet = Io::TryReadFile(generatorPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!generatorNet) {
         std::cerr << "Failed to load generator: " << generatorPath << "\n";
         return 2;
@@ -59,7 +60,7 @@ int runGenerate(
     // Optional classifier: if provided, derive numClasses from it (authoritative).
     std::optional<Neural::NeuralNetworkApplier> classifier;
     if (!classifierPath.empty()) {
-        auto net = Neural::LoadNetwork(classifierPath);
+        auto net = Io::TryReadFile(classifierPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
         if (!net) {
             std::cerr << "Failed to load classifier: " << classifierPath << "\n";
             return 2;
@@ -233,7 +234,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    auto classifierNet = Neural::LoadNetwork(classifierPath);
+    auto classifierNet = Io::TryReadFile(classifierPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!classifierNet) {
         std::cerr << "Failed to load classifier: " << classifierPath << "\n";
         return 2;
@@ -305,8 +306,12 @@ int main(int argc, char** argv) {
     Neural::GAN::GanTrainer trainer(std::move(generator), std::move(discriminator), std::move(classifier));
     trainer.train(realImages, ganConfig, &std::cout);
 
-    Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(), generatorPath);
-    Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath);
+    Io::WriteFile(generatorPath, [&](std::ostream& file) {
+        Neural::SaveNetwork(file, trainer.getGenerator().getNeuralNetworkConfig());
+    }, std::ios::binary);
+    Io::WriteFile(discriminatorPath, [&](std::ostream& file) {
+        Neural::SaveNetwork(file, trainer.getDiscriminator().getNeuralNetworkConfig());
+    }, std::ios::binary);
     std::cout << "Saved generator to " << generatorPath << "\n";
     std::cout << "Saved discriminator to " << discriminatorPath << "\n";
 

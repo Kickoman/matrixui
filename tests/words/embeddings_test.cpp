@@ -2,7 +2,7 @@
 
 #include "core/lib/random.h"
 #include "core/words/data/embeddings.h"
-#include "tests/support/temp_dir.h"
+#include <sstream>
 
 #include <cmath>
 
@@ -78,8 +78,6 @@ TEST_CASE("Embeddings report their shape and byte size") {
 }
 
 TEST_CASE("Embeddings survive a Save/Load round-trip") {
-    const Tests::TempDir dir;
-
     Embeddings original(5, 3);
     original.initializeZero();
     for (TWordId id = 0; id < 5; ++id) {
@@ -88,9 +86,9 @@ TEST_CASE("Embeddings survive a Save/Load round-trip") {
         }
     }
 
-    const auto path = dir.file("round.emb");
-    Embeddings::Save(original, path);
-    const auto loaded = Embeddings::Load(path);
+    std::stringstream stream;
+    Embeddings::Save(stream, original);
+    const auto loaded = Embeddings::Load(stream);
 
     REQUIRE(loaded.getWords() == 5);
     REQUIRE(loaded.getDim() == 3);

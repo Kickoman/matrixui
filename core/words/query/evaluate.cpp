@@ -2,11 +2,10 @@
 
 #include "core/lib/stats.h"
 #include "core/lib/text.h"
-#include "core/words/error.h"
 #include "core/words/data/vocabulary.h"
 
 #include <algorithm>
-#include <fstream>
+#include <istream>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -85,15 +84,10 @@ void AnswerQuestion(
 AnalogyReport EvaluateAnalogies(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
-    const std::filesystem::path& path,
+    std::istream& file,
     const std::size_t restrictTo,
     const std::size_t threads
 ) {
-    std::ifstream file(path);
-    if (!file) {
-        throw IoError("cannot open " + path.string());
-    }
-
     AnalogyReport report;
     std::vector<Question> questions;
 
@@ -202,14 +196,9 @@ AnalogyReport EvaluateAnalogies(
 SimilarityReport EvaluateSimilarity(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
-    const std::filesystem::path& path,
+    std::istream& file,
     const std::size_t scoreColumn
 ) {
-    std::ifstream file(path);
-    if (!file) {
-        throw IoError("cannot open " + path.string());
-    }
-
     SimilarityReport report;
     std::vector<double> human;
     std::vector<double> model;

@@ -1,5 +1,7 @@
 #include "core/words_cli/commands.h"
 
+#include "core/lib/file_stream.h"
+
 #include "core/words/data/corpus.h"
 #include "core/words/data/embeddings.h"
 #include "core/words/query/evaluate.h"
@@ -37,37 +39,61 @@ void PrintCorpusInfo(std::ostream& out, const Words::TCorpus& corpus) {
     out << std::endl;
 }
 
+Words::Vocabulary ReadVocabulary(const std::filesystem::path& path) {
+    return Io::ReadFile(path, [](std::istream& in) { return Words::Vocabulary::Load(in); },
+                        std::ios::binary);
+}
+
+Words::EmbeddingIndex ReadEmbeddings(const std::filesystem::path& path) {
+    return Io::ReadFile(path, [](std::istream& in) { return Words::EmbeddingIndex::Load(in); },
+                        std::ios::binary);
+}
+
 }  // namespace
 
 void Inspect(std::ostream& out, const InspectOptions& options) {
-    Words::PrintCorpusStatistics(out, Words::InspectDump(options.input, options.topN));
+    const auto statistics = Io::ReadFile(options.input, [&](std::istream& in) {
+        return Words::InspectDump(in, options.topN);
+    });
+    Words::PrintCorpusStatistics(out, options.input.string(), statistics);
 }
 
 void BuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Build(options.input, options.minCount);
+    const auto vocabulary = Io::ReadFile(options.input, [&](std::istream& in) {
+        return Words::Vocabulary::Build(in, options.minCount);
+    });
     PrintVocabularyInfo(out, vocabulary);
-    Words::Vocabulary::Save(vocabulary, options.output);
+    Io::WriteFile(options.output,
+                  [&](std::ostream& file) { Words::Vocabulary::Save(file, vocabulary); },
+                  std::ios::binary);
 }
 
 void LoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) {
-    PrintVocabularyInfo(out, Words::Vocabulary::Load(options.input));
+    PrintVocabularyInfo(out, ReadVocabulary(options.input));
 }
 
 void BuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto corpus = Words::EncodeCorpus(options.input, vocabulary);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto corpus = Io::ReadFile(options.input, [&](std::istream& in) {
+        return Words::EncodeCorpus(in, vocabulary);
+    });
     PrintCorpusInfo(out, corpus);
-    Words::SaveCorpus(options.output, corpus);
+    Io::WriteFile(options.output,
+                  [&](std::ostream& file) { Words::SaveCorpus(file, corpus); },
+                  std::ios::binary);
 }
 
 void LoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
-    PrintCorpusInfo(out, Words::LoadCorpus(options.input));
+    PrintCorpusInfo(out, Io::ReadFile(options.input,
+                                      [](std::istream& in) { return Words::LoadCorpus(in); },
+                                      std::ios::binary));
 }
 
 void Train(std::ostream& out, const TrainOptions& options) {
-    auto vocabulary =
-        std::make_shared<const Words::Vocabulary>(Words::Vocabulary::Load(options.vocabulary));
-    auto corpus = std::make_shared<const Words::TCorpus>(Words::LoadCorpus(options.corpus));
+    auto vocabulary = std::make_shared<const Words::Vocabulary>(ReadVocabulary(options.vocabulary));
+    auto corpus = std::make_shared<const Words::TCorpus>(
+        Io::ReadFile(options.corpus, [](std::istream& in) { return Words::LoadCorpus(in); },
+                     std::ios::binary));
 
     Words::Trainer trainer;
     trainer.setVocabulary(vocabulary);
@@ -84,13 +110,17 @@ void Train(std::ostream& out, const TrainOptions& options) {
 
     trainer.train(options.config.train);
 
-    Words::Embeddings::Save(trainer.getInputEmbeddings(), options.output);
+    Io::WriteFile(options.output,
+                  [&](std::ostream& file) {
+                      Words::Embeddings::Save(file, trainer.getInputEmbeddings());
+                  },
+                  std::ios::binary);
     out << "saved embeddings to " << options.output << '\n';
 }
 
 void Neighbours(std::ostream& out, const NeighboursOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto index = Words::EmbeddingIndex::Load(options.embeddings);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto index = ReadEmbeddings(options.embeddings);
 
     out << "words " << index.getWords() << ", dim " << index.getDim() << "\n\n";
 
@@ -103,8 +133,8 @@ void Neighbours(std::ostream& out, const NeighboursOptions& options) {
 }
 
 void Evaluate(std::ostream& out, const EvaluateOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto index = Words::EmbeddingIndex::Load(options.embeddings);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto index = ReadEmbeddings(options.embeddings);
 
     out << "words " << index.getWords() << ", dim " << index.getDim() << '\n';
 
@@ -112,8 +142,10 @@ void Evaluate(std::ostream& out, const EvaluateOptions& options) {
         out << "\n=== Analogies ===\n";
         Words::PrintAnalogyReport(
             out,
-            Words::EvaluateAnalogies(
-                vocabulary, index, options.analogies, options.restrictTo, options.threads));
+            Io::ReadFile(options.analogies, [&](std::istream& in) {
+                return Words::EvaluateAnalogies(
+                    vocabulary, index, in, options.restrictTo, options.threads);
+            }));
     }
 
     if (!options.similarity.empty()) {
@@ -121,13 +153,15 @@ void Evaluate(std::ostream& out, const EvaluateOptions& options) {
         Words::PrintSimilarityReport(
             out,
             options.similarity.filename().string(),
-            Words::EvaluateSimilarity(vocabulary, index, options.similarity, options.scoreColumn));
+            Io::ReadFile(options.similarity, [&](std::istream& in) {
+                return Words::EvaluateSimilarity(vocabulary, index, in, options.scoreColumn);
+            }));
     }
 }
 
 void Expression(std::ostream& out, const ExpressionOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto index = Words::EmbeddingIndex::Load(options.embeddings);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto index = ReadEmbeddings(options.embeddings);
 
     Words::PrintExpressionReport(
         out, vocabulary,
@@ -135,16 +169,16 @@ void Expression(std::ostream& out, const ExpressionOptions& options) {
 }
 
 void OddOne(std::ostream& out, const OddOneOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto index = Words::EmbeddingIndex::Load(options.embeddings);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto index = ReadEmbeddings(options.embeddings);
 
     Words::PrintOddOneOutReport(
         out, vocabulary, Words::QueryOddOneOut(vocabulary, index, options.words));
 }
 
 void Axis(std::ostream& out, const AxisOptions& options) {
-    const auto vocabulary = Words::Vocabulary::Load(options.vocabulary);
-    const auto index = Words::EmbeddingIndex::Load(options.embeddings);
+    const auto vocabulary = ReadVocabulary(options.vocabulary);
+    const auto index = ReadEmbeddings(options.embeddings);
 
     Words::PrintAxisReport(
         out, vocabulary,

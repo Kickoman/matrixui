@@ -1,5 +1,6 @@
 #include "gui/words/words_controller.h"
 
+#include "core/lib/file_stream.h"
 #include "core/words/config_json.h"
 #include "core/words/error.h"
 #include "core/words/query/evaluate.h"
@@ -207,9 +208,11 @@ void WordsController::inspectDump()
     }
     const auto path = dumpPath.toStdString();
     runTask("Inspecting dump", false, [this, path] {
-        const auto statistics = Words::InspectDump(path);
+        const auto statistics = Io::ReadFile(path, [](std::istream& in) {
+            return Words::InspectDump(in);
+        });
         if (logger) {
-            Words::PrintCorpusStatistics(*logger, statistics);
+            Words::PrintCorpusStatistics(*logger, path, statistics);
         }
     });
 }
@@ -225,8 +228,12 @@ void WordsController::buildVocabulary()
     const auto count = minCount;
     runTask("Building vocabulary", false, [this, dump, target, count] {
         auto built = std::make_shared<const Words::Vocabulary>(
-            Words::Vocabulary::Build(dump, count));
-        Words::Vocabulary::Save(*built, target);
+            Io::ReadFile(dump, [count](std::istream& in) {
+                return Words::Vocabulary::Build(in, count);
+            }));
+        Io::WriteFile(target, [&built](std::ostream& file) {
+            Words::Vocabulary::Save(file, *built);
+        }, std::ios::binary);
         out() << "Vocabulary: " << built->getSize() << " words, kept "
               << built->getKeptTokens() << " of " << built->getRawTokens()
               << " tokens; saved to " << target << std::endl;
@@ -250,7 +257,9 @@ void WordsController::loadVocabulary()
     }
     const auto path = vocabularyPath.toStdString();
     runTask("Loading vocabulary", false, [this, path] {
-        auto loaded = std::make_shared<const Words::Vocabulary>(Words::Vocabulary::Load(path));
+        auto loaded = std::make_shared<const Words::Vocabulary>(
+            Io::ReadFile(path, [](std::istream& in) { return Words::Vocabulary::Load(in); },
+                         std::ios::binary));
         out() << "Vocabulary: " << loaded->getSize() << " words." << std::endl;
         QMetaObject::invokeMethod(this, [this, loaded] {
             vocabulary = loaded;
@@ -274,8 +283,13 @@ void WordsController::buildCorpus()
     const auto target = corpusPath.toStdString();
     auto vocab = vocabulary;
     runTask("Building corpus", false, [this, dump, target, vocab] {
-        auto built = std::make_shared<const Words::TCorpus>(Words::EncodeCorpus(dump, *vocab));
-        Words::SaveCorpus(target, *built);
+        auto built = std::make_shared<const Words::TCorpus>(
+            Io::ReadFile(dump, [&vocab](std::istream& in) {
+                return Words::EncodeCorpus(in, *vocab);
+            }));
+        Io::WriteFile(target, [&built](std::ostream& file) {
+            Words::SaveCorpus(file, *built);
+        }, std::ios::binary);
         out() << "Corpus: " << built->size() << " tokens; saved to " << target << std::endl;
         QMetaObject::invokeMethod(this, [this, built] {
             corpus = built;
@@ -296,7 +310,9 @@ void WordsController::loadCorpus()
     }
     const auto path = corpusPath.toStdString();
     runTask("Loading corpus", false, [this, path] {
-        auto loaded = std::make_shared<const Words::TCorpus>(Words::LoadCorpus(path));
+        auto loaded = std::make_shared<const Words::TCorpus>(
+            Io::ReadFile(path, [](std::istream& in) { return Words::LoadCorpus(in); },
+                         std::ios::binary));
         out() << "Corpus: " << loaded->size() << " tokens." << std::endl;
         QMetaObject::invokeMethod(this, [this, loaded] {
             corpus = loaded;
@@ -356,7 +372,9 @@ void WordsController::saveEmbeddings()
     auto raw = embeddings;
     const auto path = embeddingsPath.toStdString();
     runTask("Saving embeddings", false, [this, raw, path] {
-        Words::Embeddings::Save(*raw, path);
+        Io::WriteFile(path, [&raw](std::ostream& file) {
+            Words::Embeddings::Save(file, *raw);
+        }, std::ios::binary);
         out() << "Saved embeddings to " << path << std::endl;
     });
 }
@@ -374,7 +392,9 @@ void WordsController::loadEmbeddings()
     const auto path = embeddingsPath.toStdString();
     auto vocab = vocabulary;
     runTask("Loading embeddings", false, [this, path, vocab] {
-        auto raw = std::make_shared<const Words::Embeddings>(Words::Embeddings::Load(path));
+        auto raw = std::make_shared<const Words::Embeddings>(
+            Io::ReadFile(path, [](std::istream& in) { return Words::Embeddings::Load(in); },
+                         std::ios::binary));
         if (raw->getWords() != vocab->getSize()) {
             out() << "Embeddings hold " << raw->getWords() << " words but the vocabulary has "
                   << vocab->getSize() << " -- they do not match." << std::endl;
@@ -469,7 +489,9 @@ void WordsController::evaluateAnalogies()
 
     out() << "Analogy evaluation can take minutes and cannot be cancelled." << std::endl;
     runTask("Evaluating analogies", false, [this, vocab, idx, path, restrict, threads] {
-        const auto report = Words::EvaluateAnalogies(*vocab, *idx, path, restrict, threads);
+        const auto report = Io::ReadFile(path, [&](std::istream& in) {
+            return Words::EvaluateAnalogies(*vocab, *idx, in, restrict, threads);
+        });
         if (logger) {
             Words::PrintAnalogyReport(*logger, report);
         }
@@ -492,7 +514,9 @@ void WordsController::evaluateSimilarity()
     const auto name = QFileInfo(similarityPath).fileName().toStdString();
 
     runTask("Evaluating similarity", false, [this, vocab, idx, path, column, name] {
-        const auto report = Words::EvaluateSimilarity(*vocab, *idx, path, column);
+        const auto report = Io::ReadFile(path, [&](std::istream& in) {
+            return Words::EvaluateSimilarity(*vocab, *idx, in, column);
+        });
         if (logger) {
             Words::PrintSimilarityReport(*logger, name, report);
         }

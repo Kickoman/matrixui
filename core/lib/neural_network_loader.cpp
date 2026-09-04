@@ -3,9 +3,9 @@
 #include "core/lib/layers.h"
 #include "core/lib/write.h"
 
-#include <filesystem>
-#include <fstream>
+#include <istream>
 #include <optional>
+#include <ostream>
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
@@ -44,21 +44,16 @@ void PushActivationLayers(
 }  // namespace
 
 
-void SaveNetwork(const NeuralNetwork& network, const std::filesystem::path& filename) {
-    std::ofstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for writing");
-    }
-
+void SaveNetwork(std::ostream& out, const NeuralNetwork& network) {
     constexpr std::uint32_t version = 1;
-    WriteBinaryLE(file, version);
-    WriteBinaryLE(file, static_cast<std::uint8_t>(network.config.hiddenActivation));
-    WriteBinaryLE(file, static_cast<std::uint8_t>(network.config.outputActivation));
+    WriteBinaryLE(out, version);
+    WriteBinaryLE(out, static_cast<std::uint8_t>(network.config.hiddenActivation));
+    WriteBinaryLE(out, static_cast<std::uint8_t>(network.config.outputActivation));
 
     const auto numLayers = static_cast<std::uint32_t>(network.config.layersSizes.size());
-    WriteBinaryLE(file, numLayers);
+    WriteBinaryLE(out, numLayers);
     for (auto size : network.config.layersSizes) {
-        WriteBinaryLE(file, static_cast<std::uint64_t>(size));
+        WriteBinaryLE(out, static_cast<std::uint64_t>(size));
     }
 
     for (const auto& layerData : network.layerStack) {
@@ -72,42 +67,34 @@ void SaveNetwork(const NeuralNetwork& network, const std::filesystem::path& file
                     weightBuf[row * cols + col] = dense->weights(row, col);
                 }
             }
-            WriteBulkLE(file, weightBuf);
+            WriteBulkLE(out, weightBuf);
 
             std::vector<double> biasBuf(cols);
             for (std::size_t col = 0; col < cols; ++col) {
                 biasBuf[col] = dense->biases(0, col);
             }
-            WriteBulkLE(file, biasBuf);
+            WriteBulkLE(out, biasBuf);
         }
     }
 }
 
-std::optional<NeuralNetworkConfiguration> LoadConfig(const std::filesystem::path& filename) {
-    if (!std::filesystem::exists(filename)) {
-        return std::nullopt;
-    }
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for reading: " + filename.string());
-    }
-
-    file.seekg(sizeof(std::uint32_t)); // skip version
+std::optional<NeuralNetworkConfiguration> LoadConfig(std::istream& in) {
+    in.seekg(sizeof(std::uint32_t), std::ios::cur); // skip version
 
     NeuralNetworkConfiguration config;
     std::uint8_t hiddenActivation, outputActivation;
-    ReadBinaryLE(file, hiddenActivation);
-    ReadBinaryLE(file, outputActivation);
+    ReadBinaryLE(in, hiddenActivation);
+    ReadBinaryLE(in, outputActivation);
     config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
     config.outputActivation = static_cast<ActivationType>(outputActivation);
 
     try {
         std::uint32_t numLayers;
-        ReadBinaryLE(file, numLayers);
+        ReadBinaryLE(in, numLayers);
         config.layersSizes.resize(numLayers);
         for (auto& layer : config.layersSizes) {
             std::uint64_t size;
-            ReadBinaryLE(file, size);
+            ReadBinaryLE(in, size);
             layer = static_cast<decltype(layer)>(size);
         }
         return config;
@@ -116,34 +103,26 @@ std::optional<NeuralNetworkConfiguration> LoadConfig(const std::filesystem::path
     }
 }
 
-std::optional<NeuralNetwork> LoadNetwork(const std::filesystem::path& filename) {
-    if (!std::filesystem::exists(filename)) {
-        return std::nullopt;
-    }
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open file for reading");
-    }
-
+NeuralNetwork LoadNetwork(std::istream& in) {
     std::uint32_t version;
-    ReadBinaryLE(file, version);
+    ReadBinaryLE(in, version);
     if (version != 1) {
         throw std::runtime_error("Unsupported network version: " + std::to_string(version));
     }
 
     NeuralNetwork network;
     std::uint8_t hiddenActivation, outputActivation;
-    ReadBinaryLE(file, hiddenActivation);
-    ReadBinaryLE(file, outputActivation);
+    ReadBinaryLE(in, hiddenActivation);
+    ReadBinaryLE(in, outputActivation);
     network.config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
     network.config.outputActivation = static_cast<ActivationType>(outputActivation);
 
     std::uint32_t numLayers;
-    ReadBinaryLE(file, numLayers);
+    ReadBinaryLE(in, numLayers);
     network.config.layersSizes.resize(numLayers);
     for (std::uint32_t i = 0; i < numLayers; ++i) {
         std::uint64_t s;
-        ReadBinaryLE(file, s);
+        ReadBinaryLE(in, s);
         network.config.layersSizes[i] = static_cast<std::size_t>(s);
     }
 
@@ -160,7 +139,7 @@ std::optional<NeuralNetwork> LoadNetwork(const std::filesystem::path& filename) 
         dense.gradientBiases = Matrix::zeros(1, cols);
 
         std::vector<double> weightBuf(rows * cols);
-        ReadBulkLE(file, weightBuf);
+        ReadBulkLE(in, weightBuf);
         for (std::size_t row = 0; row < rows; ++row) {
             for (std::size_t col = 0; col < cols; ++col) {
                 dense.weights(row, col) = weightBuf[row * cols + col];
@@ -168,7 +147,7 @@ std::optional<NeuralNetwork> LoadNetwork(const std::filesystem::path& filename) 
         }
 
         std::vector<double> biasBuf(cols);
-        ReadBulkLE(file, biasBuf);
+        ReadBulkLE(in, biasBuf);
         for (std::size_t col = 0; col < cols; ++col) {
             dense.biases(0, col) = biasBuf[col];
         }

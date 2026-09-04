@@ -24,19 +24,15 @@ namespace {
 constexpr std::size_t kTableSize = 50'000;
 
 struct Pipeline {
-    Tests::TempDir dir;
+    std::string text;
     Vocabulary vocabulary;
     TCorpus corpus;
 
     explicit Pipeline(const std::size_t distinct = 200, const std::size_t tokens = 40'000)
-        : vocabulary(BuildVocabulary(dir, distinct, tokens))
-        , corpus(EncodeCorpus(dir.file("zipf.txt"), vocabulary))
+        : text(Tests::ZipfCorpusText(distinct, tokens))
+        , vocabulary(Tests::VocabularyFromText(text, 1))
+        , corpus(Tests::CorpusFromText(text, vocabulary))
     {}
-
-    static Vocabulary BuildVocabulary(const Tests::TempDir& dir, const std::size_t distinct, const std::size_t tokens) {
-        const auto path = dir.write("zipf.txt", Tests::ZipfCorpusText(distinct, tokens));
-        return Vocabulary::Build(path, 1);
-    }
 };
 
 }  // namespace

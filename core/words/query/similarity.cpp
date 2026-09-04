@@ -27,8 +27,8 @@ EmbeddingIndex::EmbeddingIndex(Embeddings embeddings)
     }
 }
 
-EmbeddingIndex EmbeddingIndex::Load(const std::filesystem::path& path) {
-    return EmbeddingIndex(Embeddings::Load(path));
+EmbeddingIndex EmbeddingIndex::Load(std::istream& in) {
+    return EmbeddingIndex(Embeddings::Load(in));
 }
 
 std::vector<Neighbour> EmbeddingIndex::nearestToVector(

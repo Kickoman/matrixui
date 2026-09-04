@@ -15,9 +15,8 @@ namespace {
 
 constexpr std::size_t kTableSize = 100'000;
 
-Vocabulary ManyWordVocabulary(const Tests::TempDir& dir, const std::size_t distinct = 300) {
-    const auto path = dir.write("zipf.txt", Tests::ZipfCorpusText(distinct, 60'000));
-    return Vocabulary::Build(path, 1);
+Vocabulary ManyWordVocabulary(const std::size_t distinct = 300) {
+    return Tests::VocabularyFromText(Tests::ZipfCorpusText(distinct, 60'000), 1);
 }
 
 // Gradient-check helpers. applyUpdate mutates the centre row and every touched
@@ -89,8 +88,7 @@ double NumericGradient(
 }  // namespace
 
 TEST_CASE("A freshly built model has zeroed output and varied input") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 32;
@@ -108,8 +106,7 @@ TEST_CASE("A freshly built model has zeroed output and varied input") {
 }
 
 TEST_CASE("The initial score of any pair is exactly zero") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 32;
@@ -121,8 +118,7 @@ TEST_CASE("The initial score of any pair is exactly zero") {
 }
 
 TEST_CASE("The initial loss is (negatives + 1) * ln 2") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 16;
@@ -137,8 +133,7 @@ TEST_CASE("The initial loss is (negatives + 1) * ln 2") {
 }
 
 TEST_CASE("The learning rate decays linearly to the configured floor") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 8;
@@ -167,8 +162,7 @@ TEST_CASE("The learning rate decays linearly to the configured floor") {
 }
 
 TEST_CASE("The analytic gradient matches a numeric central difference") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 16;
@@ -225,8 +219,7 @@ TEST_CASE("The analytic gradient matches a numeric central difference") {
 }
 
 TEST_CASE("Overfitting a single pair drives its loss down monotonically") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 50;
@@ -252,8 +245,7 @@ TEST_CASE("Overfitting a single pair drives its loss down monotonically") {
 }
 
 TEST_CASE("trainPair never picks the context word as its own negative") {
-    const Tests::TempDir dir;
-    const auto vocabulary = ManyWordVocabulary(dir);
+    const auto vocabulary = ManyWordVocabulary();
 
     ModelConfig config;
     config.dim = 8;

@@ -2,8 +2,8 @@
 
 #include "core/words/data/types.h"
 #include <cstddef>
+#include <iosfwd>
 #include <vector>
-#include <filesystem>
 
 class XorShift;
 
@@ -26,8 +26,8 @@ public:
     void initializeUniform(XorShift& rng);
     void initializeZero();
 
-    static void Save(const Embeddings& embeddings, const std::filesystem::path& path);
-    static Embeddings Load(const std::filesystem::path& path);
+    static void Save(std::ostream& out, const Embeddings& embeddings);
+    static Embeddings Load(std::istream& in);
 
 private:
     std::size_t words{0};

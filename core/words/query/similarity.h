@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstddef>
-#include <filesystem>
+#include <iosfwd>
 #include <span>
 #include <string>
 #include <vector>
@@ -22,7 +22,7 @@ class EmbeddingIndex {
 public:
     explicit EmbeddingIndex(Embeddings embeddings);
 
-    static EmbeddingIndex Load(const std::filesystem::path& path);
+    static EmbeddingIndex Load(std::istream& in);
 
     std::vector<Neighbour> nearest(TWordId id, std::size_t count) const;
     std::vector<Neighbour> nearestToVector(std::span<const TFloat> query, std::span<const TWordId> exclude, std::size_t count) const;

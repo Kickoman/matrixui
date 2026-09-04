@@ -1,26 +1,18 @@
 #include "core/words/data/inspect.h"
 
-#include "core/words/error.h"
-
 #include <algorithm>
 #include <array>
-#include <fstream>
+#include <istream>
 #include <unordered_map>
 
 namespace Words {
 
-CorpusStatistics InspectDump(const std::filesystem::path& dump, const std::size_t topN) {
-    std::ifstream file(dump);
-    if (!file) {
-        throw IoError("Can't open file for reading: " + dump.string());
-    }
-
+CorpusStatistics InspectDump(std::istream& dump, const std::size_t topN) {
     std::unordered_map<std::string, std::size_t> words;
     CorpusStatistics statistics;
-    statistics.path = dump;
 
     std::string word;
-    while (file >> word) {
+    while (dump >> word) {
         words[word] += 1;
         statistics.symbols += word.size();
         ++statistics.totalWords;

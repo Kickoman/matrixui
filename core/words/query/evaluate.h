@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstddef>
-#include <filesystem>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -33,7 +33,7 @@ struct AnalogyReport {
 AnalogyReport EvaluateAnalogies(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
-    const std::filesystem::path& path,
+    std::istream& file,
     std::size_t restrictTo,
     std::size_t threads
 );
@@ -48,7 +48,7 @@ struct SimilarityReport {
 SimilarityReport EvaluateSimilarity(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
-    const std::filesystem::path& path,
+    std::istream& file,
     std::size_t scoreColumn
 );
 

@@ -3,6 +3,7 @@
 #include "core/classifier/learning_config.h"
 #include "core/classifier/trainer.h"
 
+#include "core/lib/file_stream.h"
 #include "core/lib/directory_dataset.h"
 #include "core/lib/neural_network.h"
 #include "core/lib/neural_network_loader.h"
@@ -44,7 +45,9 @@ DigitsClassifierController::DigitsClassifierController(QObject* parent)
 {
     recognizer.setEpochCallback([this](const Neural::Classifier::EpochLog&){
         this->testOnce();
-        Neural::SaveNetwork(this->recognizer.getNetwork(), this->networkName.toStdString());
+        Io::WriteFile(this->networkName.toStdString(), [this](std::ostream& file) {
+            Neural::SaveNetwork(file, this->recognizer.getNetwork());
+        }, std::ios::binary);
     });
 }
 
@@ -118,7 +121,7 @@ void DigitsClassifierController::loadNetwork(const QString& network, Neural::Neu
     std::optional<Neural::NeuralNetwork> loadedNetwork;
     if (QFile::exists(network)) {
         try {
-            loadedNetwork = Neural::LoadNetwork(network.toStdString());
+            loadedNetwork = Io::TryReadFile(network.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
         } catch (const std::runtime_error& e) { }
     }
     if (!loadedNetwork) {
