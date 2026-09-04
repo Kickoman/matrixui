@@ -235,4 +235,5 @@ Code `5` covers two different problems; the stderr message distinguishes them.
 - [Hyperparameters guide](hyperparameters.md) — learning rate schedules, architecture choices, dropout
 - [GUI guide](gui.md) — the Classifier and Recognizer modes
 - `core/classifier/learning_config.h` — default values
+- [`cli/classifier/README.md`](../cli/classifier/README.md) — how the subcommands are wired
 - `cli/classifier/main.cpp` — argument parsing

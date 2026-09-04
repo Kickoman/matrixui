@@ -60,7 +60,10 @@ by default, and they land in `build/lib/`:
 | `matrixgui_classifier` | `core/classifier/` | `nn` | Classifier training loop and its config |
 | `matrixgui_generator` | `core/generator/` | `nn`, `matrix` | Conditional-GAN training loop and its config |
 | `matrixgui_words` | `core/words/` | `core_lib` | The whole SGNS pipeline. Notably does **not** link `nn`, `matrix` or Eigen |
+| `matrixgui_cli_lib` | `cli/lib/` | `matrix` | Helpers shared by the command-line tools: cached PNG reader, JSON config loading, argv pre-scan |
 | `matrixgui_cli_words` | `cli/words/` | `words` | `MatrixGui_words` subcommand bodies, minus `main()` |
+| `matrixgui_cli_classifier` | `cli/classifier/` | `classifier`, `nn` | `MatrixGui_headless` subcommand bodies, minus `main()` |
+| `matrixgui_cli_generator` | `cli/generator/` | `generator` | `MatrixGui_gan` subcommand bodies, minus `main()` |
 | `matrixgui_gui_common` | `gui_common/` | Qt | Reusable widgets; built only with `BUILD_GUI=ON` |
 
 Executables — these land in `build/` itself:
@@ -231,10 +234,10 @@ doctest registers cases through file-scope global constructors; in a static
 archive the linker drops the objects and the suite silently shrinks to zero
 cases.
 
-**`cli/words/` builds its library unconditionally**, and only the executables are
-gated on `BUILD_CLI`. `-DBUILD_CLI=OFF -DBUILD_TESTS=ON` is the shape of CI's
-first job, and it must stay configurable if a test ever links
-`matrixgui_cli_words`.
+**Every `cli/*/` directory builds its library unconditionally**, and only the
+executables are gated on `BUILD_CLI`. `-DBUILD_CLI=OFF -DBUILD_TESTS=ON` is the
+shape of CI's first job, and it must stay configurable if a test ever links one
+of them.
 
 **`core/png/pngreader.cpp` wraps its stb includes in a `#pragma GCC diagnostic`
 block.** The `*_IMPLEMENTATION` defines pull the whole vendored implementation

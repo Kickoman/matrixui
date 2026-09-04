@@ -253,4 +253,5 @@ not apply to defaults — so running `generate` in a directory without a
 - [Hyperparameters guide](hyperparameters.md) — GAN stability, adaptive LR, flatness kicks
 - [GUI guide](gui.md) — the Generator mode
 - `core/generator/learning_config.h` — default values
+- [`cli/generator/README.md`](../cli/generator/README.md) — how the subcommands are wired
 - `cli/generator/main.cpp` — argument parsing
