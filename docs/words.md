@@ -34,7 +34,7 @@ MatrixGui_words neighbours --vocabulary built.voc --embeddings emb.bin --word ki
 | `core/words/train/` | Samplers, the SGNS model, the trainer | [README](../core/words/train/README.md) |
 | `core/words/query/` | Nearest neighbours, expressions, the evaluation benchmarks | [README](../core/words/query/README.md) |
 | `core/words/report/` | **All** console formatting | [README](../core/words/report/README.md) |
-| `core/words_cli/` | Subcommand option structs and bodies (CLI-only, not in `CORE_SOURCES`) | [README](../core/words_cli/README.md) |
+| `cli/words/` | Subcommand option structs and bodies (the `matrixgui_cli_words` library) | [README](../cli/words/README.md) |
 | `gui/words/` | The Qt Words mode: controller, three tabs, config editor | [README](../gui/words/README.md) |
 
 Each README is the file-level reference for its folder — what every unit
@@ -62,8 +62,8 @@ default log stream. That plumbing moved to `core/lib/stream_format.h`
 (`NullStream`, `DefaultLogStream`, `StreamFormatGuard`), so the carve-out is
 gone and the grep above is exact.
 
-`core/words_cli/` is deliberately outside `CORE_SOURCES`, because that list is
-compiled into the Qt binary too and CLI11 does not belong there.
+`cli/words/` is a separate library (`matrixgui_cli_words`) rather than part of
+`matrixgui_words`, so CLI11 never reaches the Qt binary.
 
 ## Compute, then report
 
@@ -158,7 +158,7 @@ updates are the point of the design.
 ## CLI reference
 
 `MatrixGui_words` takes a subcommand. Each one binds to its own options struct in
-`core/words_cli/options.h`, and its body lives in `core/words_cli/commands.cpp` —
+`cli/words/options.h`, and its body lives in `cli/words/commands.cpp` —
 CLI11 calls the right handler through `->callback()`, so there is no dispatch
 chain to keep in step with the registrations.
 

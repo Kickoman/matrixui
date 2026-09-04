@@ -4,14 +4,14 @@
 #include "core/generator/trainer.h"
 
 #include "core/lib/file_stream.h"
-#include "core/lib/neural_network_applier.h"
-#include "core/lib/neural_network_loader.h"
-#include "core/lib/neural_network.h"
-#include "core/lib/directory_dataset.h"
+#include "core/nn/neural_network_applier.h"
+#include "core/nn/neural_network_loader.h"
+#include "core/nn/neural_network.h"
+#include "core/nn/directory_dataset.h"
 #include "core/lib/cache.h"
 #include "core/lib/matrix_cache.h"
 
-#include "png/pngreader.h"
+#include "core/png/pngreader.h"
 
 #include <magic_enum/magic_enum.hpp>
 

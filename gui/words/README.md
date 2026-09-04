@@ -5,7 +5,7 @@ plus a mode widget holding three tabs and a terminal. No embedding logic lives
 here: every button ends in a call into `core/words`, and every result comes back
 as one of its report structs.
 
-The other front end is [`core/words_cli`](../../core/words_cli/README.md). The
+The other front end is [`cli/words`](../../cli/words/README.md). The
 two share the whole pipeline; they differ only in where the `std::ostream` goes.
 
 | File | Contains |

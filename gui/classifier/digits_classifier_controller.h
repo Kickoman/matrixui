@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/lib/neural_network.h"
+#include "core/nn/neural_network.h"
 
 #include "core/classifier/learning_config.h"
 #include "core/classifier/trainer.h"

@@ -1,8 +1,8 @@
 #include "core/generator/trainer.h"
 #include "core/generator/learning_config.h"
-#include "core/lib/loss_functions.h"
-#include "core/lib/neural_network.h"
-#include "core/lib/neural_network_applier.h"
+#include "core/nn/loss_functions.h"
+#include "core/nn/neural_network.h"
+#include "core/nn/neural_network_applier.h"
 
 #include <algorithm>
 #include <numeric>

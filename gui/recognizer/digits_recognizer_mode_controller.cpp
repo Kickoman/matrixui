@@ -2,7 +2,7 @@
 #include "gui/recognizer/digit_input_preprocess.h"
 
 #include "core/lib/file_stream.h"
-#include "core/lib/neural_network_loader.h"
+#include "core/nn/neural_network_loader.h"
 
 #include <QImage>
 

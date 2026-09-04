@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16...3.28)
 
 project(MatrixGui LANGUAGES CXX)
 
@@ -6,220 +6,60 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(BUILD_GUI "Build GUI version" ON)
 option(BUILD_CLI "Build CLI version" ON)
 option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_SHARED_LIBS "Build the matrixgui libraries as shared objects" OFF)
 
-# Qt options
-if (BUILD_GUI)
-    set(CMAKE_AUTOUIC ON)
-    set(CMAKE_AUTOMOC ON)
-    set(CMAKE_AUTORCC ON)
+set(MATRIXGUI_LIB_TYPE STATIC)
+if(BUILD_SHARED_LIBS)
+    set(MATRIXGUI_LIB_TYPE SHARED)
+endif()
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+
+add_library(matrixgui_base INTERFACE)
+target_include_directories(matrixgui_base INTERFACE ${PROJECT_SOURCE_DIR})
+target_compile_features(matrixgui_base INTERFACE cxx_std_20)
+target_compile_options(matrixgui_base INTERFACE -Wall -Wextra)
+
+add_library(matrixgui_contrib INTERFACE)
+target_include_directories(matrixgui_contrib SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/contrib)
+
+add_library(matrixgui_eigen INTERFACE)
+target_include_directories(matrixgui_eigen SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/eigen)
+
+if(BUILD_TESTS)
+    enable_testing()
+endif()
+
+add_subdirectory(core)
+
+if(BUILD_CLI OR BUILD_TESTS)
+    add_subdirectory(cli)
+endif()
+
+if(BUILD_GUI)
     find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
     find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
 
     add_subdirectory(contrib/qt-dark-theme)
-endif()
 
-# Eigen is a hard dependency (matrix/matrix.h includes it unconditionally).
-# Hide its own warnings so they do not drown the project's -Wall -Wextra.
-set_directory_properties(PATH eigen PROPERTIES COMPILE_OPTIONS "-w")
-
-set(GUI_SOURCES
-    gui/lib/theme.cpp
-    gui/lib/mode_factory.cpp
-    gui/lib/mode_settings.cpp
-    gui/lib/mode_widget.cpp
-    gui/lib/mode_controller.cpp
-    gui/lib/network_create_dialog.cpp
-    gui/lib/new_mode_widget.cpp
-    gui/lib/mode_container_widget.cpp
-
-    gui/classifier/digits_classifier_controller.cpp
-    gui/classifier/digits_classifier_mode_widget.cpp
-    gui/classifier/learning_config_widget.cpp
-
-    gui/recognizer/digits_recognizer_mode_controller.cpp
-    gui/recognizer/digits_recognizer_mode_widget.cpp
-    gui/recognizer/digit_input_preprocess.cpp
-
-    gui/generator/digits_generator_controller.cpp
-    gui/generator/digits_generator_mode_widget.cpp
-    gui/generator/gan_config_widget.cpp
-
-    gui/words/words_controller.cpp
-    gui/words/words_mode_widget.cpp
-    gui/words/words_data_tab_widget.cpp
-    gui/words/words_explore_tab_widget.cpp
-    gui/words/words_evaluate_tab_widget.cpp
-    gui/words/words_train_config_widget.cpp
-
-    gui/main_controller.cpp
-    gui/main_window.cpp
-)
-
-set(
-    GUI_COMMON_SOURCES
-    gui_common/add_tab_bar.cpp
-    gui_common/add_tab_widget.cpp
-    gui_common/advanced_terminal.cpp
-    gui_common/time_chart.cpp
-    gui_common/digit_chart.cpp
-    gui_common/paint_scene.cpp
-)
-
-set(
-    CORE_SOURCES
-    core/lib/layers.cpp
-    core/lib/neural_network.cpp
-    core/lib/neural_network_loader.cpp
-    core/lib/neural_network_applier.cpp
-    core/lib/dataset.cpp
-    core/lib/directory_dataset.cpp
-    core/lib/stream_format.cpp
-    core/lib/text.cpp
-    core/lib/stats.cpp
-
-    # Classifier
-    core/classifier/trainer.cpp
-
-    # Generator
-    core/generator/trainer.cpp
-
-    # Words
-    core/words/config.cpp
-
-    # Words: data preparation and on-disk artifacts
-    core/words/data/inspect.cpp
-    core/words/data/vocabulary.cpp
-    core/words/data/corpus.cpp
-    core/words/data/embeddings.cpp
-
-    # Words: training
-    core/words/train/subsampler.cpp
-    core/words/train/negativesampler.cpp
-    core/words/train/model.cpp
-    core/words/train/trainer.cpp
-
-    # Words: querying a trained model
-    core/words/query/similarity.cpp
-    core/words/query/expressions.cpp
-    core/words/query/queries.cpp
-    core/words/query/evaluate.cpp
-
-    # Words: console rendering
-    core/words/report/inspect_report.cpp
-    core/words/report/query_report.cpp
-    core/words/report/evaluate_report.cpp
-    core/words/report/train_report.cpp
-
-    # Other
-    matrix/matrix.cpp
-    png/pngreader.cpp
-)
-
-include_directories(eigen)
-
-add_library(matrixgui_core STATIC ${CORE_SOURCES})
-target_include_directories(matrixgui_core PUBLIC contrib)
-set_target_properties(matrixgui_core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-
-if(BUILD_GUI)
-    if(${QT_VERSION_MAJOR} EQUAL 5)
-        qt5_add_resources(FONTS gui/fonts/fonts.qrc)
-    else()
-        qt_add_resources(FONTS gui/fonts/fonts.qrc)
-    endif()
-
-    add_executable(
-        ${PROJECT_NAME}
-        ${GUI_SOURCES}
-        ${GUI_COMMON_SOURCES}
-        gui/main.cpp
-    )
-
-    target_sources(${PROJECT_NAME} PRIVATE ${FONTS})
-
-    target_link_libraries(${PROJECT_NAME}
-        matrixgui_core
-
-        Qt${QT_VERSION_MAJOR}::Gui
-        Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::Concurrent
-        Qt${QT_VERSION_MAJOR}::Charts
-
-        QtDarkTheme
-    )
-
-    target_include_directories(${PROJECT_NAME} PUBLIC contrib)
-
-endif()
-
-if(BUILD_CLI)
-    add_executable(
-        ${PROJECT_NAME}_headless
-        core/main_headless.cpp
-    )
-    target_link_libraries(${PROJECT_NAME}_headless matrixgui_core)
-
-    add_executable(
-        ${PROJECT_NAME}_gan
-        core/main_headless_gan.cpp
-    )
-    target_link_libraries(${PROJECT_NAME}_gan matrixgui_core)
-
-    add_executable(
-        ${PROJECT_NAME}_words
-        core/main_words.cpp
-        core/words_cli/commands.cpp
-    )
-    target_link_libraries(${PROJECT_NAME}_words matrixgui_core)
-
-    target_include_directories(${PROJECT_NAME}_headless PUBLIC contrib)
-    target_include_directories(${PROJECT_NAME}_gan PUBLIC contrib)
-    target_include_directories(${PROJECT_NAME}_words PUBLIC contrib)
+    add_subdirectory(gui_common)
+    add_subdirectory(gui)
 endif()
 
 if(BUILD_TESTS)
-    enable_testing()
-
-    set(
-        TEST_SOURCES
-        tests/main.cpp
-        tests/words/vocabulary_test.cpp
-        tests/words/corpus_test.cpp
-        tests/words/embeddings_test.cpp
-        tests/words/subsampler_test.cpp
-        tests/words/windowsampler_test.cpp
-        tests/words/negativesampler_test.cpp
-        tests/words/model_test.cpp
-        tests/words/similarity_test.cpp
-        tests/words/expressions_test.cpp
-        tests/words/evaluate_test.cpp
-        tests/words/golden_print_test.cpp
-        tests/words/trainer_test.cpp
-        tests/words/config_test.cpp
-        tests/words/inspect_test.cpp
-        tests/words/queries_test.cpp
-        tests/lib/file_stream_test.cpp
-        tests/lib/stream_format_test.cpp
-        tests/lib/text_test.cpp
-        tests/lib/stats_test.cpp
-    )
-
-    add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
-    target_link_libraries(${PROJECT_NAME}_tests matrixgui_core)
-    target_include_directories(${PROJECT_NAME}_tests PUBLIC contrib)
-    set_target_properties(${PROJECT_NAME}_tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
-
-    add_test(NAME unit COMMAND ${PROJECT_NAME}_tests)
+    add_subdirectory(tests)
 endif()

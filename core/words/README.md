@@ -1,7 +1,7 @@
 # `core/words` — word embeddings
 
 Skip-gram with negative sampling (SGNS), trained from a plain text dump. This
-folder is the whole pipeline; `core/words_cli/` and `gui/words/` are two front
+folder is the whole pipeline; `cli/words/` and `gui/words/` are two front
 ends over it, and neither adds logic of its own.
 
 Narrative documentation — pipeline diagram, CLI reference, the error model, how

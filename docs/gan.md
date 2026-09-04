@@ -253,4 +253,4 @@ not apply to defaults — so running `generate` in a directory without a
 - [Hyperparameters guide](hyperparameters.md) — GAN stability, adaptive LR, flatness kicks
 - [GUI guide](gui.md) — the Generator mode
 - `core/generator/learning_config.h` — default values
-- `core/main_headless_gan.cpp` — argument parsing
+- `cli/generator/main.cpp` — argument parsing

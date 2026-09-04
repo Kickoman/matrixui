@@ -1,8 +1,8 @@
 # Building MatrixGui
 
 One CMake project builds everything: a Qt desktop application, three command-line
-tools and a test binary. They all link the same static core library, so the code
-is compiled once and shared.
+tools and a test binary. They share a set of small libraries under `core/`, each
+built once and linked by whichever front end needs it.
 
 The GUI is the only part that needs Qt. If you only want the command-line tools,
 pass `-DBUILD_GUI=OFF` and you can skip installing Qt entirely.
@@ -26,7 +26,7 @@ cmake --build build
 | Requirement | Notes |
 |-------------|-------|
 | C++20 compiler | GCC or Clang |
-| CMake 3.14+ | |
+| CMake 3.16+ | |
 | Qt 6 (or Qt 5) | GUI only. Modules: Gui, Widgets, Qml, QuickWidgets, Concurrent, Charts |
 | Eigen | Bundled as a git submodule in `eigen/` |
 
@@ -44,12 +44,29 @@ sudo apt-get install -y --no-install-recommends \
 | `BUILD_GUI` | `ON` | Qt-based graphical application (`MatrixGui`) |
 | `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`) |
 | `BUILD_TESTS` | `ON` | Unit-test binary (`MatrixGui_tests`) and the `unit` CTest entry |
+| `BUILD_SHARED_LIBS` | `OFF` | Build the `matrixgui_*` libraries as `.so` instead of `.a` |
 
 ## Build targets
 
+Libraries — none of them use Qt. Their kind follows `BUILD_SHARED_LIBS`, static
+by default, and they land in `build/lib/`:
+
+| Target | Source | Depends on | Description |
+|--------|--------|-----------|-------------|
+| `matrixgui_matrix` | `core/matrix/` | Eigen | Matrix type used by everything numeric |
+| `matrixgui_png` | `core/png/` | `matrix` | Image loading/writing over vendored stb |
+| `matrixgui_core_lib` | `core/lib/` | — | Framework-free utilities: text, stats, stream formatting, file IO, RNG, caches. Knows nothing about matrices or networks |
+| `matrixgui_nn` | `core/nn/` | `matrix`, `core_lib` | Layers, network, applier, loader, datasets |
+| `matrixgui_classifier` | `core/classifier/` | `nn` | Classifier training loop and its config |
+| `matrixgui_generator` | `core/generator/` | `nn`, `matrix` | Conditional-GAN training loop and its config |
+| `matrixgui_words` | `core/words/` | `core_lib` | The whole SGNS pipeline. Notably does **not** link `nn`, `matrix` or Eigen |
+| `matrixgui_cli_words` | `cli/words/` | `words` | `MatrixGui_words` subcommand bodies, minus `main()` |
+| `matrixgui_gui_common` | `gui_common/` | Qt | Reusable widgets; built only with `BUILD_GUI=ON` |
+
+Executables — these land in `build/` itself:
+
 | Target | Kind | Description |
 |--------|------|-------------|
-| `matrixgui_core` | static library | The framework-free core. Linked by every target below; nothing in it uses Qt |
 | `MatrixGui` | GUI application | Full Qt interface for all four modes |
 | `MatrixGui_headless` | CLI | Classifier training and single-image prediction |
 | `MatrixGui_gan` | CLI | GAN training and image generation |
@@ -78,6 +95,17 @@ cmake --build build
 cmake -B build
 cmake --build build --target MatrixGui_words
 ```
+
+**Shared libraries:**
+
+```bash
+cmake -B build -DBUILD_SHARED_LIBS=ON
+cmake --build build
+```
+
+The `.so` files go to `build/lib/`; the executables in `build/` find them through
+an embedded RPATH, so no `LD_LIBRARY_PATH` is needed. Symbol visibility is left
+at the compiler default on purpose — see the comment in `CMakeLists.txt`.
 
 **Debug build:**
 
@@ -131,19 +159,87 @@ the unit tests carry the same invariants with tolerances.
 <details>
 <summary>Source layout</summary>
 
-`CMakeLists.txt` groups sources into three lists:
+Every directory that produces a target owns its own `CMakeLists.txt`. The root
+file holds only the options, three interface targets and the `add_subdirectory`
+calls:
 
-- **`CORE_SOURCES`** — `core/lib/`, `core/classifier/`, `core/generator/`,
-  `core/words/` (with its `data/`, `train/`, `query/` and `report/` subfolders,
-  each a labelled group in the list), plus `matrix/` and `png/`. Compiled once
-  into `matrixgui_core`. No Qt, so AUTOMOC/AUTOUIC/AUTORCC are turned off for
-  it.
-- **`GUI_SOURCES`** and **`GUI_COMMON_SOURCES`** — `gui/` and `gui_common/`,
-  linked only into the `MatrixGui` executable.
+```
+core/       the libraries: matrix, png, lib, nn, classifier, generator, words
+cli/        one folder per command-line tool, mirroring gui/
+gui/        the Qt application
+gui_common/ reusable Qt widgets
+tests/      the doctest suite
+```
 
-`core/words_cli/` is deliberately **not** in `CORE_SOURCES`: that list is
-compiled into the Qt GUI too, and CLI11 has no business being there. Its two
-files are listed directly on the `MatrixGui_words` target instead.
+Three `INTERFACE` targets carry the settings, and every first-party target links
+`matrixgui_base`:
+
+| Target | Carries |
+|---|---|
+| `matrixgui_base` | The repo-root include path (which is what makes `#include "core/nn/layers.h"` resolve), C++20, `-Wall -Wextra` |
+| `matrixgui_contrib` | `contrib/` as a system include — nlohmann, CLI11, doctest, magic_enum |
+| `matrixgui_eigen` | `eigen/` as a system include, so Eigen's own warnings stay quiet without silencing ours |
+
+Dependencies are declared `PUBLIC` only when a type actually appears in the
+target's headers, `PRIVATE` otherwise. That is what keeps `matrixgui_words` free
+of Eigen and CLI11 out of the Qt binary — the split that used to be maintained
+by hand as a carve-out from a flat `CORE_SOURCES` list.
+
+AUTOMOC is set per target in `gui/` and `gui_common/` rather than globally, so it
+never runs over the CLI or core targets. AUTOUIC is not enabled anywhere: there
+are no `.ui` files.
+
+</details>
+
+<details>
+<summary>Why the build files look the way they do</summary>
+
+Non-obvious constraints. Each of these will look like a pointless detail until
+you change it.
+
+**Symbol visibility is left at the compiler default, on purpose.** Setting
+`CMAKE_CXX_VISIBILITY_PRESET hidden` breaks more than linking: the `Words::Error`
+hierarchy in `core/words/error.h` is header-only, thrown inside
+`matrixgui_words` and caught in `cli/words/main.cpp`. With hidden visibility each
+module gets its own `typeinfo`, and `catch (const Words::Error&)` silently misses
+into `std::terminate`. Making hidden visibility safe needs export macros on the
+exception types, not a flag flip.
+
+**`CMAKE_RUNTIME_OUTPUT_DIRECTORY` is load-bearing.** Executables are declared in
+`cli/*/` and `gui/`, so without it they would land in `build/cli/words/` and
+friends. `README.md`, this file, and `tests/golden/{capture,compare}.sh` all
+hardcode `./build/MatrixGui_words`.
+
+**Do not add `include_directories(eigen)` back.** GCC ignores an `-isystem P`
+if a plain `-I P` for the same path appeared earlier on the command line, which
+would make `matrixgui_eigen` a no-op and bring Eigen's warnings back. For the
+same reason `eigen/` is never `add_subdirectory`'d — its own `project()` drags in
+tests, BLAS probing and install rules.
+
+**`MATRIXGUI_LIB_TYPE` is passed to `add_library()` explicitly** instead of
+relying on `BUILD_SHARED_LIBS` implicitly, so the kind of a library cannot be
+changed out from under a leaf directory by a shadowed variable.
+`contrib/qt-dark-theme` hardcodes `STATIC` and should stay that way: its `.qrc`
+is registered by a static initializer.
+
+**`enable_testing()` must stay in the root file.** Called only from
+`tests/CMakeLists.txt`, it generates no root `build/CTestTestfile.cmake`, and
+`ctest --test-dir build` — what CI runs — finds nothing.
+
+**Test sources go straight into `MatrixGui_tests`, never into a library.**
+doctest registers cases through file-scope global constructors; in a static
+archive the linker drops the objects and the suite silently shrinks to zero
+cases.
+
+**`cli/words/` builds its library unconditionally**, and only the executables are
+gated on `BUILD_CLI`. `-DBUILD_CLI=OFF -DBUILD_TESTS=ON` is the shape of CI's
+first job, and it must stay configurable if a test ever links
+`matrixgui_cli_words`.
+
+**`core/png/pngreader.cpp` wraps its stb includes in a `#pragma GCC diagnostic`
+block.** The `*_IMPLEMENTATION` defines pull the whole vendored implementation
+into that translation unit; the pragma keeps its warnings out of the build
+without silencing the rest of the file.
 
 </details>
 

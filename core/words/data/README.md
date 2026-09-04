@@ -178,7 +178,7 @@ inline void   addScaled(TFloat* __restrict a, const TFloat* __restrict b, double
 ```
 
 Both accumulate in `double` over `float` storage. They overlap in intent with
-`matrix/` and Eigen but are kept here on purpose: they are the hot path, they
+`core/matrix/` and Eigen but are kept here on purpose: they are the hot path, they
 take raw `__restrict` pointers, and folding them into a general matrix type is a
 performance question rather than a layout one.
 

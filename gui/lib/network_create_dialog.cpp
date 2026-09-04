@@ -1,8 +1,8 @@
 #include "gui/lib/network_create_dialog.h"
 
 #include "core/lib/file_stream.h"
-#include "core/lib/neural_network.h"
-#include "core/lib/neural_network_loader.h"
+#include "core/nn/neural_network.h"
+#include "core/nn/neural_network_loader.h"
 
 #include "gui/lib/qinputvalidators.h"
 

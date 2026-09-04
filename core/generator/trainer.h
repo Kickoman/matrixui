@@ -2,8 +2,8 @@
 
 #include "core/generator/learning_config.h"
 
-#include "core/lib/neural_network_applier.h"
-#include "matrix/matrix.h"
+#include "core/nn/neural_network_applier.h"
+#include "core/matrix/matrix.h"
 
 #include <random>
 #include <vector>

@@ -1,0 +1,7 @@
+add_subdirectory(matrix)
+add_subdirectory(png)
+add_subdirectory(lib)
+add_subdirectory(nn)
+add_subdirectory(classifier)
+add_subdirectory(generator)
+add_subdirectory(words)
