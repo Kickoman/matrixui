@@ -240,11 +240,13 @@ Generate 10 images of the digit 3, with classifier verification:
 | `0` | Success |
 | `2` | The generator or the classifier failed to load |
 | `4` | An exception during generation |
-| `106` | Command line did not parse: no subcommand, a missing required option, or an unknown flag |
+| `105` | A `--generator`/`--classifier`/`--dataset` path that does not exist (CLI11's file check) |
+| `106` | No subcommand, or a missing required option |
+| `109` | An unknown flag |
 
 Note that `--generator` has a default value, and the "file must exist" check does
 not apply to defaults — so running `generate` in a directory without a
-`generator.wgt` gives you `2`, not `106`.
+`generator.wgt` gives you `2`, not `105`.
 
 ---
 
@@ -254,4 +256,5 @@ not apply to defaults — so running `generate` in a directory without a
 - [GUI guide](gui.md) — the Generator mode
 - `core/generator/learning_config.h` — default values
 - [`cli/generator/README.md`](../cli/generator/README.md) — how the subcommands are wired
+- [`tests/golden/README.md`](../tests/golden/README.md) — the local CLI snapshot and its committed `.wgt` fixture
 - `cli/generator/main.cpp` — argument parsing

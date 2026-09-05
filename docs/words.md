@@ -99,12 +99,13 @@ would otherwise surface much later as a model that trains but learns nothing.
 
 Bad user input is not exceptional: an expression box would otherwise throw on
 every half-typed word. `QueryStatus` renders as an inline message; an exception
-renders as a dialog. The CLI catches `Words::Error` once, in `main`, and exits
-non-zero.
+renders as a dialog. The CLI catches `Words::Error` once, in the command wrappers of
+`cli/words/commands.cpp`, and exits non-zero.
 
 Exit codes: `0` success, `1` a failed check or reported error, `2` an internal
-error, `106` a command line that did not parse (no subcommand, a missing required
-option, an unknown flag, or a file that does not exist).
+error. Parse failures carry CLI11's own codes: `106` for no subcommand or a
+missing required option, `105` for a file check that failed, `109` for an
+unknown flag.
 
 ## Training
 
@@ -368,7 +369,7 @@ loaded corpus, since its encoded ids belong to the old vocabulary.
 ```bash
 cmake -B build -DBUILD_TESTS=ON && cmake --build build -j
 ctest --test-dir build --output-on-failure     # unit tests (doctest)
-tests/golden/compare.sh                        # CLI snapshot
+tests/golden/compare.sh words                  # CLI snapshot
 ```
 
 Two layers:
@@ -377,7 +378,7 @@ Two layers:
   fixed seeds, whole suite under three seconds. `tests/support/fixtures.h`
   builds toy vocabularies and embeddings whose neighbours are analytically
   known.
-- **A CLI snapshot** (`tests/golden/`) running every subcommand against a
+- **A CLI snapshot** (`tests/golden/words/`) running every subcommand against a
   generated corpus and diffing stdout and exit codes. `capture.sh` records,
   `compare.sh` checks. Regenerate the corpus with `make_corpus.py`; it is seeded,
   and the expectations are pinned to its exact bytes.

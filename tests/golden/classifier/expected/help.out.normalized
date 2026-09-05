@@ -1,0 +1,11 @@
+MatrixGui headless classifier CLI
+
+<BIN> [OPTIONS] SUBCOMMAND
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+
+SUBCOMMANDS:
+  predict                     Classify a single PNG image using a trained network
+  train                       Train (or continue training) a classifier network on a directory
+                              dataset

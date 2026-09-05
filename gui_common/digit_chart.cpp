@@ -59,8 +59,9 @@ void DigitChart::setCount(const unsigned count) {
     for (unsigned i = 0; i < count; ++i) {
         axisY->append(QString::number(i));
     }
-    if (barSet->count() < count) {
-        for (unsigned i = 0; i < count - barSet->count(); ++i) {
+    const unsigned existing = static_cast<unsigned>(barSet->count());
+    if (existing < count) {
+        for (unsigned i = 0; i < count - existing; ++i) {
             *barSet << 0;
         }
     }

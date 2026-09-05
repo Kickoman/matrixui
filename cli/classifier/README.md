@@ -46,7 +46,9 @@ exactly one callback runs and assigns `exitCode`.
 
 `CLI11_PARSE` is deliberately not used. It expands to a `try`/`catch` that covers
 only `CLI::ParseError`, and the bodies now run *inside* `app.parse()`. The
-explicit form calls the same `app.exit()`, so a parse failure still exits 106 and
+explicit form calls the same `app.exit()`, so a parse failure still exits with
+CLI11's own code (106 missing required option or subcommand, 105 failed file
+check, 109 unknown flag) and
 `--help` still exits 0.
 
 There is deliberately **no** catch-all around `app.parse()`. `Train` does not
@@ -77,7 +79,7 @@ options are registered. Two things depend on that:
    will actually be used.
 
 A consequence worth knowing: a `--learning-config` path that does not exist exits
-`4` here, before CLI11's `->check(CLI::ExistingFile)` could turn it into `106`.
+`4` here, before CLI11's `->check(CLI::ExistingFile)` could turn it into `105`.
 
 ## The shape of a command body
 

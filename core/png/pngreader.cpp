@@ -20,7 +20,8 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
         throw std::runtime_error("Failed to load image: " + filename);
     }
 
-    const bool resizeNecessary = targetHeight != height || targetWidth != width;
+    const bool resizeNecessary = targetHeight != static_cast<unsigned>(height)
+                              || targetWidth != static_cast<unsigned>(width);
 
     unsigned char* resized = img;
     if (resizeNecessary) {
@@ -30,8 +31,8 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
 
     Matrix result(targetHeight, targetWidth);
 
-    for (int y = 0; y < targetHeight; y++) {
-        for (int x = 0; x < targetWidth; x++) {
+    for (unsigned y = 0; y < targetHeight; y++) {
+        for (unsigned x = 0; x < targetWidth; x++) {
             unsigned char pixel = resized[y * targetWidth + x];
             result(y, x) = (255.0 - pixel) / 255.0; // 0=white, 1=black
         }
@@ -39,7 +40,7 @@ Matrix PngUtils::fromImage(const std::string& filename, const unsigned targetHei
 
     stbi_image_free(img);
     if (resizeNecessary) {
-        delete resized;
+        delete[] resized;
     }
     return result;
 }

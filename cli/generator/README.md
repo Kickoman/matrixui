@@ -45,7 +45,9 @@ exactly one callback runs and assigns `exitCode`.
 
 `CLI11_PARSE` is deliberately not used. It expands to a `try`/`catch` that covers
 only `CLI::ParseError`, and the bodies now run *inside* `app.parse()`. The
-explicit form calls the same `app.exit()`, so a parse failure still exits 106 and
+explicit form calls the same `app.exit()`, so a parse failure still exits with
+CLI11's own code (106 missing required option or subcommand, 105 failed file
+check, 109 unknown flag) and
 `--help` still exits 0.
 
 There is deliberately **no** catch-all around `app.parse()`. `Train` does not
@@ -81,7 +83,7 @@ Two things that table does not say:
 One quirk that follows from the registration in this file: `--generator` has both
 a default (`generator.wgt`) *and* a `->check(CLI::ExistingFile)`. CLI11 does not
 apply a check to a default, so running `generate` in a directory without a
-`generator.wgt` reaches the body and exits `2`, not `106`.
+`generator.wgt` reaches the body and exits `2`, not `105`.
 
 ## Shared with the classifier
 

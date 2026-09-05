@@ -154,7 +154,7 @@ Matrix SoftmaxLayer::forward(const Matrix& input, const ForwardContext&) const {
     return forward(input);
 }
 
-Matrix SoftmaxLayer::backward(const Matrix& gradOutput, const Matrix& /*input*/, const Matrix& output) {
+Matrix SoftmaxLayer::backward(const Matrix& gradOutput, const Matrix& /*input*/, const Matrix& /* output */) {
     return gradOutput;
 }
 

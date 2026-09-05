@@ -1,0 +1,24 @@
+Generate sample images from a trained generator
+
+<BIN> generate [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --label UINT REQUIRED 
+                              Digit to generate
+          --num-classes UINT [10]  
+                              Number of digit classes
+          --generator TEXT:FILE [generator.wgt]  
+                              Generator network file to load
+          --num-samples UINT [1]  
+                              How many images to generate
+          --output TEXT [generated.png]  
+                              Output PNG path. With --num-samples > 1, a counter is inserted
+                              before the extension.
+          --classifier TEXT:FILE 
+                              Optional: print this classifier's predicted label alongside each
+                              image
+          --dataset-img-width UINT [28]  
+                              Width of test images in pixels.
+          --dataset-img-height UINT [28]  
+                              Height of test images in pixels.

@@ -138,7 +138,7 @@ ctest --test-dir build --output-on-failure
 The suite is doctest-based and registered with CTest under the name `unit`; you
 can also run `./build/MatrixGui_tests` directly. It currently covers the words
 module only. See [words.md](words.md#tests) for what it asserts and for the
-separate golden CLI snapshot.
+separate golden CLI snapshots (`tests/golden/README.md`).
 
 <details>
 <summary>What CI builds</summary>
@@ -153,9 +153,10 @@ into it, as two jobs:
 
 Both check out with `submodules: true`, since Eigen is required to configure.
 
-The golden CLI snapshot (`tests/golden/compare.sh`) deliberately does not run in
-CI, for the `-march=native` reason given above. It stays a local pre-commit tool;
-the unit tests carry the same invariants with tolerances.
+The golden CLI snapshots (`tests/golden/compare.sh`, covering all three
+command-line tools) deliberately do not run in CI, for the `-march=native`
+reason given above. They stay a local pre-commit tool; the unit tests carry the
+same invariants with tolerances. See `tests/golden/README.md`.
 
 </details>
 
@@ -210,8 +211,8 @@ exception types, not a flag flip.
 
 **`CMAKE_RUNTIME_OUTPUT_DIRECTORY` is load-bearing.** Executables are declared in
 `cli/*/` and `gui/`, so without it they would land in `build/cli/words/` and
-friends. `README.md`, this file, and `tests/golden/{capture,compare}.sh` all
-hardcode `./build/MatrixGui_words`.
+friends. `README.md`, this file, and the `tests/golden/*/` scripts all default
+to `./build/MatrixGui_words` and friends.
 
 **Do not add `include_directories(eigen)` back.** GCC ignores an `-isystem P`
 if a plain `-I P` for the same path appeared earlier on the command line, which

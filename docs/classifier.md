@@ -223,10 +223,13 @@ echo "Predicted: $digit"
 | `3` | Dataset root does not contain subdirectories `0`..`N-1` |
 | `4` | `--layers` has fewer than two entries; malformed config JSON; or an exception during prediction |
 | `5` | Predict: the `.wgt` failed to load — **or** training: `width × height` does not equal the network's input size |
-| `106` | Command line did not parse: no subcommand, a missing required option, an unknown flag, or a file that does not exist |
+| `105` | A `--network`/`--image` path that does not exist (CLI11's file check) |
+| `106` | No subcommand, or a missing required option |
+| `109` | An unknown flag |
 
 Code `5` covers two different problems; the stderr message distinguishes them.
-`106` comes from the argument parser and is what a typo produces.
+Codes `105`/`106`/`109` come from the argument parser; a typo'd flag produces
+`109`.
 
 ---
 
@@ -236,4 +239,5 @@ Code `5` covers two different problems; the stderr message distinguishes them.
 - [GUI guide](gui.md) — the Classifier and Recognizer modes
 - `core/classifier/learning_config.h` — default values
 - [`cli/classifier/README.md`](../cli/classifier/README.md) — how the subcommands are wired
+- [`tests/golden/README.md`](../tests/golden/README.md) — the local CLI snapshot and its committed `.wgt` fixture
 - `cli/classifier/main.cpp` — argument parsing

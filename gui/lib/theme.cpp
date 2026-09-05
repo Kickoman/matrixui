@@ -19,7 +19,9 @@ static std::optional<bool> queryGSettingsDark() {
         "gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null", "r");
     if (pipe) {
         char buf[64] = {};
-        fgets(buf, sizeof(buf), pipe);
+        if (!fgets(buf, sizeof(buf), pipe)) {
+            buf[0] = '\0';
+        }
         pclose(pipe);
         std::string val(buf);
         if (val.find("prefer-dark")  != std::string::npos) return true;
@@ -31,7 +33,9 @@ static std::optional<bool> queryGSettingsDark() {
         "gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null", "r");
     if (pipe) {
         char buf[64] = {};
-        fgets(buf, sizeof(buf), pipe);
+        if (!fgets(buf, sizeof(buf), pipe)) {
+            buf[0] = '\0';
+        }
         pclose(pipe);
         std::string val(buf);
         std::transform(val.begin(), val.end(), val.begin(), ::tolower);

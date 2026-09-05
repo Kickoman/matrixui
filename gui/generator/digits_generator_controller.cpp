@@ -78,8 +78,8 @@ Neural::NeuralNetwork makeDiscriminatorNetwork(
 
 QImage matrixToQImage(const Matrix& flat, const std::size_t height, const std::size_t width) {
     QImage img(width, height, QImage::Format_Grayscale8);
-    for (int r = 0; r < height; ++r) {
-        for (int c = 0; c < width; ++c) {
+    for (std::size_t r = 0; r < height; ++r) {
+        for (std::size_t c = 0; c < width; ++c) {
             const double val = flat(0, r * width + c);
             const int gray = static_cast<int>(std::clamp(val, 0.0, 1.0) * 255.0);
             img.setPixel(c, r, qRgb(gray, gray, gray));

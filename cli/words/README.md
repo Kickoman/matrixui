@@ -39,15 +39,17 @@ Each subcommand binds its flags to its own options struct and attaches its body
 with CLI11's `->callback()`:
 
 ```cpp
-inspectCmd->callback([&] { WordsCli::Inspect(std::cout, inspect); });
+inspectCmd->callback([&] {
+    exitCode = WordsCli::Inspect(std::cout, std::cerr, inspect);
+});
 ```
 
 So CLI11 calls the right handler directly. There is no switch, no map from name
 to function, and nothing to keep in step with the registrations — a subcommand
 that is registered is wired, or it does not compile.
 
-`app.require_subcommand(1)` makes a bare invocation an error rather than a
-silent no-op.
+`app.require_subcommand(1)` sets both the minimum and the maximum to one, so a
+bare invocation is an error and exactly one callback assigns `exitCode`.
 
 ## Shape of a command body
 
@@ -55,13 +57,17 @@ Every body is a few lines: load what it needs, call into `core/words`, hand the
 resulting struct to a printer from `core/words/report/`.
 
 ```cpp
-void Inspect(std::ostream& out, const InspectOptions& options) {
+void RunInspect(std::ostream& out, const InspectOptions& options) {
     Words::PrintCorpusStatistics(out, Words::InspectDump(options.input, options.topN));
+}
+
+int Inspect(std::ostream& out, std::ostream& err, const InspectOptions& options) {
+    return Guarded(err, [&] { RunInspect(out, options); });
 }
 ```
 
-**Every body takes the output stream as a parameter.** `main` passes
-`std::cout`; the tests pass a `std::ostringstream`. Nothing here writes to a
+**Every body takes its streams as parameters.** `main` passes `std::cout` and
+`std::cerr`; the tests pass `std::ostringstream`s. Nothing here writes to a
 stream it found on its own.
 
 Two local helpers in `commands.cpp` — `PrintVocabularyInfo` and
@@ -71,15 +77,18 @@ a report struct the GUI would ever render.
 
 ## Errors and exit codes
 
-Nothing here catches. `main` catches `Words::Error` once and exits non-zero, so
-a body may let an `IoError` from a missing file propagate.
+The bodies do not catch; they signal failure by throwing `Words::Error` or
+`Io::Error`. The `Guarded` wrapper in `commands.cpp` catches once for all
+eleven commands, prints the `error: ` / `internal error: ` line to `err`, and
+returns the code. The constants live in `commands.h`; `main` keeps only the
+`CLI::ParseError` catch, exactly like the classifier and generator CLIs.
 
 | Code | Meaning |
 |---|---|
 | `0` | success |
 | `1` | a failed check or reported error |
 | `2` | an internal error |
-| `106` | the command line did not parse — CLI11's own code |
+| `105`/`106`/`109` | CLI11's own parse-failure codes: failed file check / missing required option or subcommand / unknown flag |
 
 CLI11 rejects a missing required option, an unknown flag, an absent subcommand,
 and — via `->check(CLI::ExistingFile)` — an input file that does not exist,
@@ -88,9 +97,10 @@ before any body runs.
 ## Adding a subcommand
 
 1. Add an options struct to `options.h`.
-2. Declare and define `void Name(std::ostream&, const NameOptions&)`.
-3. Register the flags and a `->callback()` in `main.cpp`.
-4. Extend `tests/golden/capture.sh` so the new subcommand is snapshotted, and
+2. Define `RunName(out, options)` and wrap it:
+   `int Name(std::ostream&, std::ostream&, const NameOptions&)` via `Guarded`.
+3. Register the flags and a `->callback()` that assigns `exitCode` in `main.cpp`.
+4. Extend `tests/golden/words/capture.sh` so the new subcommand is snapshotted, and
    re-run it to record the expected output.
 
 Keep computation out of the body. If a command needs logic worth testing, it

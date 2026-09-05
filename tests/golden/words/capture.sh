@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Capture stdout+stderr and exit code of every MatrixGui_words subcommand.
 #
-# Usage: tests/golden/capture.sh <output-dir> [binary]
+# Usage: tests/golden/words/capture.sh <output-dir> [binary]
 set -u
 
 OUT="${1:?usage: capture.sh <output-dir> [binary]}"
@@ -11,7 +11,7 @@ WORK="$OUT/_work"
 rm -rf "$OUT"
 mkdir -p "$WORK"
 
-TEXT=tests/golden/corpus.txt
+TEXT=tests/golden/words/corpus.txt
 VOC="$WORK/built.voc"
 COR="$WORK/built.cor"
 EMB="$WORK/emb.bin"
@@ -64,7 +64,7 @@ normalize() {
         "$1" | cat -s
 }
 
-for f in "$OUT"/*.out; do
+for f in "$OUT"/*.out "$OUT"/*.err; do
     normalize "$f" > "$f.normalized"
 done
 

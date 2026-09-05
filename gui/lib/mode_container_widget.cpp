@@ -17,7 +17,7 @@ ModeContainerWidget::ModeContainerWidget(QWidget* parent)
     });
 }
 
-const QString& ModeContainerWidget::getModeName() const {
+QString ModeContainerWidget::getModeName() const {
     auto* modeWidget = qobject_cast<ModeWidget*>(mainLayout->currentWidget());
     if (!modeWidget) {
         qDebug() << "Can't retrieve mode name: mode widget is not ModeWidget somehow";

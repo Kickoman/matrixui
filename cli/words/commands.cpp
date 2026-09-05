@@ -2,6 +2,8 @@
 
 #include "core/lib/file_stream.h"
 
+#include "core/words/error.h"
+
 #include "core/words/data/corpus.h"
 #include "core/words/data/embeddings.h"
 #include "core/words/query/evaluate.h"
@@ -15,6 +17,7 @@
 #include "core/words/data/vocabulary.h"
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <ostream>
 
@@ -51,14 +54,16 @@ Words::EmbeddingIndex ReadEmbeddings(const std::filesystem::path& path) {
 
 }  // namespace
 
-void Inspect(std::ostream& out, const InspectOptions& options) {
+namespace {
+
+void RunInspect(std::ostream& out, const InspectOptions& options) {
     const auto statistics = Io::ReadFile(options.input, [&](std::istream& in) {
         return Words::InspectDump(in, options.topN);
     });
     Words::PrintCorpusStatistics(out, options.input.string(), statistics);
 }
 
-void BuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
+void RunBuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
     const auto vocabulary = Io::ReadFile(options.input, [&](std::istream& in) {
         return Words::Vocabulary::Build(in, options.minCount);
     });
@@ -68,11 +73,11 @@ void BuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
                   std::ios::binary);
 }
 
-void LoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) {
+void RunLoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) {
     PrintVocabularyInfo(out, ReadVocabulary(options.input));
 }
 
-void BuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
+void RunBuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto corpus = Io::ReadFile(options.input, [&](std::istream& in) {
         return Words::EncodeCorpus(in, vocabulary);
@@ -83,13 +88,13 @@ void BuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
                   std::ios::binary);
 }
 
-void LoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
+void RunLoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
     PrintCorpusInfo(out, Io::ReadFile(options.input,
                                       [](std::istream& in) { return Words::LoadCorpus(in); },
                                       std::ios::binary));
 }
 
-void Train(std::ostream& out, const TrainOptions& options) {
+void RunTrain(std::ostream& out, const TrainOptions& options) {
     auto vocabulary = std::make_shared<const Words::Vocabulary>(ReadVocabulary(options.vocabulary));
     auto corpus = std::make_shared<const Words::TCorpus>(
         Io::ReadFile(options.corpus, [](std::istream& in) { return Words::LoadCorpus(in); },
@@ -118,7 +123,7 @@ void Train(std::ostream& out, const TrainOptions& options) {
     out << "saved embeddings to " << options.output << '\n';
 }
 
-void Neighbours(std::ostream& out, const NeighboursOptions& options) {
+void RunNeighbours(std::ostream& out, const NeighboursOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
 
@@ -132,7 +137,7 @@ void Neighbours(std::ostream& out, const NeighboursOptions& options) {
     }
 }
 
-void Evaluate(std::ostream& out, const EvaluateOptions& options) {
+void RunEvaluate(std::ostream& out, const EvaluateOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
 
@@ -159,7 +164,7 @@ void Evaluate(std::ostream& out, const EvaluateOptions& options) {
     }
 }
 
-void Expression(std::ostream& out, const ExpressionOptions& options) {
+void RunExpression(std::ostream& out, const ExpressionOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
 
@@ -168,7 +173,7 @@ void Expression(std::ostream& out, const ExpressionOptions& options) {
         Words::QueryExpression(vocabulary, index, options.expression, options.count));
 }
 
-void OddOne(std::ostream& out, const OddOneOptions& options) {
+void RunOddOne(std::ostream& out, const OddOneOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
 
@@ -176,7 +181,7 @@ void OddOne(std::ostream& out, const OddOneOptions& options) {
         out, vocabulary, Words::QueryOddOneOut(vocabulary, index, options.words));
 }
 
-void Axis(std::ostream& out, const AxisOptions& options) {
+void RunAxis(std::ostream& out, const AxisOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
 
@@ -184,6 +189,69 @@ void Axis(std::ostream& out, const AxisOptions& options) {
         out, vocabulary,
         Words::QueryAxis(vocabulary, index, options.axis, options.words,
                          options.restrictTo, options.count));
+}
+
+template <typename Body>
+int Guarded(std::ostream& err, Body&& body) {
+    try {
+        body();
+        return kSuccess;
+    } catch (const Io::Error& error) {
+        err << "error: " << error.what() << '\n';
+        return kFailure;
+    } catch (const Words::Error& error) {
+        err << "error: " << error.what() << '\n';
+        return kFailure;
+    } catch (const std::exception& error) {
+        err << "internal error: " << error.what() << '\n';
+        return kInternalError;
+    }
+}
+
+}  // namespace
+
+int Inspect(std::ostream& out, std::ostream& err, const InspectOptions& options) {
+    return Guarded(err, [&] { RunInspect(out, options); });
+}
+
+int BuildVocabulary(std::ostream& out, std::ostream& err, const BuildVocabularyOptions& options) {
+    return Guarded(err, [&] { RunBuildVocabulary(out, options); });
+}
+
+int LoadVocabulary(std::ostream& out, std::ostream& err, const LoadVocabularyOptions& options) {
+    return Guarded(err, [&] { RunLoadVocabulary(out, options); });
+}
+
+int BuildCorpus(std::ostream& out, std::ostream& err, const BuildCorpusOptions& options) {
+    return Guarded(err, [&] { RunBuildCorpus(out, options); });
+}
+
+int LoadCorpus(std::ostream& out, std::ostream& err, const LoadCorpusOptions& options) {
+    return Guarded(err, [&] { RunLoadCorpus(out, options); });
+}
+
+int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
+    return Guarded(err, [&] { RunTrain(out, options); });
+}
+
+int Neighbours(std::ostream& out, std::ostream& err, const NeighboursOptions& options) {
+    return Guarded(err, [&] { RunNeighbours(out, options); });
+}
+
+int Evaluate(std::ostream& out, std::ostream& err, const EvaluateOptions& options) {
+    return Guarded(err, [&] { RunEvaluate(out, options); });
+}
+
+int Expression(std::ostream& out, std::ostream& err, const ExpressionOptions& options) {
+    return Guarded(err, [&] { RunExpression(out, options); });
+}
+
+int OddOne(std::ostream& out, std::ostream& err, const OddOneOptions& options) {
+    return Guarded(err, [&] { RunOddOne(out, options); });
+}
+
+int Axis(std::ostream& out, std::ostream& err, const AxisOptions& options) {
+    return Guarded(err, [&] { RunAxis(out, options); });
 }
 
 }  // namespace WordsCli

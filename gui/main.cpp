@@ -26,14 +26,14 @@ int main(int argc, char** argv) {
     parser.addOption(theme);
     parser.process(a);
 
-    if (!parser.isSet(theme) && AppTheme::IsSystemDarkMode()
-        || parser.isSet(theme) && parser.value(theme) == "dark"
+    if ((!parser.isSet(theme) && AppTheme::IsSystemDarkMode())
+        || (parser.isSet(theme) && parser.value(theme) == "dark")
     ) {
         AppTheme::SetTheme(Theme::Dark);
         AppTheme::ApplyTheme(a);
     }
 
-    constexpr char* fontPath = ":/fonts/ubuntu-sans.ttf";
+    constexpr const char* fontPath = ":/fonts/ubuntu-sans.ttf";
     const auto fontId = QFontDatabase::addApplicationFont(fontPath);
     if (fontId != -1) {
         qDebug() << "Font ID installed: " << fontId;

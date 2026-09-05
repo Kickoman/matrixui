@@ -348,5 +348,8 @@ experiments/*
 .vscode
 
 ### MatrixGui golden-test scratch ###
-# Artifacts rebuilt by tests/golden/capture.sh on every run.
-tests/golden/expected/_work/
+# Artifacts rebuilt by tests/golden/*/capture.sh on every run. Raw .out/.err
+# are kept locally for eyeballing; only their .normalized forms and the exit
+# codes are committed and diffed.
+tests/golden/*/expected/_work/
+tests/golden/*/expected/*.err

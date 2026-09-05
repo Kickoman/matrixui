@@ -1,5 +1,3 @@
-#include "core/lib/file_stream.h"
-#include "core/words/error.h"
 #include "cli/words/commands.h"
 #include "cli/words/options.h"
 
@@ -7,19 +5,11 @@
 
 #include <iostream>
 
-namespace {
-
-// Exit codes: 0 success, 1 a reported error, 2 a bug.
-// CLI11 returns 106 of its own accord when the command line does not parse.
-constexpr int kSuccess = 0;
-constexpr int kFailure = 1;
-constexpr int kInternalError = 2;
-
-}  // namespace
-
 int main(int argc, char** argv) {
     CLI::App app{"Words embedder"};
     app.require_subcommand(1);
+
+    int exitCode = WordsCli::kSuccess;
 
     WordsCli::InspectOptions inspect;
     auto* inspectCmd = app.add_subcommand("inspect", "Summarise a raw text dump");
@@ -28,7 +18,7 @@ int main(int argc, char** argv) {
     inspectCmd->add_option("--top", inspect.topN, "How many frequent words to list")
         ->capture_default_str();
     inspectCmd->callback([&] {
-        WordsCli::Inspect(std::cout, inspect);
+        exitCode = WordsCli::Inspect(std::cout, std::cerr, inspect);
     });
 
     WordsCli::BuildVocabularyOptions buildVocabulary;
@@ -40,7 +30,7 @@ int main(int argc, char** argv) {
     buildVocabularyCmd->add_option("--min-count", buildVocabulary.minCount, "Drop words below this count")
         ->capture_default_str();
     buildVocabularyCmd->callback([&] {
-        WordsCli::BuildVocabulary(std::cout, buildVocabulary);
+        exitCode = WordsCli::BuildVocabulary(std::cout, std::cerr, buildVocabulary);
     });
 
     WordsCli::LoadVocabularyOptions loadVocabulary;
@@ -48,7 +38,7 @@ int main(int argc, char** argv) {
     loadVocabularyCmd->add_option("--input-file", loadVocabulary.input, "Built vocabulary file")
         ->required()->check(CLI::ExistingFile);
     loadVocabularyCmd->callback([&] {
-        WordsCli::LoadVocabulary(std::cout, loadVocabulary);
+        exitCode = WordsCli::LoadVocabulary(std::cout, std::cerr, loadVocabulary);
     });
 
     WordsCli::BuildCorpusOptions buildCorpus;
@@ -60,7 +50,7 @@ int main(int argc, char** argv) {
     buildCorpusCmd->add_option("--vocabulary", buildCorpus.vocabulary, "Built vocabulary path")
         ->required()->check(CLI::ExistingFile);
     buildCorpusCmd->callback([&] {
-        WordsCli::BuildCorpus(std::cout, buildCorpus);
+        exitCode = WordsCli::BuildCorpus(std::cout, std::cerr, buildCorpus);
     });
 
     WordsCli::LoadCorpusOptions loadCorpus;
@@ -68,7 +58,7 @@ int main(int argc, char** argv) {
     loadCorpusCmd->add_option("--input-file", loadCorpus.input, "Built corpus file path")
         ->required()->check(CLI::ExistingFile);
     loadCorpusCmd->callback([&] {
-        WordsCli::LoadCorpus(std::cout, loadCorpus);
+        exitCode = WordsCli::LoadCorpus(std::cout, std::cerr, loadCorpus);
     });
 
     WordsCli::TrainOptions train;
@@ -87,7 +77,7 @@ int main(int argc, char** argv) {
     trainCmd->add_option("--lr", train.config.model.initialLearningRate, "Initial learning rate")->capture_default_str();
     trainCmd->add_option("--threads", train.config.train.threads, "Worker threads (0 = auto)")->capture_default_str();
     trainCmd->callback([&] {
-        WordsCli::Train(std::cout, train);
+        exitCode = WordsCli::Train(std::cout, std::cerr, train);
     });
 
     WordsCli::NeighboursOptions neighbours;
@@ -99,7 +89,7 @@ int main(int argc, char** argv) {
     neighboursCmd->add_option("--word", neighbours.word, "Query word (empty runs a default battery)");
     neighboursCmd->add_option("--count", neighbours.count, "How many neighbours")->capture_default_str();
     neighboursCmd->callback([&] {
-        WordsCli::Neighbours(std::cout, neighbours);
+        exitCode = WordsCli::Neighbours(std::cout, std::cerr, neighbours);
     });
 
     WordsCli::EvaluateOptions evaluate;
@@ -116,7 +106,7 @@ int main(int argc, char** argv) {
     evaluateCmd->add_option("--restrict-to", evaluate.restrictTo, "Search top-N words only (0 = all)")->capture_default_str();
     evaluateCmd->add_option("--threads", evaluate.threads, "Worker threads (0 = auto)")->capture_default_str();
     evaluateCmd->callback([&] {
-        WordsCli::Evaluate(std::cout, evaluate);
+        exitCode = WordsCli::Evaluate(std::cout, std::cerr, evaluate);
     });
 
     WordsCli::ExpressionOptions expression;
@@ -128,7 +118,7 @@ int main(int argc, char** argv) {
         ->required()->check(CLI::ExistingFile);
     expressionCmd->add_option("--count", expression.count, "How many results")->capture_default_str();
     expressionCmd->callback([&] {
-        WordsCli::Expression(std::cout, expression);
+        exitCode = WordsCli::Expression(std::cout, std::cerr, expression);
     });
 
     WordsCli::OddOneOptions oddOne;
@@ -139,7 +129,7 @@ int main(int argc, char** argv) {
     oddOneCmd->add_option("--embeddings", oddOne.embeddings, "Trained embeddings")
         ->required()->check(CLI::ExistingFile);
     oddOneCmd->callback([&] {
-        WordsCli::OddOne(std::cout, oddOne);
+        exitCode = WordsCli::OddOne(std::cout, std::cerr, oddOne);
     });
 
     WordsCli::AxisOptions axis;
@@ -153,25 +143,16 @@ int main(int argc, char** argv) {
     axisCmd->add_option("--restrict-to", axis.restrictTo, "Scan top-N words (0 = all)")->capture_default_str();
     axisCmd->add_option("--count", axis.count, "How many per end")->capture_default_str();
     axisCmd->callback([&] {
-        WordsCli::Axis(std::cout, axis);
+        exitCode = WordsCli::Axis(std::cout, std::cerr, axis);
     });
 
-    // CLI11_PARSE cannot be used here: the handlers run inside parse(), and its
-    // catch only covers CLI::ParseError, so a Words::Error would escape main.
+    // CLI11_PARSE cannot be used here: the subcommand callbacks run inside
+    // parse(), and the macro's catch covers only CLI::ParseError.
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& error) {
         return app.exit(error);
-    } catch (const Io::Error& error) {
-        std::cerr << "error: " << error.what() << '\n';
-        return kFailure;
-    } catch (const Words::Error& error) {
-        std::cerr << "error: " << error.what() << '\n';
-        return kFailure;
-    } catch (const std::exception& error) {
-        std::cerr << "internal error: " << error.what() << '\n';
-        return kInternalError;
     }
 
-    return kSuccess;
+    return exitCode;
 }

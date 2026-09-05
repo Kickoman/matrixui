@@ -71,7 +71,7 @@ struct DropoutLayer {
     Matrix forward(const Matrix& input, const ForwardContext& ctx) const;
     Matrix backward(const Matrix& gradOutput, const Matrix& input, const Matrix& output);
 
-    void applyGradients(double learningRate) {}
+    void applyGradients(double) {}
     void zeroGradients() {}
 };
 
@@ -81,7 +81,7 @@ struct SoftmaxLayer {
     Matrix forward(const Matrix& input, const ForwardContext& ctx) const;
     Matrix backward(const Matrix& gradOutput, const Matrix& input, const Matrix& output);
 
-    void applyGradients(double learningRate) {}
+    void applyGradients(double) {}
     void zeroGradients() {}
 };
 

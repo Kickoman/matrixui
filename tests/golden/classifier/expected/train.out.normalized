@@ -1,0 +1,18 @@
+Starting with parameters:
+	Network path: <WORK>/trained.wgt
+	Training dataset: <WORK>/dataset
+	Testing dataset: <WORK>/dataset
+	Layers (for new network): 64, 16, 10
+	Hidden activation: relu
+	Output activation: softmax
+	Initial LR: 0.2
+	Min LR: 0.0001
+	LR decay: 0.7
+	Max epochs: 2
+	Patience: 1
+	Inner epochs: 1
+	Dropout: 0
+	Dataset limit per label: 100
+	Test file limit per label: 1
+
+Final test accuracy: <ACC>

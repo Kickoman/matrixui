@@ -10,7 +10,7 @@
 
 namespace {
 
-const std::size_t GetPrediction(const Matrix& embedding) {
+std::size_t GetPrediction(const Matrix& embedding) {
     assert(embedding.getRows() == 1);
     assert(embedding.getCols() > 0);
     std::size_t result = 0;
