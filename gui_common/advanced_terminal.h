@@ -30,6 +30,10 @@ public:
     AdvancedTerminalStream& operator<<(const T& t) {
         std::lock_guard<std::mutex> lock(bufferMutex);
         buffer << t;
+        // Flush every completed line: std::endl reaches a streambuf as '\n'
+        // plus sync(), never as a manipulator, so output that ends lines with a
+        // plain '\n' (the report printers do) would otherwise stay invisible.
+        checkAndFlush();
         return *this;
     }
 
@@ -70,7 +74,9 @@ private:
 
     void checkAndFlush() {
         const auto& content = buffer.str();
-        const auto newLinePosition = content.find('\n');
+        // Up to the LAST newline: a chunk carrying several line breaks must
+        // not leave its tail invisible until the next write arrives.
+        const auto newLinePosition = content.rfind('\n');
 
         if (newLinePosition != std::string::npos) {
             const auto& toFlush = QString::fromStdString(content.substr(0, newLinePosition + 1));

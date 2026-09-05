@@ -1,7 +1,8 @@
 #include "gui/lib/network_create_dialog.h"
 
-#include "core/lib/neural_network.h"
-#include "core/lib/neural_network_loader.h"
+#include "core/lib/file_stream.h"
+#include "core/nn/neural_network.h"
+#include "core/nn/neural_network_loader.h"
 
 #include "gui/lib/qinputvalidators.h"
 
@@ -114,7 +115,9 @@ void NetworkCreateDialog::handleSelectedPathChanged(const QString& text) {
     qDebug() << "Selection: " << text;
     if (QFile::exists(text)) {
         try {
-            const auto config = Neural::LoadConfig(text.toStdString()).value();
+            const auto config = Io::ReadFile(text.toStdString(), [](std::istream& in) {
+                return Neural::LoadConfig(in);
+            }, std::ios::binary).value();
             networkLayersInput->setText(QString::fromStdString(Neural::LayersToTextRepresentation(config.layersSizes)));
 
             const auto hiddenIndex = hiddenActivation->findData(static_cast<std::uint8_t>(config.hiddenActivation));

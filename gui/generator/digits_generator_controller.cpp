@@ -3,14 +3,15 @@
 #include "core/generator/learning_config.h"
 #include "core/generator/trainer.h"
 
-#include "core/lib/neural_network_applier.h"
-#include "core/lib/neural_network_loader.h"
-#include "core/lib/neural_network.h"
-#include "core/lib/directory_dataset.h"
+#include "core/lib/file_stream.h"
+#include "core/nn/neural_network_applier.h"
+#include "core/nn/neural_network_loader.h"
+#include "core/nn/neural_network.h"
+#include "core/nn/directory_dataset.h"
 #include "core/lib/cache.h"
 #include "core/lib/matrix_cache.h"
 
-#include "png/pngreader.h"
+#include "core/png/pngreader.h"
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -77,8 +78,8 @@ Neural::NeuralNetwork makeDiscriminatorNetwork(
 
 QImage matrixToQImage(const Matrix& flat, const std::size_t height, const std::size_t width) {
     QImage img(width, height, QImage::Format_Grayscale8);
-    for (int r = 0; r < height; ++r) {
-        for (int c = 0; c < width; ++c) {
+    for (std::size_t r = 0; r < height; ++r) {
+        for (std::size_t c = 0; c < width; ++c) {
             const double val = flat(0, r * width + c);
             const int gray = static_cast<int>(std::clamp(val, 0.0, 1.0) * 255.0);
             img.setPixel(c, r, qRgb(gray, gray, gray));
@@ -87,7 +88,7 @@ QImage matrixToQImage(const Matrix& flat, const std::size_t height, const std::s
     return img;
 }
 
-} // namespace
+}  // namespace
 
 
 DigitsGeneratorController::DigitsGeneratorController(QObject* parent)
@@ -194,9 +195,13 @@ void DigitsGeneratorController::run() {
         activeTrainer.store(&trainer, std::memory_order_release);
 
         trainer.setEpochCallback([this, &trainer](std::size_t epoch, double dScore, double gScore, double emaReal, double emaGen) {
-            // Save after each epoch (same pattern as classifier)
-            Neural::SaveNetwork(trainer.getGenerator().getNeuralNetworkConfig(),     generatorPath.toStdString());
-            Neural::SaveNetwork(trainer.getDiscriminator().getNeuralNetworkConfig(), discriminatorPath.toStdString());
+            // Save after each epoch.
+            Io::WriteFile(generatorPath.toStdString(), [&](std::ostream& file) {
+                Neural::SaveNetwork(file, trainer.getGenerator().getNeuralNetworkConfig());
+            }, std::ios::binary);
+            Io::WriteFile(discriminatorPath.toStdString(), [&](std::ostream& file) {
+                Neural::SaveNetwork(file, trainer.getDiscriminator().getNeuralNetworkConfig());
+            }, std::ios::binary);
 
             QMetaObject::invokeMethod(this, [this, epoch, dScore, gScore, emaReal, emaGen] {
                 emit epochCompleted(epoch, dScore, gScore, emaReal, emaGen);
@@ -277,7 +282,7 @@ bool DigitsGeneratorController::loadClassifier() {
     assert(!internalRunner || !internalRunner->isRunning());
 
     out() << "Loading classifier from " << classifierPath.toStdString() << std::endl;
-    auto net = Neural::LoadNetwork(classifierPath.toStdString());
+    auto net = Io::TryReadFile(classifierPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!net) {
         out() << "Couldn't load classifier." << std::endl;
         return false;
@@ -331,7 +336,7 @@ bool DigitsGeneratorController::loadGenerator() {
         latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         return true;
     }
-    if (auto network = Neural::LoadNetwork(generatorPath.toStdString())) {
+    if (auto network = Io::TryReadFile(generatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
         generatorNet = std::move(network);
         latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         out() << "Successfully loaded generator." << std::endl;
@@ -363,7 +368,7 @@ bool DigitsGeneratorController::loadDiscriminator() {
         discriminatorNet = Neural::CreateNetwork(discriminatorConfiguration);
         return true;
     }
-    if (auto network = Neural::LoadNetwork(discriminatorPath.toStdString())) {
+    if (auto network = Io::TryReadFile(discriminatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
         discriminatorNet = std::move(network);
         out() << "Successfully loaded discriminator." << std::endl;
         return true;
@@ -391,7 +396,8 @@ bool DigitsGeneratorController::loadProject() {
         return false;
     }
 
-    // The order is important for validation
+    // Classifier first: it fixes the class count, and loadDiscriminator /
+    // loadGenerator both refuse to run without it.
     resetProject();
     if (!loadClassifier()) {
         out() << "Classifier is not loaded. Stopping." << std::endl;

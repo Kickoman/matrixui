@@ -1,0 +1,2 @@
+Specify data directories: use --dataset <dir> for both train and test, or set
+  --train-dataset and/or --test-dataset (unspecified side falls back to --dataset).

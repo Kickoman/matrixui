@@ -1,0 +1,10 @@
+MatrixGui GAN CLI (generator/discriminator training & sampling)
+
+<BIN> [OPTIONS] SUBCOMMAND
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+
+SUBCOMMANDS:
+  generate                    Generate sample images from a trained generator
+  train                       Train generator+discriminator against a frozen classifier

@@ -1,0 +1,81 @@
+Train generator+discriminator against a frozen classifier
+
+<BIN> train [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --classifier TEXT REQUIRED 
+                              Trained classifier (frozen signal source)
+          --dataset TEXT:DIR REQUIRED 
+                              Training images root (subdirs 0..9 of PNGs)
+
+Network paths:
+          --generator TEXT [generator.wgt]  
+                              Generator save path (created if missing)
+          --discriminator TEXT [discriminator.wgt]  
+                              Discriminator save path (created if missing)
+
+Topology:
+          --latent-dim UINT [100]  
+                              Noise vector size fed to generator
+          --gen-layers UINT [[256,512]]  ... 
+                              Generator hidden layer sizes (new network only)
+          --disc-layers UINT [[512,256]]  ... 
+                              Discriminator hidden layer sizes (new network only)
+          --dataset-img-width UINT [28]  
+                              Width of test images in pixels.
+          --dataset-img-height UINT [28]  
+                              Height of test images in pixels.
+
+GAN training:
+          --gen-lr FLOAT [0.0002]  
+                              Generator learning rate
+          --disc-lr FLOAT [0.0001]  
+                              Discriminator learning rate
+          --epochs UINT [300]  
+                              Total epochs
+          --batch-size UINT [64]  
+                              Samples per batch
+          --disc-steps UINT [3]  
+                              Discriminator updates per generator update
+          --dropout FLOAT [0.3]  
+                              Discriminator dropout rate
+          --classifier-weight FLOAT [1]  
+                              Weight of classifier loss in generator update
+          --dataset-limit UINT [0]  
+                              Max images per label to load (0 = all)
+
+Adaptive learning rate:
+          --adaptive-lr       Enable adaptive lr adjustment
+          --lr-ema-alpha FLOAT [0.9]  
+                              EMA smoothing factor; higher = slower reaction
+          --d-real-target-low FLOAT [0.3]  
+                              D(real) below this => D collapsed
+          --d-real-target-high FLOAT [0.8]  
+                              D(real) above this => D dominating
+          --gen-fool-target-low FLOAT [0.3]  
+                              D(G(z)) below this => D dominating/collapsed
+          --gen-fool-target-high FLOAT [0.6]  
+                              D(G(z)) above this => G dominating
+          --lr-adjust-factor FLOAT [1.05]  
+                              Multiplicative lr step per epoch
+          --lr-min FLOAT [1e-06]  
+                              Lower lr clamp
+          --lr-max FLOAT [0.01]  
+                              Upper lr clamp
+          --lr-warmup-epochs UINT [5]  
+                              Epochs before adaptive adjustments begin
+
+Flatness detection:
+          --flatness-detection 
+                              Enable plateau detection
+          --flatness-threshold FLOAT [0.005]  
+                              Max EMA change per epoch to count as flat
+          --flatness-window UINT [10]  
+                              Consecutive flat epochs before kick fires
+          --flatness-kick-duration UINT [5]  
+                              Epochs to hold the kick
+          --flatness-dropout-boost FLOAT [2]  
+                              Multiply D dropout by this during kick
+          --flatness-gen-lr-boost FLOAT [3]  
+                              Multiply G lr by this during kick

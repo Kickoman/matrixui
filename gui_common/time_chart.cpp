@@ -6,6 +6,9 @@
 #include <QValueAxis>
 #include <QBoxLayout>
 
+#include <algorithm>
+#include <cmath>
+
 TimeChart::TimeChart(QWidget* parent)
     : QWidget(parent)
 {
@@ -37,6 +40,11 @@ void TimeChart::setTitle(const QString& title)
     chart->setTitle(title);
 }
 
+void TimeChart::setAutoScaleY(const bool enabled)
+{
+    autoScaleY = enabled;
+}
+
 QChart* TimeChart::getChart() {
     return chart;
 }
@@ -64,6 +72,20 @@ void TimeChart::addPoint(const double value, const QString& seriesName)
     } else {
         axisX->setRange(0, 20);
     };
+
+    if (autoScaleY) {
+        observedMin = hasObservedValue ? std::min(observedMin, value) : value;
+        observedMax = hasObservedValue ? std::max(observedMax, value) : value;
+        hasObservedValue = true;
+
+        // All-time running bounds: a monotone loss curve never needs the range
+        // to shrink, and this avoids rescanning the series on every point.
+        double padding = 0.05 * (observedMax - observedMin);
+        if (padding <= 0.) {
+            padding = std::max(1., std::abs(observedMax) * 0.05);
+        }
+        axisY->setRange(observedMin - padding, observedMax + padding);
+    }
 }
 
 QLineSeries* TimeChart::getSeries(const QString& name) {

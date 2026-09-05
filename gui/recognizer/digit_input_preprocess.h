@@ -27,4 +27,4 @@ inline constexpr double kPreviewPixmapScale = 5.0;
 QImage scaleKeepingAspectRatio(const QImage& src, const QSize& targetSize);
 void centerOfMassAlign(QImage& img);
 
-} // namespace reader
+}  // namespace reader

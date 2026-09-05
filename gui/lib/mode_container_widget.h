@@ -13,7 +13,7 @@ class ModeContainerWidget : public QWidget
 public:
     explicit ModeContainerWidget(QWidget* parent = nullptr);
 
-    const QString& getModeName() const;
+    QString getModeName() const;
 
 signals:
     void modeRequested(ModeContainerWidget* self, ModeType mode);

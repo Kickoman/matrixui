@@ -2,10 +2,6 @@
 
 #include "QtDarkTheme.h"
 
-// Source - https://stackoverflow.com/a/78854851
-// Posted by Nick Bolton
-// Retrieved 2026-04-17, License - CC BY-SA 4.0
-
 #include <QGuiApplication>
 #include <QApplication>
 #include <QPalette>
@@ -15,13 +11,17 @@
 
 namespace {
 #ifdef __linux__
+// Source - https://stackoverflow.com/a/78854851
+// Posted by Nick Bolton
+// Retrieved 2026-04-17, License - CC BY-SA 4.0
 static std::optional<bool> queryGSettingsDark() {
-    // Check color-scheme first
     FILE* pipe = popen(
         "gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null", "r");
     if (pipe) {
         char buf[64] = {};
-        fgets(buf, sizeof(buf), pipe);
+        if (!fgets(buf, sizeof(buf), pipe)) {
+            buf[0] = '\0';
+        }
         pclose(pipe);
         std::string val(buf);
         if (val.find("prefer-dark")  != std::string::npos) return true;
@@ -33,10 +33,11 @@ static std::optional<bool> queryGSettingsDark() {
         "gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null", "r");
     if (pipe) {
         char buf[64] = {};
-        fgets(buf, sizeof(buf), pipe);
+        if (!fgets(buf, sizeof(buf), pipe)) {
+            buf[0] = '\0';
+        }
         pclose(pipe);
         std::string val(buf);
-        // Convert to lowercase for comparison
         std::transform(val.begin(), val.end(), val.begin(), ::tolower);
         if (val.find("dark") != std::string::npos) return true;
         return false;

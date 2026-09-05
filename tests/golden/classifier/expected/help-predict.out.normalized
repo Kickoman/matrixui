@@ -1,0 +1,16 @@
+Classify a single PNG image using a trained network
+
+<BIN> predict [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --network TEXT:FILE REQUIRED 
+                              Trained network file (.wgt) to load
+          --image TEXT:FILE REQUIRED 
+                              PNG image to classify
+
+Dataset:
+          --dataset-img-width UINT [28]  
+                              Width of test images in pixels.
+          --dataset-img-height UINT [28]  
+                              Height of test images in pixels.

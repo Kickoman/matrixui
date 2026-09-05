@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QDialog>
-#include "core/lib/neural_network.h"
+#include "core/nn/neural_network.h"
 
 class QLabel;
 class QLineEdit;

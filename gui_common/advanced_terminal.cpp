@@ -86,7 +86,7 @@ QString AdvancedTerminal::processBackspaces(const QString& text)
     QString result;
     for (int i = 0; i < text.length(); ++i) {
         if (text[i] == '\b' && !result.isEmpty()) {
-            result.chop(1); // Remove last character
+            result.chop(1);
         } else {
             result += text[i];
         }

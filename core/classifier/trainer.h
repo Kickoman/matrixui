@@ -7,8 +7,8 @@
 
 #include "core/classifier/learning_config.h"
 
-#include "core/lib/neural_network_applier.h"
-#include "core/lib/dataset.h"
+#include "core/nn/neural_network_applier.h"
+#include "core/nn/dataset.h"
 
 namespace Neural {
 
@@ -88,6 +88,6 @@ private:
 };
 
 
-} // Classifier
+}  // namespace Classifier
 
-} // Neural
+}  // namespace Neural

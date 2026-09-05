@@ -58,7 +58,6 @@ DigitsClassifierModeWidget::DigitsClassifierModeWidget(QWidget* parent)
     auto* buttonLayout = new QHBoxLayout();
     auto* infoLayout = new QHBoxLayout();
     auto* networkInfoLayout = new QVBoxLayout();
-    auto* configInfoLayout = new QVBoxLayout();
     auto* imagePropertiesLayout = new QFormLayout();
     buttonLayout->addWidget(toggleLearningButton);
     buttonLayout->addWidget(openNetworkButton);

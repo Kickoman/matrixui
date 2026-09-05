@@ -8,7 +8,7 @@ class CommaSeparatedIntsValidator : public QValidator
 public:
     CommaSeparatedIntsValidator(QObject *parent = nullptr) : QValidator(parent) {}
 
-    State validate(QString &input, int &pos) const override
+    State validate(QString &input, int &) const override
     {
         if (input.contains(QRegularExpression(R"([^0-9\s,\-])")))
             return Invalid;

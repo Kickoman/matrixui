@@ -1,0 +1,7 @@
+Loaded 20 real images.
+Generator:     18 16 64 
+Discriminator: 64 16 1 
+Latent dim: 8  epochs: 1  batch: 4  disc-steps: 3  gen-lr: 0.0002  disc-lr: 0.0001
+
+Saved generator to <WORK>/g.wgt
+Saved discriminator to <WORK>/d.wgt

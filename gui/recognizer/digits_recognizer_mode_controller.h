@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gui/lib/mode_controller.h"
-#include "core/lib/neural_network_applier.h"
+#include "core/nn/neural_network_applier.h"
 
 
 class DigitsRecognizerModeController : public ModeController

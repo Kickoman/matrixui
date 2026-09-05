@@ -1,0 +1,23 @@
+Processed tests/golden/words/corpus.txt
+Symbols: 1870079
+Words: 400000
+Unique words: 1400
+  words with minCount = 5: 1400
+  words with minCount = 10: 1400
+  words with minCount = 50: 1355
+Top-15 by frequency:
+  the of 35487 (share 0.0887175)
+  one of 19034 (share 0.047585)
+  king of 13153 (share 0.0328825)
+  france of 10193 (share 0.0254825)
+  computer of 8344 (share 0.02086)
+  water of 7202 (share 0.018005)
+  music of 6121 (share 0.0153025)
+  red of 5416 (share 0.01354)
+  war of 4977 (share 0.0124425)
+  man of 4509 (share 0.0112725)
+  woman of 4151 (share 0.0103775)
+  paris of 3878 (share 0.009695)
+  rome of 3478 (share 0.008695)
+  good of 3352 (share 0.00838)
+  better of 3146 (share 0.007865)

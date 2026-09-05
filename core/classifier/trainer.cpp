@@ -1,8 +1,8 @@
 #include "core/classifier/trainer.h"
 #include "core/classifier/learning_config.h"
 
-#include "core/lib/dataset.h"
-#include "core/lib/neural_network.h"
+#include "core/nn/dataset.h"
+#include "core/nn/neural_network.h"
 
 #include <iostream>
 #include <ostream>
@@ -10,7 +10,7 @@
 
 namespace {
 
-const std::size_t GetPrediction(const Matrix& embedding) {
+std::size_t GetPrediction(const Matrix& embedding) {
     assert(embedding.getRows() == 1);
     assert(embedding.getCols() > 0);
     std::size_t result = 0;
@@ -230,5 +230,5 @@ void Trainer::setOutputStream(std::ostream* stream) {
     this->stream = stream;
 }
 
-} // Classifier
-} // Trainer
+}  // namespace Classifier
+}  // namespace Neural

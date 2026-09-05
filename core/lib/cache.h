@@ -29,33 +29,8 @@ struct CacheConfig {
     bool enable_stats = false;
 };
 
-// template<typename Key, typename Value>
-// std::size_t default_memory_calculator(const Key& key, const Value& value) {
-//     std::size_t size = 0;
-
-//     if constexpr (std::is_arithmetic_v<Key>) {
-//         size += sizeof(Key);
-//     } else if constexpr (std::is_same_v<Key, std::string>) {
-//         size += key.capacity();
-//     } else if constexpr (std::is_same_v<Key, std::vector<typename Key::value_type>>) {
-//         size += key.capacity() * sizeof(typename Key::value_type);
-//     } else {
-//         size += sizeof(Key);
-//     }
-
-//     if constexpr (std::is_arithmetic_v<Value>) {
-//         size += sizeof(Value);
-//     } else if constexpr (std::is_same_v<Value, std::string>) {
-//         size += value.capacity();
-//     } else if constexpr (std::is_same_v<Value, std::vector<typename Value::value_type>>) {
-//         size += value.capacity() * sizeof(typename Value::value_type);
-//     } else {
-//         size += sizeof(Value);
-//     }
-
-//     return size;
-// }
-
+// No std::vector branch: Value::value_type does not exist for Matrix, the only
+// Value this cache is instantiated with, and naming it is a hard error there.
 template<typename Key, typename Value>
 std::size_t default_memory_calculator(const Key& key, const Value& value) {
     std::size_t size = 0;

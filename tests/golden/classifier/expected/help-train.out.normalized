@@ -1,0 +1,63 @@
+Train (or continue training) a classifier network on a directory dataset
+
+<BIN> train [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --network TEXT REQUIRED 
+                              Network save path (.wgt). Created if missing.
+          --working-directory TEXT [training-data]  
+                              Working directory for training data.
+
+Config:
+          --learning-config TEXT:FILE 
+                              Load training hyperparameters from a JSON file (as written to
+                              learning-config.json); flags below override individual fields
+                              from the loaded config.
+          --network-config TEXT:FILE 
+                              Load network topology from a JSON file (as written to
+                              network-config.json), used only when creating a new network;
+                              flags below override individual fields from the loaded config.
+
+Dataset:
+          --dataset TEXT      Dataset root used for both training and testing (subdirs 0..9).
+                              Overridden per-side by --train-dataset/--test-dataset.
+          --train-dataset TEXT 
+                              Training data root (subdirs 0..<num_of_classes-1>); falls back to
+                              --dataset if not set.
+          --test-dataset TEXT Testing data root (subdirs 0..<num_of_classes-1>); falls back to
+                              --dataset if not set.
+          --test-file-limit UINT [0]  
+                              Max test files per class (0 = all). Runs evaluation after
+                              training.
+          --dataset-img-width UINT [28]  
+                              Width of test images in pixels.
+          --dataset-img-height UINT [28]  
+                              Height of test images in pixels.
+
+Network:
+          --layers UINT [[784,50,20,10]]  ... 
+                              Layer sizes, comma-separated (used only when creating a new
+                              network)
+          --hidden-activation ENUM:value in {relu->1,sigmoid->0,softmax->3,tanh->2} OR {1,0,3,2} [1]  
+                              Hidden layer activation (used only when creating a new network)
+          --output-activation ENUM:value in {relu->1,sigmoid->0,softmax->3,tanh->2} OR {1,0,3,2} [3]  
+                              Output layer activation (used only when creating a new network)
+
+Training:
+          --initial-lr FLOAT [0.2]  
+                              Initial learning rate
+          --min-lr FLOAT [0.0001]  
+                              Minimum learning rate
+          --lr-decay FLOAT [0.7]  
+                              Learning rate decay factor
+          --max-epochs UINT [500]  
+                              Maximum training epochs
+          --patience UINT [10]  
+                              Early-stopping patience (epochs)
+          --inner-epochs UINT [1]  
+                              Backprop passes per sample per epoch
+          --dropout FLOAT [0]  
+                              Dropout rate
+          --dataset-limit-per-label, --dataset-file-limit UINT [100]  
+                              Max training files per class (0 = all)

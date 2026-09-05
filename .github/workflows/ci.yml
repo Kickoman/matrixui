@@ -1,0 +1,59 @@
+# Build and test on master pushes and PRs. Two jobs: core + CLI + doctest
+# (no Qt), and a Qt6 GUI compile.
+#
+# tests/golden/compare.sh deliberately does not run here -- see docs/building.md.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Core build & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (with the eigen submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure
+        run: cmake -B build -DBUILD_GUI=OFF -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+  gui-build:
+    name: GUI build (Qt6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (with the eigen submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Qt6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qt6-base-dev qt6-declarative-dev qt6-charts-dev
+
+      - name: Configure
+        run: cmake -B build -DBUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
