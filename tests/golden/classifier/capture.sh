@@ -12,7 +12,14 @@ rm -rf "$OUT"
 mkdir -p "$WORK"
 
 NET=tests/golden/classifier/fixtures/network.wgt
-python3 tests/golden/classifier/fixtures/make_dataset.py "$WORK/dataset" > /dev/null
+# The dataset is generated, not committed, so python3 is a hard requirement here.
+# On a Mac without the Command Line Tools installed `python3` is only a stub that
+# pops an installer prompt; fail loudly rather than letting every later snapshot
+# diff against images that were never written.
+if ! python3 tests/golden/classifier/fixtures/make_dataset.py "$WORK/dataset" > /dev/null; then
+    echo "capture: python3 failed -- is it installed? (macOS: xcode-select --install)" >&2
+    exit 1
+fi
 IMG="$WORK/dataset/3/img_0.png"
 printf 'garbage' > "$WORK/corrupt.wgt"
 printf '{nope' > "$WORK/bad-learning.json"
@@ -65,10 +72,25 @@ run train train --network "$WORK/trained.wgt" --dataset "$WORK/dataset" \
 # the options. Train's stderr is epoch-by-epoch chatter whose every number is
 # nondeterministic, so it is blanked wholesale below -- same reasoning as the
 # words snapshot dropping its progress ticks.
+# On macOS $TMPDIR lives under /var, which is a symlink to /private/var, so a path
+# the C++ side resolves comes back with the /private prefix and would not match the
+# literal $WORK below. Substitute both spellings. Paths also land inside a sed
+# regex, so escape the metacharacters that macOS temp names really do contain.
+physical_path() {
+    if [ -d "$1" ]; then (cd "$1" && pwd -P); else printf '%s' "$1"; fi
+}
+sed_escape() {
+    printf '%s' "$1" | sed -e 's/[][\.*^$+?(){}|#/]/\\&/g'
+}
+WORK_PHYS="$(physical_path "$WORK")"
+WORK_RE="$(sed_escape "$WORK")"
+WORK_PHYS_RE="$(sed_escape "$WORK_PHYS")"
+
 normalize() {
     sed -E \
-        -e "s#$WORK#<WORK>#g" \
-        -e "s#$BIN#<BIN>#g" \
+        -e "s#$WORK_PHYS_RE#<WORK>#g" \
+        -e "s#$WORK_RE#<WORK>#g" \
+        -e "s#$(sed_escape "$BIN")#<BIN>#g" \
         -e 's#Final test accuracy: .*#Final test accuracy: <ACC>#' \
         "$1" | cat -s
 }

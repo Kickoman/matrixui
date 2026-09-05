@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "core/nn/neural_network.h"
 
 namespace Neural {

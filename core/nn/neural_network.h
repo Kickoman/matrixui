@@ -2,6 +2,8 @@
 
 #include "core/nn/layers.h"
 
+#include <cstddef>
+#include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
 

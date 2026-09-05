@@ -7,7 +7,7 @@
 #include <QHorizontalBarSeries>
 #include <QVBoxLayout>
 #include <QValueAxis>
-#include <qobject.h>
+#include <QObject>
 
 
 DigitChart::DigitChart(QWidget* parent)

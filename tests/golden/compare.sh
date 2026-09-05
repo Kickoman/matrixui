@@ -7,13 +7,15 @@ set -u
 
 cd "$(dirname "$0")/../.."
 
-TOOLS=("$@")
-if [ "${#TOOLS[@]}" -eq 0 ]; then
-    TOOLS=(words classifier generator)
+# Deliberately the positional list rather than an array: macOS ships bash 3.2,
+# where expanding an empty array under `set -u` aborts with "unbound variable" --
+# which is exactly the no-argument case documented above.
+if [ "$#" -eq 0 ]; then
+    set -- words classifier generator
 fi
 
 status=0
-for tool in "${TOOLS[@]}"; do
+for tool in "$@"; do
     if tests/golden/"$tool"/compare.sh; then
         echo "golden[$tool]: ok"
     else

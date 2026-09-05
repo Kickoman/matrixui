@@ -1,6 +1,12 @@
-#include "core/nn/dataset.h"
+#pragma once
+
+#include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <string>
+#include <vector>
+
+#include "core/nn/dataset.h"
 
 
 namespace Neural {

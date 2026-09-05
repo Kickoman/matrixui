@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,6 +16,7 @@ option(BUILD_GUI "Build GUI version" ON)
 option(BUILD_CLI "Build CLI version" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_SHARED_LIBS "Build the matrixgui libraries as shared objects" OFF)
+option(ENABLE_NATIVE_ARCH "Tune the Release build for the building machine's CPU" ON)
 
 set(MATRIXGUI_LIB_TYPE STATIC)
 if(BUILD_SHARED_LIBS)
@@ -33,6 +34,25 @@ add_library(matrixgui_base INTERFACE)
 target_include_directories(matrixgui_base INTERFACE ${PROJECT_SOURCE_DIR})
 target_compile_features(matrixgui_base INTERFACE cxx_std_20)
 target_compile_options(matrixgui_base INTERFACE -Wall -Wextra)
+
+# Release is tuned for the building machine, but the spelling of "tune for this
+# CPU" is not portable: Apple Clang on arm64 rejects -march=native outright, so
+# hardcoding it makes the project fail to even configure on Apple Silicon. Probe
+# instead, and fall back to plain -O3 when neither spelling is accepted -- no
+# real loss there, since Eigen's NEON path is on by default on arm64, unlike AVX
+# on x86. See docs/building.md for why the flag matters to the golden snapshots.
+if(ENABLE_NATIVE_ARCH)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-march=native" MATRIXGUI_HAS_MARCH_NATIVE)
+    if(MATRIXGUI_HAS_MARCH_NATIVE)
+        target_compile_options(matrixgui_base INTERFACE "$<$<CONFIG:Release>:-march=native>")
+    else()
+        check_cxx_compiler_flag("-mcpu=native" MATRIXGUI_HAS_MCPU_NATIVE)
+        if(MATRIXGUI_HAS_MCPU_NATIVE)
+            target_compile_options(matrixgui_base INTERFACE "$<$<CONFIG:Release>:-mcpu=native>")
+        endif()
+    endif()
+endif()
 
 add_library(matrixgui_contrib INTERFACE)
 target_include_directories(matrixgui_contrib SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/contrib)
@@ -52,7 +72,7 @@ endif()
 
 if(BUILD_GUI)
     find_package(QT NAMES Qt6 Qt5 COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
-    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Qml QuickWidgets Concurrent Charts REQUIRED)
+    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Gui Widgets Concurrent Charts REQUIRED)
 
     add_subdirectory(contrib/qt-dark-theme)
 

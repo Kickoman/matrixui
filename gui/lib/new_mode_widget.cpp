@@ -3,7 +3,6 @@
 
 #include <QGridLayout>
 #include <QToolButton>
-#include <qtoolbutton.h>
 
 NewModeWidget::NewModeWidget(QWidget* parent)
     : ModeWidget("New mode", parent)
@@ -19,7 +18,11 @@ NewModeWidget::NewModeWidget(QWidget* parent)
     wordsButton->setText("Word\nembeddings\n(SGNS)");
 
     const QSize buttonSize(300, 300);
-    const QFont buttonFont("sans", 24);
+    // "sans" is a fontconfig alias, which is a Linux-only concept; on macOS Core
+    // Text cannot resolve it. Ask for the style and let Qt pick the real family.
+    QFont buttonFont;
+    buttonFont.setStyleHint(QFont::SansSerif);
+    buttonFont.setPointSize(24);
     digitsClassifierButton->setFixedSize(buttonSize);
     digitsClassifierButton->setFont(buttonFont);
     digitsRecognitionPlaygroundButton->setFixedSize(buttonSize);

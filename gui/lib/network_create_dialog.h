@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <vector>
+
 #include <QDialog>
 #include "core/nn/neural_network.h"
 

@@ -1,6 +1,8 @@
 #ifndef PNGREADER_H
 #define PNGREADER_H
 
+#include <string>
+
 #include "core/matrix/matrix.h"
 
 namespace PngUtils {

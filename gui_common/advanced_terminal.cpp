@@ -1,5 +1,6 @@
 #include "gui_common/advanced_terminal.h"
 
+#include <QFontDatabase>
 #include <QScrollBar>
 
 
@@ -8,7 +9,12 @@ AdvancedTerminal::AdvancedTerminal(QWidget* parent)
 {
     setReadOnly(true);
     setWordWrapMode(QTextOption::NoWrap);
-    setFont(QFont("Consolas", 10));
+    // Consolas is a Microsoft font and is absent on both Linux and macOS, where Qt
+    // silently substitutes a proportional face -- fatal for a widget whose whole
+    // job is column alignment (see processCarriageReturns/processBackspaces below).
+    QFont terminalFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    terminalFont.setPointSize(10);
+    setFont(terminalFont);
 
     QPalette p = palette();
     p.setColor(QPalette::Base, QColor(30, 30, 30));

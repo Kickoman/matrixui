@@ -10,7 +10,11 @@
 
 #include <QThread>
 #include <QPointer>
+#include <cstddef>
 #include <filesystem>
+#include <ostream>
+#include <string>
+#include <vector>
 
 Q_DECLARE_METATYPE(Neural::Classifier::TestResult);
 Q_DECLARE_METATYPE(Neural::Classifier::LearningConfig);

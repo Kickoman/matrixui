@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include <QObject>
 
 #include "gui/lib/mode_factory.h"

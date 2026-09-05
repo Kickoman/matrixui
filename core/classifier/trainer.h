@@ -2,8 +2,10 @@
 
 #include <cstddef>
 #include <atomic>
+#include <functional>
 #include <ostream>
 #include <memory>
+#include <vector>
 
 #include "core/classifier/learning_config.h"
 

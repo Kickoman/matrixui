@@ -56,11 +56,26 @@ run err-unknown-word neighbours --vocabulary "$VOC" --embeddings "$EMB" --word z
 # may finish before the first report window elapses. Only the header and the
 # final summary are reproducible, so the progress lines are dropped entirely.
 # The work directory is also absolute.
+# On macOS $TMPDIR lives under /var, which is a symlink to /private/var, so a path
+# the C++ side resolves comes back with the /private prefix and would not match the
+# literal $WORK below. Substitute both spellings. Paths also land inside a sed
+# regex, so escape the metacharacters that macOS temp names really do contain.
+physical_path() {
+    if [ -d "$1" ]; then (cd "$1" && pwd -P); else printf '%s' "$1"; fi
+}
+sed_escape() {
+    printf '%s' "$1" | sed -e 's/[][\.*^$+?(){}|#/]/\\&/g'
+}
+WORK_PHYS="$(physical_path "$WORK")"
+WORK_RE="$(sed_escape "$WORK")"
+WORK_PHYS_RE="$(sed_escape "$WORK_PHYS")"
+
 normalize() {
     sed -E \
         -e '/^ *[0-9]+(\.[0-9]+)?%  pairs /d' \
         -e 's#in [0-9]+(\.[0-9]+)?s \([0-9]+(\.[0-9]+)?k pairs/s\)#in <SECS> (<RATE>)#' \
-        -e "s#$WORK#<WORK>#g" \
+        -e "s#$WORK_PHYS_RE#<WORK>#g" \
+        -e "s#$WORK_RE#<WORK>#g" \
         "$1" | cat -s
 }
 

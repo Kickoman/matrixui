@@ -14,7 +14,7 @@ set -eu
 BUILD="${1:-./build}"
 HERE=tests/golden/classifier/fixtures
 GEN=tests/golden/generator/fixtures
-TMP="$(mktemp -d)"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/matrixgui-fixtures.XXXXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 python3 "$HERE/make_dataset.py" "$TMP/dataset"

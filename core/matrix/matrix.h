@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <functional>
+#include <ostream>
+#include <vector>
+
 #include "Eigen/Dense"
 
 class Matrix {

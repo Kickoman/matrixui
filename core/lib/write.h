@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <istream>
+#include <ostream>
 #include <vector>
 
 constexpr bool IsLittleEndian() {

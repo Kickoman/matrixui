@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <ostream>
+
 #include "gui/lib/mode_widget.h"
 
 class AdvancedTerminal;

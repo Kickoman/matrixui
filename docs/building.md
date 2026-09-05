@@ -27,14 +27,14 @@ cmake --build build
 |-------------|-------|
 | C++20 compiler | GCC or Clang |
 | CMake 3.16+ | |
-| Qt 6 (or Qt 5) | GUI only. Modules: Gui, Widgets, Qml, QuickWidgets, Concurrent, Charts |
+| Qt 6 (or Qt 5) | GUI only. Modules: Gui, Widgets, Concurrent, Charts |
 | Eigen | Bundled as a git submodule in `eigen/` |
 
 On Debian/Ubuntu, the Qt package set CI uses is:
 
 ```bash
 sudo apt-get install -y --no-install-recommends \
-  qt6-base-dev qt6-declarative-dev qt6-charts-dev
+  qt6-base-dev qt6-charts-dev
 ```
 
 ## CMake options
@@ -45,6 +45,7 @@ sudo apt-get install -y --no-install-recommends \
 | `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`) |
 | `BUILD_TESTS` | `ON` | Unit-test binary (`MatrixGui_tests`) and the `unit` CTest entry |
 | `BUILD_SHARED_LIBS` | `OFF` | Build the `matrixgui_*` libraries as `.so` instead of `.a` |
+| `ENABLE_NATIVE_ARCH` | `ON` | Let Release tune for the building CPU, when the compiler accepts it |
 
 ## Build targets
 
@@ -119,13 +120,23 @@ cmake --build build
 
 `CMAKE_BUILD_TYPE` defaults to `Release` when you do not set it.
 
-Everything compiles with `-Wall -Wextra`. Release adds `-O3 -DNDEBUG
--march=native`, Debug adds `-g`.
+Everything compiles with `-Wall -Wextra`. Release adds `-O3 -DNDEBUG`, Debug
+adds `-g`. Release additionally tries to tune for the building CPU: CMake probes
+`-march=native`, then `-mcpu=native`, and uses whichever the compiler accepts.
 
-`-march=native` means release binaries are tuned for the machine that built them
+That probe exists because the spelling is not portable — Apple Clang on arm64
+rejects `-march=native` outright, so hardcoding it made the project fail to even
+configure on Apple Silicon. When neither flag is accepted the build simply stays
+at `-O3`, which costs little there: Eigen's NEON path is on by default on arm64,
+unlike AVX on x86. `-DENABLE_NATIVE_ARCH=OFF` skips the probe entirely, which is
+also the quickest way to reproduce the Apple Silicon configuration on Linux.
+
+Native tuning means release binaries are tuned for the machine that built them
 and are not portable to a different CPU. That is also why the golden CLI
 snapshot only runs locally: it pins the float output of a trained model, and a
 different instruction set accumulates floats in a different order.
+
+See [macos.md](macos.md) for building on a Mac.
 
 ## Tests
 
@@ -213,6 +224,14 @@ exception types, not a flag flip.
 `cli/*/` and `gui/`, so without it they would land in `build/cli/words/` and
 friends. `README.md`, this file, and the `tests/golden/*/` scripts all default
 to `./build/MatrixGui_words` and friends.
+
+**On macOS the GUI escapes that directory, deliberately.** `MatrixGui` is built
+with `MACOSX_BUNDLE`, so it lands in `build/MatrixGui.app/Contents/MacOS/` rather
+than `build/MatrixGui`. Without a bundle a Qt app on macOS has no Dock icon,
+cannot reliably be raised to the front, and keys `QSettings` off an empty bundle
+identifier. Only the GUI is affected — every CLI tool, and therefore every
+`tests/golden/*/` script, still resolves to `build/<name>`. See
+[macos.md](macos.md).
 
 **Do not add `include_directories(eigen)` back.** GCC ignores an `-isystem P`
 if a plain `-I P` for the same path appeared earlier on the command line, which

@@ -42,6 +42,22 @@ add_executable(MatrixGui
 
 set_target_properties(MatrixGui PROPERTIES AUTOMOC ON)
 
+# On macOS a Qt app has to be a bundle to behave like an application at all:
+# without one it runs as a faceless background process, gets no Dock icon, cannot
+# reliably be brought to the foreground, and QSettings keys off an empty bundle
+# identifier. This is the one target that escapes CMAKE_RUNTIME_OUTPUT_DIRECTORY --
+# it lands in <build>/MatrixGui.app/Contents/MacOS/. The CLI tools, and so every
+# tests/golden script, are unaffected.
+if(APPLE)
+    set_target_properties(MatrixGui PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "MatrixGui"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "by.kastus.matrixgui"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+    )
+endif()
+
 target_link_libraries(MatrixGui PRIVATE
     matrixgui_gui_common
 

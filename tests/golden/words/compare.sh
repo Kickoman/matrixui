@@ -8,7 +8,7 @@
 set -u
 
 BIN="${1:-./build/MatrixGui_words}"
-ACTUAL="$(mktemp -d)"
+ACTUAL="$(mktemp -d "${TMPDIR:-/tmp}/matrixgui-golden.XXXXXXXX")"
 trap 'rm -rf "$ACTUAL"' EXIT
 
 tests/golden/words/capture.sh "$ACTUAL" "$BIN" > /dev/null 2>&1

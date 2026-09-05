@@ -93,6 +93,7 @@ matches the network's input layer.
 ## Documentation
 
 - [Building](docs/building.md) — CMake options, build targets, dependencies, tests
+- [macOS](docs/macos.md) — building and running on a Mac
 - [Classifier](docs/classifier.md) — Training and inference CLI reference
 - [GAN](docs/gan.md) — GAN training and image generation CLI reference
 - [Word embeddings](docs/words.md) — SGNS pipeline, module layout, CLI reference
@@ -195,6 +196,7 @@ Pa zmoŭčańni vyjavy čytajucca ŭ pamiery 28×28 pikseliaŭ i transfarmujucca
 ## Dakumentacyja (pa-angieĺsku)
 
 - [Zborka](docs/building.md) — opcyi CMake, mety zborki, zaliežnaści, testy
+- [macOS](docs/macos.md) — zborka i zapusk na Maku
 - [Klasifikatar](docs/classifier.md) — apisańnie navučańnia i inferensu ŭtylitaj kamandnaha radku
 - [GAN](docs/gan.md) — navučańnie GAN i generacyja vyjaŭ utylitaj kamandnaha radku
 - [Viektarnyja pradstaŭleńni słovaŭ](docs/words.md) — kanvejer SGNS, struktura moduliaŭ, apisańnie CLI

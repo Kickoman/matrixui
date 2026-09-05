@@ -4,7 +4,6 @@
 #include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
-#include <qspinbox.h>
 
 
 LearningConfigWidget::LearningConfigWidget(QWidget* parent)

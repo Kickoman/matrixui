@@ -24,7 +24,7 @@ words = SEEDED + [f"w{i:04d}" for i in range(VOCAB - len(SEEDED))]
 weights = [1.0 / (i + 1) ** 0.9 for i in range(len(words))]
 
 out = random.choices(words, weights=weights, k=TOKENS)
-with open("tests/golden/corpus.txt", "w") as f:
+with open("tests/golden/words/corpus.txt", "w") as f:
     f.write(" ".join(out))
 
 print(f"wrote {TOKENS} tokens over {len(set(out))} distinct words")

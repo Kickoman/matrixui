@@ -22,6 +22,14 @@ use `-march=native`, and several expectations pin float-derived output (words
 training losses, the classifier's `predict` digit), which is not bit-portable
 across CPUs. See `docs/building.md`.
 
+For the same reason these are **expected to differ on macOS** — a different CPU
+and a different standard library reorder float accumulation. The scripts
+themselves are kept portable (macOS ships bash 3.2 and a BSD userland, so
+`mktemp` gets an explicit template, the tool list uses positional parameters
+rather than an array, and path normalisation accounts for `/var` being a symlink
+to `/private/var`), but a clean diff on a Mac is not something to expect. The
+unit tests are the portable check. See `docs/macos.md`.
+
 ## Determinism and fixtures
 
 **words** regenerates everything at capture time. Its corpus is committed

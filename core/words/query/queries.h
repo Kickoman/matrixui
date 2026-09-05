@@ -4,6 +4,7 @@
 #include "core/words/query/similarity.h"
 #include "core/words/data/types.h"
 
+#include <cstddef>
 #include <span>
 #include <string>
 #include <string_view>

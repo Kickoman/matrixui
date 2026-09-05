@@ -10,8 +10,12 @@
 #include <QThread>
 #include <QPointer>
 #include <QImage>
+#include <cstddef>
+#include <filesystem>
+#include <functional>
 #include <optional>
 #include <random>
+#include <string>
 #include <vector>
 #include <atomic>
 

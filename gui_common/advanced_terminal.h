@@ -2,7 +2,10 @@
 
 #include <QPlainTextEdit>
 #include <ios>
-#include <qtmetamacros.h>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <QtGlobal>
 #include <sstream>
 #include <mutex>
 

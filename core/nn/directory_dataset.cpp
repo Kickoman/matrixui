@@ -25,7 +25,7 @@ std::vector<Sample> DirectoryDataset::getSamplesForLabel(const std::size_t label
     assert(fileReader);
     std::vector<Sample> samples;
     const auto directory = datasetDirectory / std::to_string(label);
-    auto files = DirectoryLister::listFiles(directory, limit);
+    auto files = DirectoryLister::listFilesWithExtensions(directory, {".png", ".PNG"}, limit);
     samples.reserve(files.size());
     std::transform(files.cbegin(), files.cend(), std::back_inserter(samples), [this, label](const auto& file){
         return Sample{
@@ -42,7 +42,14 @@ std::vector<Sample> DirectoryDataset::getAllSamples(const std::size_t limitPerLa
     std::vector<Sample> samples;
     const auto directories = DirectoryLister::listDirectories(datasetDirectory);
     for (const auto& directory : directories) {
-        const auto label = std::stoull(directory.filename().string());
+        // A dataset root can hold directories that are not class labels -- on macOS
+        // a volume carries .Spotlight-V100 and .fseventsd. std::stoull would throw
+        // on those, so skip anything that is not purely a number instead.
+        const auto name = directory.filename().string();
+        if (name.empty() || name.find_first_not_of("0123456789") != std::string::npos) {
+            continue;
+        }
+        const auto label = std::stoull(name);
         auto labelSamples = getSamplesForLabel(label, limitPerLabel);
         samples.insert(
             samples.end(),
