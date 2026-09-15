@@ -165,6 +165,10 @@ void wrapBinary(Expression::TRpn& rpn, const MutationConfig& c) {
 } // namespace
 
 
+void FunctionGenetizerApplier::SeedThreadRng(const std::uint64_t seed) {
+    rng().seed(seed);
+}
+
 void FunctionGenetizerApplier::resetExpected() {
     expectedEntries.resize(0);
     mutationConfig = {};
@@ -182,6 +186,11 @@ void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, co
         .variables = std::move(variables),
         .expectedResult = result,
     });
+}
+
+void FunctionGenetizerApplier::setMutationOptions(std::vector<char> operators, const TScalar scalarRange) {
+    mutationConfig.operators = std::move(operators);
+    mutationConfig.scalarRange = scalarRange;
 }
 
 OrganismInfo FunctionGenetizerApplier::makeRandomOrganism(const std::size_t maxDepth, const bool full) const {
@@ -204,6 +213,9 @@ std::string FunctionGenetizerApplier::PrintWorld(const FunctionGenetizer::TWorld
         top = world.size();
     }
     top = std::min(top, world.size());
+    if (top == 0) {
+        return "<empty world>\n";
+    }
     tabs::Tabulator tabulator;
     tabulator.addHeader() << "Birth" << "Expression" << "Rank";
     for (std::size_t i = 0; i < top; ++i) {

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Run the golden CLI snapshots. With no arguments, all three tools; otherwise
+# Run the golden CLI snapshots. With no arguments, all tools; otherwise
 # only the ones named.
 #
-# Usage: tests/golden/compare.sh [words|classifier|generator ...]
+# Usage: tests/golden/compare.sh [words|classifier|generator|functions ...]
 set -u
 
 cd "$(dirname "$0")/../.."
 
 TOOLS=("$@")
 if [ "${#TOOLS[@]}" -eq 0 ]; then
-    TOOLS=(words classifier generator)
+    TOOLS=(words classifier generator functions)
 fi
 
 status=0

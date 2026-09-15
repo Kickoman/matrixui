@@ -1,12 +1,12 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <random>
 #include <vector>
 #include <algorithm>
 #include <functional>
-
-// #include <iostream>
 
 namespace genetyka {
 
@@ -67,6 +67,10 @@ public:
         world.reserve(config.maxPopulation);
         tournamentCompetitors.resize(config.tournamentSize);
         rankedPopulationCount = 0;
+    }
+
+    void setSeed(std::uint64_t seed) {
+        generator.seed(seed);
     }
 
     void addOrganism(const TOrganism& organism) {

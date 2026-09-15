@@ -4,6 +4,7 @@
 #include "core/lib/rpn.h"
 #include "core/functions/genetizer.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -48,8 +49,12 @@ using FunctionGenetizer = genetyka::Genetizer<OrganismInfo, double>;
 
 class FunctionGenetizerApplier {
 public:
+    static void SeedThreadRng(std::uint64_t seed);
+
     void resetExpected();
     void addExpected(std::vector<Variable>&& variables, double result);
+
+    void setMutationOptions(std::vector<char> operators, TScalar scalarRange);
 
     OrganismInfo makeRandomOrganism(std::size_t maxDepth, bool full) const;
     void seedRandom(FunctionGenetizer& genetizer, std::size_t count, std::size_t maxDepth = 4) const;

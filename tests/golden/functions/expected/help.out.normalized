@@ -1,0 +1,9 @@
+Genetic symbolic regression: evolve an expression fitting expected values
+
+<BIN> [OPTIONS] SUBCOMMAND
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+
+SUBCOMMANDS:
+  run                         Evolve an expression fitting a CSV of expected values

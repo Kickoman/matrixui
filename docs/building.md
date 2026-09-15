@@ -1,6 +1,6 @@
 # Building MatrixGui
 
-One CMake project builds everything: a Qt desktop application, three command-line
+One CMake project builds everything: a Qt desktop application, four command-line
 tools and a test binary. They share a set of small libraries under `core/`, each
 built once and linked by whichever front end needs it.
 
@@ -153,7 +153,7 @@ into it, as two jobs:
 
 Both check out with `submodules: true`, since Eigen is required to configure.
 
-The golden CLI snapshots (`tests/golden/compare.sh`, covering all three
+The golden CLI snapshots (`tests/golden/compare.sh`, covering all four
 command-line tools) deliberately do not run in CI, for the `-march=native`
 reason given above. They stay a local pre-commit tool; the unit tests carry the
 same invariants with tolerances. See `tests/golden/README.md`.
@@ -168,7 +168,7 @@ file holds only the options, three interface targets and the `add_subdirectory`
 calls:
 
 ```
-core/       the libraries: matrix, png, lib, nn, classifier, generator, words
+core/       the libraries: matrix, png, lib, nn, classifier, generator, words, functions
 cli/        one folder per command-line tool, mirroring gui/
 gui/        the Qt application
 gui_common/ reusable Qt widgets

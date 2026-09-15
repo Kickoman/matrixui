@@ -1,0 +1,12 @@
+Start world:
+Birth | Expression |   Rank
+===========================
+    0 |        x+1 | 0.4461
+    0 |          x | 0.4450
+Final world:
+Birth | Expression |   Rank
+===========================
+    1 |        x+x | 0.9764
+    2 |        x+x | 0.9764
+    1 |        x+x | 0.9764
+Best: x+x (rank 0.976413)

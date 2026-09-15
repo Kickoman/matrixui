@@ -29,6 +29,7 @@ add_executable(MatrixGui_tests
     cli/classifier_commands_test.cpp
     cli/generator_commands_test.cpp
     cli/words_commands_test.cpp
+    cli/functions_commands_test.cpp
 )
 
 target_link_libraries(MatrixGui_tests PRIVATE
@@ -40,6 +41,7 @@ target_link_libraries(MatrixGui_tests PRIVATE
     matrixgui_cli_words
     matrixgui_cli_classifier
     matrixgui_cli_generator
+    matrixgui_cli_functions
     matrixgui_nn
     matrixgui_png
     matrixgui_matrix

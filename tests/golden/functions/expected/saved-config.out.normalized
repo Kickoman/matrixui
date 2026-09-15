@@ -1,0 +1,18 @@
+{
+  "epochs": 1,
+  "genetizer": {
+    "maxPopulation": 64,
+    "populationDecreaseFactor": 0.9,
+    "tournamentSize": 3
+  },
+  "initialExpressions": [],
+  "mutation": {
+    "operators": "+-*/^",
+    "scalarRange": 5.0
+  },
+  "printEvery": 10,
+  "printTop": 2,
+  "randomCount": 16,
+  "randomDepth": 4,
+  "seed": 42
+}

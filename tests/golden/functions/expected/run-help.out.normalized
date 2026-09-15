@@ -1,0 +1,36 @@
+Evolve an expression fitting a CSV of expected values
+
+<BIN> run [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --data TEXT:FILE REQUIRED 
+                              CSV data points: header row of variable names, last column
+                              'expected'
+          --epochs UINT [50]  Epochs to evolve
+          --seed UINT [0]     Random seed (0 = nondeterministic)
+          --max-population UINT [100000]  
+                              World size
+          --tournament-size UINT [3]  
+                              Tournament selection size
+          --population-decrease FLOAT [0.9]  
+                              Survivor share kept between epochs
+          --operators TEXT [+-*/^]  
+                              Binary operators available to mutation
+          --scalar-range FLOAT [5]  
+                              Random constants are drawn from [-range, range]
+          --expression TEXT ... 
+                              Initial expression, repeatable (replaces the config list)
+          --random-count UINT [200]  
+                              Random organisms seeded into the initial population
+          --random-depth UINT [4]  
+                              Max tree depth of the random initial organisms
+          --print-top UINT [10]  
+                              World rows to print (0 = all)
+          --print-every UINT [10]  
+                              Print the world every N epochs (0 = only start and final)
+
+Config:
+          --config TEXT:FILE  Load settings from a JSON file (as written by --save-config);
+                              flags below override individual fields from the loaded config.
+          --save-config TEXT  Write the effective config JSON to this path
