@@ -34,6 +34,13 @@ run run-expressions run --data "$DATA" --seed 42 --epochs 2 \
     --max-population 64 --random-count 0 --expression "x" --expression "x+1" \
     --print-top 3 --print-every 0
 
+run run-patience run --data "$DATA" --seed 42 --epochs 50 --patience 2 \
+    --max-population 64 --random-count 16 --print-top 3 --print-every 0
+
+run run-weights run --data "$DATA" --seed 42 --epochs 3 \
+    --accuracy-weight 1 --complexity-weight 0 --length-weight 0 \
+    --max-population 64 --random-count 16 --print-top 3 --print-every 0
+
 run save-config run --data "$DATA" --seed 42 --epochs 1 \
     --max-population 64 --random-count 16 --print-top 2 \
     --save-config "$WORK/cfg.json"

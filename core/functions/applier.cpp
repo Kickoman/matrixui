@@ -1,6 +1,9 @@
 #include "core/functions/applier.h"
 #include "core/lib/tabulator.h"
+
 #include <cassert>
+#include <string_view>
+#include <unordered_map>
 
 
 namespace Genetizer {
@@ -33,6 +36,8 @@ std::mt19937& rng() {
     static thread_local std::mt19937 gen{std::random_device{}()};
     return gen;
 }
+
+constexpr long double kInvalidResultPenalty = 100;
 
 std::size_t randIndex(std::size_t n) {
     return std::uniform_int_distribution<std::size_t>{0, n - 1}(rng());
@@ -173,6 +178,9 @@ void FunctionGenetizerApplier::resetExpected() {
     expectedEntries.resize(0);
     mutationConfig = {};
     knownVariables.clear();
+    expectedMagnitudeSum = 0;
+    errorScale = 1.;
+    rankCache.clear();
 }
 
 void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, const double result) {
@@ -186,11 +194,20 @@ void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, co
         .variables = std::move(variables),
         .expectedResult = result,
     });
+
+    expectedMagnitudeSum += std::abs(result);
+    errorScale = std::max(1., expectedMagnitudeSum / static_cast<TScalar>(expectedEntries.size()));
+    rankCache.clear();
 }
 
 void FunctionGenetizerApplier::setMutationOptions(std::vector<char> operators, const TScalar scalarRange) {
     mutationConfig.operators = std::move(operators);
     mutationConfig.scalarRange = scalarRange;
+}
+
+void FunctionGenetizerApplier::setFitnessOptions(const FitnessConfig& fitness) {
+    fitnessConfig = fitness;
+    rankCache.clear();
 }
 
 OrganismInfo FunctionGenetizerApplier::makeRandomOrganism(const std::size_t maxDepth, const bool full) const {
@@ -209,24 +226,45 @@ void FunctionGenetizerApplier::seedRandom(FunctionGenetizer& genetizer, const st
 }
 
 std::string FunctionGenetizerApplier::PrintWorld(const FunctionGenetizer::TWorld &world, std::size_t top) {
-    if (top == 0) {
-        top = world.size();
-    }
-    top = std::min(top, world.size());
-    if (top == 0) {
+    if (world.empty()) {
+        // Tabulator cannot render an empty table (max over no rows).
         return "<empty world>\n";
     }
-    tabs::Tabulator tabulator;
-    tabulator.addHeader() << "Birth" << "Expression" << "Rank";
-    for (std::size_t i = 0; i < top; ++i) {
-        const auto& org = world[i];
-        tabulator.addRow()
-            << org.organism.epochOfBirth
-            << org.organism.expression.toString()
-            << org.rank
-        ;
+
+    struct Distinct {
+        const std::string* expression;  // owned by the organism's memoized presentation
+        std::size_t birth;
+        double rank;
+        std::size_t copies;
+    };
+    std::vector<Distinct> distinct;
+    std::unordered_map<std::string_view, std::size_t> seen;
+    seen.reserve(world.size());
+
+    for (const auto& info : world) {
+        const auto& presentation = info.organism.getPresentation();
+        const auto [it, inserted] = seen.try_emplace(presentation, distinct.size());
+        if (inserted) {
+            distinct.push_back(Distinct{&presentation, info.organism.epochOfBirth, info.rank, 1});
+        } else {
+            auto& row = distinct[it->second];
+            ++row.copies;
+            row.birth = std::min(row.birth, info.organism.epochOfBirth);
+        }
     }
-    return tabulator.tabulate();
+
+    if (top == 0 || top > distinct.size()) {
+        top = distinct.size();
+    }
+
+    tabs::Tabulator tabulator;
+    tabulator.addHeader() << "Birth" << "Expression" << "Rank" << "Copies";
+    for (std::size_t i = 0; i < top; ++i) {
+        const auto& row = distinct[i];
+        tabulator.addRow() << row.birth << *row.expression << row.rank << row.copies;
+    }
+    return "unique " + std::to_string(distinct.size()) + " / " + std::to_string(world.size())
+        + "\n" + tabulator.tabulate();
 }
 
 double FunctionGenetizerApplier::rankOrganism(const OrganismInfo& organism) {
@@ -259,24 +297,24 @@ double FunctionGenetizerApplier::rankOrganism(const OrganismInfo& organism) {
             }
             const auto result = expression.run(vars);
             if (std::isinf(result) || std::isnan(result)) {
-                error += 100;
+                error += kInvalidResultPenalty;
             } else {
-                error += std::abs(result - entry.expectedResult);
+                error += std::abs(result - entry.expectedResult) / errorScale;
             }
         }
 
         const auto complexity = rpn.size();
         const auto complexityFitness = 1. / (1. + complexity / 50.);
         const auto expressionFitness = 1. / (1. + readable.size() / 50.);
-        const auto accuracyFitness = 1. / (1. + error);
+        const auto accuracyFitness = 1. / (1. + static_cast<double>(error) / expectedEntries.size());
 
-        constexpr auto accWeightRaw = 0.98;
-        constexpr auto comWeightRaw = 0.7;
-        constexpr auto expWeightRaw = 0.0001;
-        constexpr auto sumWeight = accWeightRaw + comWeightRaw + expWeightRaw;
-        constexpr auto accWeight = accWeightRaw / sumWeight;
-        constexpr auto comWeight = comWeightRaw / sumWeight;
-        constexpr auto expWeight = expWeightRaw / sumWeight;
+        const auto accWeightRaw = fitnessConfig.accuracyWeight;
+        const auto comWeightRaw = fitnessConfig.complexityWeight;
+        const auto expWeightRaw = fitnessConfig.lengthWeight;
+        const auto sumWeight = accWeightRaw + comWeightRaw + expWeightRaw;
+        const auto accWeight = accWeightRaw / sumWeight;
+        const auto comWeight = comWeightRaw / sumWeight;
+        const auto expWeight = expWeightRaw / sumWeight;
 
         const auto res = accWeight * accuracyFitness + comWeight * complexityFitness + expWeight * expressionFitness;
         rankCache.put(readable, res);

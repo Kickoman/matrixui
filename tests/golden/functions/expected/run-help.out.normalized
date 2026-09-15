@@ -7,7 +7,11 @@ OPTIONS:
           --data TEXT:FILE REQUIRED 
                               CSV data points: header row of variable names, last column
                               'expected'
-          --epochs UINT [50]  Epochs to evolve
+          --epochs UINT [500]  
+                              Epochs to evolve
+          --patience UINT [50]  
+                              Stop when the best rank has not improved for this many epochs (0
+                              = never)
           --seed UINT [0]     Random seed (0 = nondeterministic)
           --max-population UINT [100000]  
                               World size
@@ -26,7 +30,7 @@ OPTIONS:
           --random-depth UINT [4]  
                               Max tree depth of the random initial organisms
           --print-top UINT [10]  
-                              World rows to print (0 = all)
+                              Distinct expressions to print (0 = all)
           --print-every UINT [10]  
                               Print the world every N epochs (0 = only start and final)
 
@@ -34,3 +38,11 @@ Config:
           --config TEXT:FILE  Load settings from a JSON file (as written by --save-config);
                               flags below override individual fields from the loaded config.
           --save-config TEXT  Write the effective config JSON to this path
+
+Fitness:
+          --accuracy-weight FLOAT [0.98]  
+                              Fitness weight of how well the expression fits the data
+          --complexity-weight FLOAT [0.2]  
+                              Fitness weight of how few RPN units the expression uses
+          --length-weight FLOAT [0.0001]  
+                              Fitness weight of how short the printed expression is

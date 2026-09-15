@@ -44,6 +44,9 @@ int main(int argc, char** argv) {
 
     runCmd->add_option("--epochs", run.config.epochs, "Epochs to evolve")
         ->capture_default_str();
+    runCmd->add_option("--patience", run.config.patience,
+            "Stop when the best rank has not improved for this many epochs (0 = never)")
+        ->capture_default_str();
     runCmd->add_option("--seed", run.config.seed, "Random seed (0 = nondeterministic)")
         ->capture_default_str();
     runCmd->add_option("--max-population", run.config.genetizer.maxPopulation, "World size")
@@ -60,6 +63,15 @@ int main(int argc, char** argv) {
     runCmd->add_option("--scalar-range", run.config.mutation.scalarRange,
             "Random constants are drawn from [-range, range]")
         ->capture_default_str();
+    runCmd->add_option("--accuracy-weight", run.config.fitness.accuracyWeight,
+            "Fitness weight of how well the expression fits the data")
+        ->group("Fitness")->capture_default_str();
+    runCmd->add_option("--complexity-weight", run.config.fitness.complexityWeight,
+            "Fitness weight of how few RPN units the expression uses")
+        ->group("Fitness")->capture_default_str();
+    runCmd->add_option("--length-weight", run.config.fitness.lengthWeight,
+            "Fitness weight of how short the printed expression is")
+        ->group("Fitness")->capture_default_str();
     runCmd->add_option("--expression", run.config.initialExpressions,
             "Initial expression, repeatable (replaces the config list)");
     runCmd->add_option("--random-count", run.config.randomCount,
@@ -69,7 +81,7 @@ int main(int argc, char** argv) {
             "Max tree depth of the random initial organisms")
         ->capture_default_str();
     runCmd->add_option("--print-top", run.config.printTop,
-            "World rows to print (0 = all)")
+            "Distinct expressions to print (0 = all)")
         ->capture_default_str();
     runCmd->add_option("--print-every", run.config.printEvery,
             "Print the world every N epochs (0 = only start and final)")

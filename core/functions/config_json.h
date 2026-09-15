@@ -16,7 +16,10 @@ namespace Genetizer {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MutationOptions, operators, scalarRange);
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
-    FunctionsConfig, genetizer, mutation, initialExpressions,
-    randomCount, randomDepth, epochs, printTop, printEvery, seed);
+    FitnessConfig, accuracyWeight, complexityWeight, lengthWeight);
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+    FunctionsConfig, genetizer, mutation, fitness, initialExpressions,
+    randomCount, randomDepth, epochs, patience, printTop, printEvery, seed);
 
 }  // namespace Genetizer

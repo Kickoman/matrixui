@@ -60,6 +60,56 @@ The starting population comes from `initialExpressions` (or repeated
 `--expression`) plus `randomCount` random trees. An expression that does not
 parse fails the run and is named in the error.
 
+**Seeded expressions are the only source of exact constants.** Random constants
+come from a `uniform_real_distribution` and mutation nudges them by a normal
+step, so a constant that is exactly `2` has probability zero of ever appearing
+on its own. `(x*x+x)/2` is therefore reachable only if something in the gene
+pool already carries an integer — which is what `--expression "x/2"`,
+`--expression "x+1"` and friends are for. Without them the search finds the
+right shape with drifted constants, e.g. `(1.1827+x)*x/2.0253`.
+
+## Fitness
+
+Three terms, blended by weights that are normalized by their sum, so only their
+ratio matters:
+
+| Term | Meaning |
+|---|---|
+| accuracy | `1 / (1 + mean error)`, the error of each point divided by `max(1, mean(abs(expected)))` |
+| complexity | `1 / (1 + rpn units / 50)` |
+| length | `1 / (1 + printed characters / 50)` |
+
+**The accuracy term is normalized by both the point count and the magnitude of
+the data**, so the same problem measured in units and in thousands ranks
+identically, and adding points does not shrink the accuracy term. Without that
+normalization the summed error on a dataset reaching 190 was ~1140 for a
+trivial expression, the accuracy term collapsed to 0.0009 against complexity's
+0.41, and the fitness degenerated into "shortest expression wins" — the
+population converged onto `x` and no partial solution could ever get credit.
+
+The weights are tuned around that normalization, which is why
+`complexityWeight` is 0.2 rather than something closer to the accuracy weight;
+see the comment on `FitnessConfig` in
+[`core/functions/applier.h`](../../core/functions/applier.h). A point that
+evaluates to inf or nan costs 100 in the same normalized units.
+
+## World output
+
+Identical expressions collapse into one row with a `Copies` count, and a
+`unique K / N` line reports how many distinct expressions the whole world holds
+— a converged population is mostly clones, so the uncollapsed top rows were N
+copies of one string. `--print-top` counts **distinct** expressions, and `Birth`
+is the earliest birth in the clone group (clones tie on rank and the sort is not
+stable, so the first one encountered is not reproducible).
+
+## Early stopping
+
+`--patience` stops the run when the best rank has not improved for that many
+consecutive epochs; `0` disables it and every epoch runs. The naming follows
+`MatrixGui_headless train`, with one deliberate difference: the classifier
+requires an improvement of at least 0.001, while ranks here improve by much
+less than that late in a run, so any improvement at all resets the counter.
+
 ## Order inside the body
 
 `RunRun` is short but its order is load-bearing, and the pieces are not
@@ -72,6 +122,11 @@ interchangeable:
    draws from is built by `addExpected`; seeding first throws out of
    `std::vector::at`.
 3. **`setConfig` runs before `runEpoch`.** It sizes the tournament buffer.
+4. **`setMutationOptions`, `setFitnessOptions` and every `addExpected` run
+   before the first `addOrganism`,** because adding an organism ranks it
+   immediately — and because `addExpected` and `setFitnessOptions` clear the
+   rank cache, every rank taken before them being measured against different
+   data or different weights.
 
 ## Seeds
 

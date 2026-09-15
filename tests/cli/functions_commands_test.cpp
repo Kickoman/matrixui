@@ -93,9 +93,10 @@ TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     const auto path = dir.write("config.json", R"json({
         "genetizer": {"maxPopulation": 128, "tournamentSize": 5, "populationDecreaseFactor": 0.8},
         "mutation": {"operators": "+-", "scalarRange": 2.5},
+        "fitness": {"accuracyWeight": 2.0, "complexityWeight": 0.5, "lengthWeight": 0.001},
         "initialExpressions": ["x", "sin(x)"],
         "randomCount": 16, "randomDepth": 2,
-        "epochs": 7, "printTop": 4, "printEvery": 0, "seed": 99
+        "epochs": 7, "patience": 3, "printTop": 4, "printEvery": 0, "seed": 99
     })json");
 
     Genetizer::FunctionsConfig config;
@@ -105,9 +106,12 @@ TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     CHECK(config.genetizer.tournamentSize == 5);
     CHECK(config.mutation.operators == "+-");
     CHECK(config.mutation.scalarRange == 2.5);
+    CHECK(config.fitness.accuracyWeight == 2.0);
+    CHECK(config.fitness.complexityWeight == 0.5);
     REQUIRE(config.initialExpressions.size() == 2);
     CHECK(config.initialExpressions[1] == "sin(x)");
     CHECK(config.epochs == 7);
+    CHECK(config.patience == 3);
     CHECK(config.seed == 99);
 }
 
@@ -181,7 +185,12 @@ TEST_CASE("Run evolves deterministically under a fixed seed") {
     CHECK(err1.str().empty());
     CHECK(out1.str().find("Start world:") != std::string::npos);
     CHECK(out1.str().find("Expression") != std::string::npos);  // table header
-    CHECK(out1.str().find("Epoch 2:") != std::string::npos);
+    CHECK(out1.str().find("Copies") != std::string::npos);
+    CHECK(out1.str().find("unique ") != std::string::npos);
+    CHECK(out1.str().find("Epoch 1:") != std::string::npos);
+    // The last epoch is printed by the final block, not the periodic one.
+    CHECK(out1.str().find("Epoch 2:") == std::string::npos);
+    CHECK(out1.str().find("Final world (epoch 2):") != std::string::npos);
     CHECK(out1.str().find("Best: ") != std::string::npos);
 
     std::ostringstream out2, err2;
@@ -204,4 +213,56 @@ TEST_CASE("Run writes the effective config when asked") {
     REQUIRE(CliLib::LoadJsonConfig(loadErr, options.saveConfigPath, reloaded, "functions"));
     CHECK(reloaded.seed == 42);
     CHECK(reloaded.genetizer.maxPopulation == 64);
+    CHECK(reloaded.patience == options.config.patience);
+    CHECK(reloaded.fitness.accuracyWeight == options.config.fitness.accuracyWeight);
+}
+
+TEST_CASE("Run stops early when the best rank stagnates") {
+    Tests::TempDir dir;
+    FunctionsCli::RunOptions options;
+    options.dataPath = dir.write("data.csv", "x,expected\n1,2\n2,4\n3,6\n4,8\n");
+    options.config = SmallConfig();
+    options.config.epochs = 50;
+    options.config.patience = 1;
+    options.config.printEvery = 0;
+
+    std::ostringstream out, err;
+    REQUIRE(FunctionsCli::Run(out, err, options) == FunctionsCli::kSuccess);
+    CHECK(out.str().find("Stopped early: no improvement for 1 epochs (patience 1)")
+          != std::string::npos);
+    CHECK(out.str().find("Epoch 50:") == std::string::npos);
+    CHECK(out.str().find("Final world (epoch 50)") == std::string::npos);
+}
+
+TEST_CASE("Run uses every epoch when patience is disabled") {
+    Tests::TempDir dir;
+    FunctionsCli::RunOptions options;
+    options.dataPath = dir.write("data.csv", "x,expected\n1,2\n2,4\n3,6\n4,8\n");
+    options.config = SmallConfig();
+    options.config.epochs = 3;
+    options.config.patience = 0;
+    options.config.printEvery = 0;
+
+    std::ostringstream out, err;
+    REQUIRE(FunctionsCli::Run(out, err, options) == FunctionsCli::kSuccess);
+    CHECK(out.str().find("Stopped early") == std::string::npos);
+    CHECK(out.str().find("Final world (epoch 3):") != std::string::npos);
+}
+
+TEST_CASE("Run rejects unusable fitness weights") {
+    Tests::TempDir dir;
+    FunctionsCli::RunOptions options;
+    options.dataPath = dir.write("data.csv", "x,expected\n1,2\n2,4\n");
+    options.config = SmallConfig();
+
+    SUBCASE("negative") {
+        options.config.fitness.complexityWeight = -1;
+    }
+    SUBCASE("all zero") {
+        options.config.fitness = {0, 0, 0};
+    }
+
+    std::ostringstream out, err;
+    CHECK(FunctionsCli::Run(out, err, options) == FunctionsCli::kFailure);
+    CHECK(err.str().find("fitness weight") != std::string::npos);
 }

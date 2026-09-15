@@ -1,11 +1,13 @@
 Start world:
-Birth | Expression |   Rank
-===========================
-    0 |        x+x | 0.9764
-    0 |          x | 0.4450
-Final world:
-Birth | Expression |   Rank
-===========================
-    0 |        x+x | 0.9764
-    1 |        x+x | 0.9764
-Best: x+x (rank 0.976413)
+unique 16 / 16
+Birth | Expression |   Rank | Copies
+====================================
+    0 |        x+x | 0.9904 |      1
+    0 |          x | 0.7199 |      1
+Final world (epoch 1):
+unique 57 / 64
+Birth | Expression |   Rank | Copies
+====================================
+    0 |        x+x | 0.9904 |      3
+    1 |   x*2.2901 | 0.8852 |      1
+Best: x+x (rank 0.990402)

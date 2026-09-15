@@ -45,6 +45,12 @@ struct MutationConfig {
     TScalar scalarRange = 5.;
 };
 
+struct FitnessConfig {
+    double accuracyWeight = 0.98;
+    double complexityWeight = 0.2;
+    double lengthWeight = 0.0001;
+};
+
 using FunctionGenetizer = genetyka::Genetizer<OrganismInfo, double>;
 
 class FunctionGenetizerApplier {
@@ -55,6 +61,7 @@ public:
     void addExpected(std::vector<Variable>&& variables, double result);
 
     void setMutationOptions(std::vector<char> operators, TScalar scalarRange);
+    void setFitnessOptions(const FitnessConfig& fitness);
 
     OrganismInfo makeRandomOrganism(std::size_t maxDepth, bool full) const;
     void seedRandom(FunctionGenetizer& genetizer, std::size_t count, std::size_t maxDepth = 4) const;
@@ -77,9 +84,14 @@ private:
     void mutateFunction(OrganismInfo& organism);
 
     MutationConfig mutationConfig;
+    FitnessConfig fitnessConfig;
     std::unordered_set<std::string> knownVariables;
     VariableHolder vars;
     std::vector<Entry> expectedEntries;
+
+    TScalar expectedMagnitudeSum = 0;
+    TScalar errorScale = 1.;
+
     cache::LRUCache<std::string, double> rankCache{};
 };
 

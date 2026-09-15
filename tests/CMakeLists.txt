@@ -17,6 +17,8 @@ add_executable(MatrixGui_tests
     words/inspect_test.cpp
     words/queries_test.cpp
 
+    functions/applier_test.cpp
+
     lib/file_stream_test.cpp
     lib/mapped_file_test.cpp
     lib/stream_format_test.cpp

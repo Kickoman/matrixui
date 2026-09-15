@@ -36,6 +36,13 @@ void ValidateConfig(const Genetizer::FunctionsConfig& config) {
         throw std::runtime_error(
             "config: nothing to seed -- need randomCount > 0 or initialExpressions");
     }
+    const auto& fitness = config.fitness;
+    if (fitness.accuracyWeight < 0 || fitness.complexityWeight < 0 || fitness.lengthWeight < 0) {
+        throw std::runtime_error("config: fitness weights must not be negative");
+    }
+    if (fitness.accuracyWeight + fitness.complexityWeight + fitness.lengthWeight <= 0) {
+        throw std::runtime_error("config: at least one fitness weight must be positive");
+    }
 }
 
 void SaveConfig(const std::string& path, const Genetizer::FunctionsConfig& config) {
@@ -62,6 +69,7 @@ void RunRun(std::ostream& out, const RunOptions& options) {
     applier.setMutationOptions(
         {config.mutation.operators.begin(), config.mutation.operators.end()},
         config.mutation.scalarRange);
+    applier.setFitnessOptions(config.fitness);
     for (auto& entry : entries) {
         applier.addExpected(std::move(entry.variables), entry.expectedResult);
     }
@@ -97,24 +105,41 @@ void RunRun(std::ostream& out, const RunOptions& options) {
         << Genetizer::FunctionGenetizerApplier::PrintWorld(genetizer.getWorld(), config.printTop)
         << '\n';
 
-    bool printed = false;
+    double bestRank = genetizer.getWorld().front().rank;
+    std::size_t stagnateEpochs = 0;
+    std::size_t lastEpoch = 0;
     for (std::size_t epoch = 1; epoch <= config.epochs; ++epoch) {
         genetizer.runEpoch();
-        printed = config.printEvery != 0 && epoch % config.printEvery == 0;
-        if (printed) {
+        lastEpoch = epoch;
+
+        const auto epochBest = genetizer.getWorld().front().rank;
+        bool exhausted = false;
+        if (epochBest > bestRank) {
+            bestRank = epochBest;
+            stagnateEpochs = 0;
+        } else {
+            exhausted = config.patience != 0 && ++stagnateEpochs >= config.patience;
+        }
+
+        const bool isLastEpoch = exhausted || epoch == config.epochs;
+        if (!isLastEpoch && config.printEvery != 0 && epoch % config.printEvery == 0) {
             out << "Epoch " << epoch << ":\n"
                 << Genetizer::FunctionGenetizerApplier::PrintWorld(
                        genetizer.getWorld(), config.printTop)
                 << '\n';
         }
+
+        if (exhausted) {
+            out << "Stopped early: no improvement for " << stagnateEpochs
+                << " epochs (patience " << config.patience << ")\n";
+            break;
+        }
     }
 
     const auto& world = genetizer.getWorld();
-    if (!printed) {
-        out << "Final world:\n"
-            << Genetizer::FunctionGenetizerApplier::PrintWorld(world, config.printTop) << '\n';
-    }
-    out << "Best: " << world.front().organism.expression.toString()
+    out << "Final world (epoch " << lastEpoch << "):\n"
+        << Genetizer::FunctionGenetizerApplier::PrintWorld(world, config.printTop) << '\n';
+    out << "Best: " << world.front().organism.getPresentation()
         << " (rank " << world.front().rank << ")\n";
 }
 
