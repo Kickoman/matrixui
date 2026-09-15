@@ -115,7 +115,7 @@ drives it the same way:
 ```cpp
 Words::Trainer trainer;
 trainer.setVocabulary(vocabulary);          // shared_ptr<const Vocabulary>
-trainer.setCorpus(corpus);                  // shared_ptr<const TCorpus>
+trainer.setCorpus(corpus);                  // shared_ptr<const Words::Corpus>
 trainer.setModelConfig(config.model);
 trainer.setSamplingConfig(config.sampling);
 trainer.setProgressCallback([](const Words::TrainProgress& p) { /* chart */ });
@@ -190,6 +190,7 @@ and prints its statistics.
 | `--input-file <path>` | *required* | Raw text file |
 | `--output-file <path>` | *required* | Where to write the vocabulary |
 | `--min-count <n>` | `5` | Drop words occurring fewer times than this |
+| `--prune-threshold <n>` | `20000000` | Prune rare words whenever distinct words exceed this; `0` disables. Approximate, as in the original word2vec: the output reports how many prune runs fired and the final reduce counter |
 
 `loadvoc` takes only `--input-file`, pointing at a built `.voc`.
 
@@ -227,6 +228,7 @@ vocabulary it was built against must always be used together.
 | `--sample <x>` | `1e-4` | Subsampling threshold; `0` disables subsampling |
 | `--lr <x>` | `0.025` | Initial learning rate |
 | `--threads <n>` | `0` | Worker threads; `0` uses the hardware concurrency |
+| `--corpus-storage <mode>` | `auto` | How the corpus is held: `load` reads it into memory, `mmap` maps the file read-only, `auto` loads only when the file is small (< 4 GB and < ¼ of `MemAvailable`). The chosen mode is printed at startup |
 
 </details>
 

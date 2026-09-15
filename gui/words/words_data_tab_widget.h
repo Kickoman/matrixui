@@ -6,6 +6,7 @@
 
 class TimeChart;
 class WordsTrainConfigWidget;
+class QComboBox;
 class QLabel;
 class QProgressBar;
 class QPushButton;
@@ -38,7 +39,10 @@ private:
     QLabel* corpusLabel = nullptr;
     QLabel* embeddingsLabel = nullptr;
     QSpinBox* minCountSpin = nullptr;
+    QComboBox* corpusStorageCombo = nullptr;
     WordsTrainConfigWidget* configWidget = nullptr;
+
+    Words::CorpusStorage selectedCorpusStorage() const;
 
     QPushButton* toggleTrainingButton = nullptr;
     QPushButton* loadEmbeddingsButton = nullptr;

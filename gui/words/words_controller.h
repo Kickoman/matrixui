@@ -53,6 +53,7 @@ public:
         QString similarityPath;
 
         std::size_t minCount = 5;
+        Words::CorpusStorage corpusStorage = Words::CorpusStorage::Auto;
         Words::WordsConfig config;
         std::size_t scoreColumn = 2;
         std::size_t restrictTo = 30000;
@@ -73,6 +74,7 @@ public:
     // loop through setValue -> valueChanged -> infoUpdated. See docs/gui.md.
     void setConfig(const Words::WordsConfig& value);
     void setMinCount(std::size_t value);
+    void setCorpusStorage(Words::CorpusStorage value);
     void setEvaluateParams(std::size_t scoreColumn, std::size_t restrictTo, std::size_t threads);
 
 public slots:
@@ -131,6 +133,7 @@ private:
     QString similarityPath;
 
     std::size_t minCount = 5;
+    Words::CorpusStorage corpusStorage = Words::CorpusStorage::Auto;
     Words::WordsConfig config;
     std::size_t scoreColumn = 2;
     std::size_t restrictTo = 30000;
@@ -140,7 +143,7 @@ private:
     Words::Trainer trainer;
 
     std::shared_ptr<const Words::Vocabulary> vocabulary;
-    std::shared_ptr<const Words::TCorpus> corpus;
+    std::shared_ptr<const Words::Corpus> corpus;
     std::shared_ptr<const Words::Embeddings> embeddings;   // raw: the only thing worth saving
     std::shared_ptr<const Words::EmbeddingIndex> index;    // normalized: queries only
 };

@@ -111,7 +111,7 @@ TEST_CASE("GeneratePairs honours the [from, to) range") {
     const Subsampler subsampler(vocabulary, 0.);  // disabled: keep every token
     const WindowSampler windowSampler(2);
 
-    const auto corpus = DistinctChunk(100);
+    const Corpus corpus(DistinctChunk(100));
 
     XorShift rng(3);
     std::set<TWordId> centers;

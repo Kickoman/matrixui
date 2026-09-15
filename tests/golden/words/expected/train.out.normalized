@@ -1,3 +1,4 @@
+corpus storage: loaded
 vocab 1400, corpus 400000, model 0 MB
 dim 32, negatives 5, window 5, epochs 1, threads 1
 estimated pairs: 931904

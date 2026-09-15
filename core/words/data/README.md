@@ -14,7 +14,7 @@ the word list, `EncodeCorpus` to turn the same dump into ids, and finally
 | `types.h` | `TWordId`, `Pair` |
 | `inspect.h/.cpp` | `CorpusStatistics`, `InspectDump` — statistics over a raw dump |
 | `vocabulary.h/.cpp` | `class Vocabulary` — the word ↔ id table with counts |
-| `corpus.h/.cpp` | `TCorpus`, `EncodeCorpus`, `SaveCorpus`, `LoadCorpus` |
+| `corpus.h/.cpp` | `class Corpus`, `TCorpus`, `EncodeCorpus`, `EncodeCorpusToStream`, `SaveCorpus`, `LoadCorpus` |
 | `embeddings.h/.cpp` | `TFloat`, `class Embeddings`, `dot`, `addScaled` |
 
 ## `types.h`
@@ -56,7 +56,9 @@ exactly, which is what makes the numbers predictive rather than indicative.
 ## `vocabulary.h` / `vocabulary.cpp`
 
 ```cpp
-static Vocabulary Build(std::istream& dump, std::size_t minCount = 5);
+static Vocabulary Build(std::istream& dump, std::size_t minCount = 5,
+                        std::size_t pruneThreshold = DefaultPruneThreshold,
+                        VocabularyBuildStats* stats = nullptr);
 static Vocabulary Load(std::istream& in);
 static void       Save(std::ostream& out, const Vocabulary& vocabulary);
 
@@ -88,11 +90,23 @@ iteration order, and every embedding trained from the corpus would shift with it
 of the dump the vocabulary actually covers. `getFrequency` divides by
 `keptTokens`, so frequencies over the surviving vocabulary sum to 1.
 
+`Build` caps its working set the way the original word2vec does: whenever the
+frequency table exceeds `pruneThreshold` distinct words (default 20 million,
+0 disables), every word whose count is at most a growing reduce counter is
+evicted and the counter is bumped. The method is deliberately approximate — a
+word rare early in the dump loses its partial count and starts over if it
+reappears — which is why `VocabularyBuildStats` (`pruneRuns`,
+`finalMinReduce`) exists: the caller can tell the user the counts are no longer
+exact. On dumps whose distinct-word count stays under the threshold (text8,
+fil9) the result is bit-identical to a build without pruning.
+
 **Traps:**
 
 - `Build` reserves `1 << 20` hash buckets up front so a wiki-scale dump (~1M
   distinct words) never rehashes mid-stream. That costs a flat ~10 MB even on a
   tiny corpus. It is a deliberate trade, not an oversight.
+- Pruning erases map nodes but `std::unordered_map` never shrinks its bucket
+  array, so peak memory is set by `pruneThreshold`, not by the dump.
 - `Load` opens in binary mode to match `Save`. Text mode mangles the payload on
   Windows.
 - A vocabulary larger than `TWordId` can address, or a file that declares zero
@@ -118,14 +132,54 @@ size × {
 ```cpp
 using TCorpus = std::vector<TWordId>;
 
-TCorpus EncodeCorpus(std::istream& dump, const Vocabulary& vocabulary);
-void    SaveCorpus(std::ostream& out, const TCorpus& corpus);
-TCorpus LoadCorpus(std::istream& in);
+TCorpus       EncodeCorpus(std::istream& dump, const Vocabulary& vocabulary);
+std::uint64_t EncodeCorpusToStream(std::istream& dump, const Vocabulary& vocabulary,
+                                   std::ostream& out, std::size_t bufferTokens = 1 << 18);
+void          SaveCorpus(std::ostream& out, const TCorpus& corpus);
+TCorpus       LoadCorpus(std::istream& in);
+
+enum class CorpusStorage { Auto, Mapped, Loaded };
+
+class Corpus {
+    static Corpus Open(const std::filesystem::path& path,
+                       CorpusStorage storage = CorpusStorage::Auto);
+    explicit Corpus(TCorpus tokens);
+    std::size_t size() const;  TWordId operator[](std::size_t) const;
+    const TWordId* data() const;  const TWordId* begin() const;  const TWordId* end() const;
+    CorpusStorage getStorage() const;
+};
 ```
 
 The dump reduced to a flat stream of ids. Words absent from the vocabulary are
 dropped, not replaced with a sentinel, so the corpus is shorter than the dump by
 exactly the tokens `minCount` removed.
+
+`Corpus` is the read-side view training runs over — one non-template type so
+`GeneratePairs`, `BuildProbeSet` and the trainer stay non-generic. It owns its
+tokens in one of two ways: a `std::vector` (`Loaded`) or a read-only POSIX
+`mmap` of the `.cor` file (`Mapped`, via `core/lib/mapped_file.h`). Either way
+the accessors read through one base pointer, so the hot loop costs the same as
+indexing a vector — there is no per-access branch on the mode.
+
+`Open` resolves `Auto` by reading `MemAvailable` from `/proc/meminfo`: a file
+under 4 GB **and** under a quarter of available memory is loaded, anything else
+is mapped. The same test picks the `madvise` hint for mapped corpora —
+`MADV_WILLNEED` when the file fits in the page cache (pages survive into the
+next epoch), `MADV_SEQUENTIAL` when it cannot (aggressive readahead, drop
+behind). Advising `SEQUENTIAL` on a file that fits would evict pages the next
+epoch is about to reread, which is why the hint follows the fit test rather
+than the mode. `Open` also cross-checks the declared token count against the
+file's actual size, so a truncated `.cor` is rejected up front instead of
+training on a zero-padded tail. On platforms without `mmap` (and on big-endian
+hosts, where the raw bytes would bypass the byte-swapping reader) a `Mapped`
+request quietly falls back to `Loaded`; `getStorage()` reports what actually
+happened, and the CLI prints it.
+
+`EncodeCorpusToStream` is the constant-memory sibling of `EncodeCorpus`: it
+writes the header with a zero count, streams ids through a `bufferTokens`-sized
+buffer, then seeks back to offset 8 and patches in the real count. `buildcor`
+uses it, so encoding a dump never allocates in proportion to its length;
+`EncodeCorpus` remains for callers that want the ids in memory anyway.
 
 **The ids belong to one specific vocabulary.** A `.cor` and the `.voc` it was
 built against must always travel together; nothing in the format detects a

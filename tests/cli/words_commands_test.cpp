@@ -3,6 +3,7 @@
 #include "cli/words/commands.h"
 #include "cli/words/options.h"
 
+#include "tests/support/fixtures.h"
 #include "tests/support/temp_dir.h"
 
 #include <sstream>
@@ -38,6 +39,61 @@ TEST_CASE("BuildVocabulary reports an unwritable output path") {
     std::ostringstream out, err;
     CHECK(WordsCli::BuildVocabulary(out, err, options) == WordsCli::kFailure);
     CHECK(err.str().rfind("error: ", 0) == 0);
+}
+
+TEST_CASE("BuildVocabulary reports pruning when it happens") {
+    Tests::TempDir dir;
+    WordsCli::BuildVocabularyOptions options;
+    options.input = dir.write("dump.txt", "a a a a a a a a a a w1 w2 w3 w4 w5 w6\n");
+    options.output = dir.file("built.voc");
+    options.minCount = 1;
+    options.pruneThreshold = 4;
+
+    std::ostringstream out, err;
+    CHECK(WordsCli::BuildVocabulary(out, err, options) == WordsCli::kSuccess);
+    CHECK(out.str().find("Pruned 1 times (final min-reduce 1)") != std::string::npos);
+}
+
+TEST_CASE("Train honours the corpus storage option") {
+    Tests::TempDir dir;
+    const auto text = dir.write("dump.txt", Tests::ToyCorpusText());
+
+    WordsCli::BuildVocabularyOptions buildVocabulary;
+    buildVocabulary.input = text;
+    buildVocabulary.output = dir.file("built.voc");
+    buildVocabulary.minCount = 1;
+
+    WordsCli::BuildCorpusOptions buildCorpus;
+    buildCorpus.input = text;
+    buildCorpus.output = dir.file("built.cor");
+    buildCorpus.vocabulary = buildVocabulary.output;
+
+    std::ostringstream out, err;
+    REQUIRE(WordsCli::BuildVocabulary(out, err, buildVocabulary) == WordsCli::kSuccess);
+    REQUIRE(WordsCli::BuildCorpus(out, err, buildCorpus) == WordsCli::kSuccess);
+
+    WordsCli::TrainOptions train;
+    train.vocabulary = buildVocabulary.output;
+    train.corpus = buildCorpus.output;
+    train.output = dir.file("emb.bin");
+    train.corpusStorage = "mmap";
+    train.config.model.dim = 4;
+    train.config.train.epochs = 1;
+    train.config.train.threads = 1;
+
+    std::ostringstream trainOut, trainErr;
+    CHECK(WordsCli::Train(trainOut, trainErr, train) == WordsCli::kSuccess);
+    CHECK(trainErr.str().empty());
+    CHECK(trainOut.str().find("corpus storage: mapped") != std::string::npos);
+}
+
+TEST_CASE("Train rejects an unknown corpus storage name") {
+    WordsCli::TrainOptions train;
+    train.corpusStorage = "bogus";
+
+    std::ostringstream out, err;
+    CHECK(WordsCli::Train(out, err, train) == WordsCli::kFailure);
+    CHECK(err.str().find("error: unknown corpus storage") != std::string::npos);
 }
 
 TEST_CASE("Inspect summarises a small text file") {

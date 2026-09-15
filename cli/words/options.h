@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/words/config.h"
+#include "core/words/data/vocabulary.h"
 
 #include <cstddef>
 #include <filesystem>
@@ -12,6 +13,7 @@ struct BuildVocabularyOptions {
     std::filesystem::path input;
     std::filesystem::path output;
     std::size_t minCount{5};
+    std::size_t pruneThreshold{Words::Vocabulary::DefaultPruneThreshold};
 };
 
 struct InspectOptions {
@@ -37,6 +39,7 @@ struct TrainOptions {
     std::filesystem::path vocabulary;
     std::filesystem::path corpus;
     std::filesystem::path output;
+    std::string corpusStorage{"auto"};
     Words::WordsConfig config;
 };
 

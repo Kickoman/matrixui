@@ -196,7 +196,7 @@ plus `stopped` (true when `requestStop()` cut the run short) and `history`, one
 
 ```cpp
 void setVocabulary(std::shared_ptr<const Vocabulary>);
-void setCorpus(std::shared_ptr<const TCorpus>);
+void setCorpus(std::shared_ptr<const Corpus>);
 void setModelConfig(const ModelConfig&);
 void setSamplingConfig(const SamplingConfig&);
 void setProgressCallback(std::function<void(const TrainProgress&)>);

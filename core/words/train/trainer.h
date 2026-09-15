@@ -27,7 +27,7 @@ struct Probe {
 };
 
 std::vector<Probe> BuildProbeSet(
-    const TCorpus& corpus,
+    const Corpus& corpus,
     const Subsampler& subsampler,
     const WindowSampler& windowSampler,
     const NegativeSampler& negativeSampler,
@@ -78,7 +78,7 @@ public:
     Trainer& operator=(const Trainer&) = delete;
 
     void setVocabulary(std::shared_ptr<const Vocabulary> vocabulary);
-    void setCorpus(std::shared_ptr<const TCorpus> corpus);
+    void setCorpus(std::shared_ptr<const Corpus> corpus);
     void setModelConfig(const ModelConfig& config);
     void setSamplingConfig(const SamplingConfig& config);
 
@@ -98,7 +98,7 @@ private:
     std::ostream& log() const;
 
     std::shared_ptr<const Vocabulary> vocabulary;
-    std::shared_ptr<const TCorpus> corpus;
+    std::shared_ptr<const Corpus> corpus;
     ModelConfig modelConfig;
     SamplingConfig samplingConfig;
 

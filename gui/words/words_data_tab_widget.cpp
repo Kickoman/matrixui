@@ -4,6 +4,7 @@
 #include "gui/words/words_train_config_widget.h"
 #include "gui_common/time_chart.h"
 
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -31,6 +32,14 @@ WordsDataTabWidget::WordsDataTabWidget(QWidget* parent)
     minCountSpin = new QSpinBox(this);
     minCountSpin->setRange(1, 1000);
     minCountSpin->setValue(5);
+
+    corpusStorageCombo = new QComboBox(this);
+    corpusStorageCombo->addItem("auto", static_cast<int>(Words::CorpusStorage::Auto));
+    corpusStorageCombo->addItem("mmap", static_cast<int>(Words::CorpusStorage::Mapped));
+    corpusStorageCombo->addItem("load", static_cast<int>(Words::CorpusStorage::Loaded));
+    corpusStorageCombo->setToolTip(
+        "How the corpus is held: load reads it into memory, mmap maps the file "
+        "read-only, auto loads only small files");
 
     configWidget = new WordsTrainConfigWidget(this);
 
@@ -74,6 +83,7 @@ WordsDataTabWidget::WordsDataTabWidget(QWidget* parent)
     infoColumn->addWidget(corpusLabel);
     infoColumn->addWidget(embeddingsLabel);
     minCountForm->addRow("Min word count", minCountSpin);
+    minCountForm->addRow("Corpus storage", corpusStorageCombo);
     infoColumn->addLayout(minCountForm);
     infoColumn->setAlignment(Qt::AlignTop);
 
@@ -103,6 +113,8 @@ void WordsDataTabWidget::setController(WordsController* newController)
 
     configWidget->setConfig(controller->getInfo().config);
     minCountSpin->setValue(static_cast<int>(controller->getInfo().minCount));
+    corpusStorageCombo->setCurrentIndex(corpusStorageCombo->findData(
+        static_cast<int>(controller->getInfo().corpusStorage)));
 
     connect(openDumpButton, &QPushButton::clicked, [this] {
         const auto path = QFileDialog::getOpenFileName(
@@ -144,6 +156,7 @@ void WordsDataTabWidget::setController(WordsController* newController)
             return;
         }
         controller->setCorpusPath(path);
+        controller->setCorpusStorage(selectedCorpusStorage());
         controller->buildCorpus();
     });
 
@@ -154,6 +167,7 @@ void WordsDataTabWidget::setController(WordsController* newController)
             return;
         }
         controller->setCorpusPath(path);
+        controller->setCorpusStorage(selectedCorpusStorage());
         controller->loadCorpus();
     });
 
@@ -189,6 +203,11 @@ void WordsDataTabWidget::setController(WordsController* newController)
     });
 }
 
+Words::CorpusStorage WordsDataTabWidget::selectedCorpusStorage() const
+{
+    return static_cast<Words::CorpusStorage>(corpusStorageCombo->currentData().toInt());
+}
+
 void WordsDataTabWidget::updateInfo(const WordsController::Info& info)
 {
     dumpLabel->setText(info.dumpPath.isEmpty() ? "No text dump" : "Dump: " + info.dumpPath);
@@ -214,6 +233,7 @@ void WordsDataTabWidget::updateInfo(const WordsController::Info& info)
     saveEmbeddingsButton->setEnabled(idle && info.hasEmbeddings);
     configWidget->setDisabled(!idle);
     minCountSpin->setDisabled(!idle);
+    corpusStorageCombo->setDisabled(!idle);
 
     toggleTrainingButton->setText(info.training ? "Stop training" : "Start training");
     toggleTrainingButton->setEnabled(

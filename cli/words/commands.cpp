@@ -33,13 +33,26 @@ void PrintVocabularyInfo(std::ostream& out, const Words::Vocabulary& vocabulary)
     }
 }
 
-void PrintCorpusInfo(std::ostream& out, const Words::TCorpus& corpus) {
+void PrintCorpusInfo(std::ostream& out, const Words::Corpus& corpus) {
     out << "Corpus size: " << corpus.size() << std::endl;
     out << "First 10 tokens: ";
     for (std::size_t i = 0; i < std::min<std::size_t>(10, corpus.size()); ++i) {
         out << corpus[i] << " ";
     }
     out << std::endl;
+}
+
+Words::CorpusStorage ParseCorpusStorage(const std::string& name) {
+    if (name == "auto") {
+        return Words::CorpusStorage::Auto;
+    }
+    if (name == "mmap") {
+        return Words::CorpusStorage::Mapped;
+    }
+    if (name == "load") {
+        return Words::CorpusStorage::Loaded;
+    }
+    throw Words::ConfigError("unknown corpus storage -- expected auto, mmap or load: " + name);
 }
 
 Words::Vocabulary ReadVocabulary(const std::filesystem::path& path) {
@@ -64,10 +77,15 @@ void RunInspect(std::ostream& out, const InspectOptions& options) {
 }
 
 void RunBuildVocabulary(std::ostream& out, const BuildVocabularyOptions& options) {
+    Words::VocabularyBuildStats stats;
     const auto vocabulary = Io::ReadFile(options.input, [&](std::istream& in) {
-        return Words::Vocabulary::Build(in, options.minCount);
+        return Words::Vocabulary::Build(in, options.minCount, options.pruneThreshold, &stats);
     });
     PrintVocabularyInfo(out, vocabulary);
+    if (stats.pruneRuns > 0) {
+        out << "Pruned " << stats.pruneRuns << " times (final min-reduce "
+            << stats.finalMinReduce << ")" << std::endl;
+    }
     Io::WriteFile(options.output,
                   [&](std::ostream& file) { Words::Vocabulary::Save(file, vocabulary); },
                   std::ios::binary);
@@ -79,26 +97,31 @@ void RunLoadVocabulary(std::ostream& out, const LoadVocabularyOptions& options) 
 
 void RunBuildCorpus(std::ostream& out, const BuildCorpusOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
-    const auto corpus = Io::ReadFile(options.input, [&](std::istream& in) {
-        return Words::EncodeCorpus(in, vocabulary);
-    });
-    PrintCorpusInfo(out, corpus);
     Io::WriteFile(options.output,
-                  [&](std::ostream& file) { Words::SaveCorpus(file, corpus); },
+                  [&](std::ostream& file) {
+                      Io::ReadFile(options.input, [&](std::istream& in) {
+                          Words::EncodeCorpusToStream(in, vocabulary, file);
+                      });
+                  },
                   std::ios::binary);
+    PrintCorpusInfo(out, Words::Corpus::Open(options.output));
 }
 
 void RunLoadCorpus(std::ostream& out, const LoadCorpusOptions& options) {
-    PrintCorpusInfo(out, Io::ReadFile(options.input,
-                                      [](std::istream& in) { return Words::LoadCorpus(in); },
-                                      std::ios::binary));
+    PrintCorpusInfo(out, Words::Corpus::Open(options.input));
 }
 
 void RunTrain(std::ostream& out, const TrainOptions& options) {
+    const auto requested = ParseCorpusStorage(options.corpusStorage);
     auto vocabulary = std::make_shared<const Words::Vocabulary>(ReadVocabulary(options.vocabulary));
-    auto corpus = std::make_shared<const Words::TCorpus>(
-        Io::ReadFile(options.corpus, [](std::istream& in) { return Words::LoadCorpus(in); },
-                     std::ios::binary));
+    auto corpus = std::make_shared<const Words::Corpus>(
+        Words::Corpus::Open(options.corpus, requested));
+
+    out << "corpus storage: " << Words::CorpusStorageName(corpus->getStorage()) << '\n';
+    if (requested == Words::CorpusStorage::Mapped &&
+        corpus->getStorage() == Words::CorpusStorage::Loaded) {
+        out << "mmap is not supported here -- fell back to loading the corpus\n";
+    }
 
     Words::Trainer trainer;
     trainer.setVocabulary(vocabulary);
