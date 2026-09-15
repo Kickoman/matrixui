@@ -10,10 +10,19 @@
 
 namespace Words {
 
+struct VocabularyBuildStats {
+    std::size_t pruneRuns{0};
+    std::size_t finalMinReduce{0};
+};
+
 class Vocabulary {
 public:
 
-    static Vocabulary Build(std::istream& dump, std::size_t minCount = 5);
+    static constexpr std::size_t DefaultPruneThreshold = 20'000'000;
+
+    static Vocabulary Build(std::istream& dump, std::size_t minCount = 5,
+                            std::size_t pruneThreshold = DefaultPruneThreshold,
+                            VocabularyBuildStats* stats = nullptr);
 
     std::optional<TWordId> getId(const std::string& word) const;
     const std::string& getWord(TWordId id) const { return id2word[id]; }

@@ -32,9 +32,10 @@ run loadvoc   loadvoc  --input-file "$VOC"
 run buildcor  buildcor --input-file "$TEXT" --vocabulary "$VOC" --output-file "$COR"
 run loadcor   loadcor  --input-file "$COR"
 
-# --- training (1 epoch, 1 thread so pair scheduling is deterministic) ---
+# --- training (1 epoch, 1 thread so pair scheduling is deterministic;
+#     explicit storage so the snapshot does not depend on available memory) ---
 run train train --vocabulary "$VOC" --corpus "$COR" --output-file "$EMB" \
-    --dim 32 --epochs 1 --threads 1
+    --dim 32 --epochs 1 --threads 1 --corpus-storage load
 
 # --- query commands ---
 run neighbours-word neighbours --vocabulary "$VOC" --embeddings "$EMB" --word king --count 5

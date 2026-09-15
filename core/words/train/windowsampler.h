@@ -42,7 +42,7 @@ private:
 
 template<typename Fn, typename Predicate>
 void GeneratePairsWhile(
-    const TCorpus& corpus,
+    const Corpus& corpus,
     const Subsampler& subsampler,
     const WindowSampler& windowSampler,
     XorShift& rng,
@@ -76,7 +76,7 @@ void GeneratePairsWhile(
 
 template<typename Fn>
 void GeneratePairs(
-    const TCorpus& corpus,
+    const Corpus& corpus,
     const Subsampler& subsampler,
     const WindowSampler& windowSampler,
     XorShift& rng,

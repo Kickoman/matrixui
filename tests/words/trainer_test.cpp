@@ -11,6 +11,7 @@
 #include "tests/support/capture.h"
 #include "core/words/error.h"
 #include "tests/support/fixtures.h"
+#include "tests/support/temp_dir.h"
 
 #include <chrono>
 #include <cmath>
@@ -33,6 +34,12 @@ struct Pipeline {
         , vocabulary(Tests::VocabularyFromText(text, 1))
         , corpus(Tests::CorpusFromText(text, vocabulary))
     {}
+
+    Corpus openCorpus() const { return Corpus(corpus); }
+
+    std::shared_ptr<const Corpus> shareCorpus() const {
+        return std::make_shared<const Corpus>(TCorpus(corpus));
+    }
 };
 
 }  // namespace
@@ -48,7 +55,7 @@ TEST_CASE("BuildProbeSet returns the requested number of probes") {
     config.negatives = 5;
 
     const auto probes = BuildProbeSet(
-        pipeline.corpus, subsampler, windowSampler, negativeSampler, config, 300, 42);
+        pipeline.openCorpus(), subsampler, windowSampler, negativeSampler, config, 300, 42);
 
     CHECK(probes.size() == 300);
     for (const auto& probe : probes) {
@@ -68,7 +75,7 @@ TEST_CASE("BuildProbeSet is deterministic for a fixed seed") {
     config.dim = 16;
 
     const auto build = [&] {
-        return BuildProbeSet(pipeline.corpus, subsampler, windowSampler,
+        return BuildProbeSet(pipeline.openCorpus(), subsampler, windowSampler,
                              negativeSampler, config, 100, 7);
     };
 
@@ -94,7 +101,7 @@ TEST_CASE("MeanProbeLoss on an untouched model is (negatives + 1) * ln 2") {
     config.negatives = 5;
 
     const auto probes = BuildProbeSet(
-        pipeline.corpus, subsampler, windowSampler, negativeSampler, config, 50, 1);
+        pipeline.openCorpus(), subsampler, windowSampler, negativeSampler, config, 50, 1);
 
     XorShift rng(3);
     const SGNSModel model(pipeline.vocabulary, config, rng);
@@ -148,7 +155,7 @@ TEST_CASE("Trainer reduces the mean probe loss") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setSamplingConfig(samplingConfig);
     trainer.setVerbose(false);
@@ -160,6 +167,43 @@ TEST_CASE("Trainer reduces the mean probe loss") {
     CHECK_FALSE(summary.stopped);
     CHECK(summary.threads == 1);
     CHECK(summary.probeCount == 200);
+}
+
+TEST_CASE("Training is identical on a loaded and a mapped corpus") {
+    const Pipeline pipeline;
+    const Tests::TempDir dir;
+
+    std::ostringstream stream;
+    SaveCorpus(stream, pipeline.corpus);
+    const auto path = dir.write("corpus.cor", stream.str());
+
+    const auto trainOnce = [&](const CorpusStorage storage) {
+        ModelConfig modelConfig;
+        modelConfig.dim = 16;
+
+        SamplingConfig samplingConfig;
+        samplingConfig.negativeTableSize = kTableSize;
+
+        TrainConfig trainConfig;
+        trainConfig.epochs = 1;
+        trainConfig.threads = 1;
+        trainConfig.probePairs = 100;
+
+        Trainer trainer;
+        trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
+        trainer.setCorpus(std::make_shared<const Corpus>(Corpus::Open(path, storage)));
+        trainer.setModelConfig(modelConfig);
+        trainer.setSamplingConfig(samplingConfig);
+        trainer.setVerbose(false);
+        return trainer.train(trainConfig);
+    };
+
+    const auto loaded = trainOnce(CorpusStorage::Loaded);
+    const auto mapped = trainOnce(CorpusStorage::Mapped);
+
+    CHECK(loaded.pairsDone == mapped.pairsDone);
+    CHECK(loaded.initialLoss == mapped.initialLoss);
+    CHECK(loaded.finalLoss == mapped.finalLoss);
 }
 
 TEST_CASE("Trainer routes output to the stream it is given") {
@@ -179,7 +223,7 @@ TEST_CASE("Trainer routes output to the stream it is given") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setSamplingConfig(samplingConfig);
 
@@ -215,7 +259,7 @@ TEST_CASE("setVerbose(false) silences the trainer completely") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setSamplingConfig(samplingConfig);
 
@@ -245,7 +289,7 @@ TEST_CASE("Trainer reports progress through its callback") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setSamplingConfig(samplingConfig);
     trainer.setVerbose(false);
@@ -284,7 +328,7 @@ TEST_CASE("requestStop cuts a run short") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setSamplingConfig(samplingConfig);
     trainer.setVerbose(false);
@@ -321,7 +365,7 @@ TEST_CASE("Trainer rejects an impossible configuration up front") {
 
     Trainer trainer;
     trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
-    trainer.setCorpus(std::make_shared<const TCorpus>(pipeline.corpus));
+    trainer.setCorpus(pipeline.shareCorpus());
     trainer.setModelConfig(modelConfig);
     trainer.setVerbose(false);
 

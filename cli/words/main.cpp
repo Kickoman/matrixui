@@ -29,6 +29,9 @@ int main(int argc, char** argv) {
         ->required();
     buildVocabularyCmd->add_option("--min-count", buildVocabulary.minCount, "Drop words below this count")
         ->capture_default_str();
+    buildVocabularyCmd->add_option("--prune-threshold", buildVocabulary.pruneThreshold,
+                                   "Prune rare words when distinct words exceed this (0 = never)")
+        ->capture_default_str();
     buildVocabularyCmd->callback([&] {
         exitCode = WordsCli::BuildVocabulary(std::cout, std::cerr, buildVocabulary);
     });
@@ -76,6 +79,8 @@ int main(int argc, char** argv) {
     trainCmd->add_option("--sample", train.config.sampling.sample, "Subsampling threshold")->capture_default_str();
     trainCmd->add_option("--lr", train.config.model.initialLearningRate, "Initial learning rate")->capture_default_str();
     trainCmd->add_option("--threads", train.config.train.threads, "Worker threads (0 = auto)")->capture_default_str();
+    trainCmd->add_option("--corpus-storage", train.corpusStorage, "Corpus storage: auto, mmap or load")
+        ->check(CLI::IsMember({"auto", "mmap", "load"}))->capture_default_str();
     trainCmd->callback([&] {
         exitCode = WordsCli::Train(std::cout, std::cerr, train);
     });

@@ -10,15 +10,30 @@
 
 namespace Words {
 
-Vocabulary Vocabulary::Build(std::istream &dump, const std::size_t minCount) {
+Vocabulary Vocabulary::Build(std::istream &dump, const std::size_t minCount,
+                             const std::size_t pruneThreshold, VocabularyBuildStats* stats) {
     std::unordered_map<std::string, std::size_t> frequencies;
     frequencies.reserve(1 << 20);
 
     std::size_t rawTokens = 0;
+    std::size_t minReduce = 1;
+    std::size_t pruneRuns = 0;
     std::string word;
     while (dump >> word) {
         ++frequencies[word];
         ++rawTokens;
+        if (pruneThreshold > 0 && frequencies.size() > pruneThreshold) {
+            std::erase_if(frequencies, [minReduce](const auto& entry) {
+                return entry.second <= minReduce;
+            });
+            ++minReduce;
+            ++pruneRuns;
+        }
+    }
+
+    if (stats != nullptr) {
+        stats->pruneRuns = pruneRuns;
+        stats->finalMinReduce = pruneRuns > 0 ? minReduce - 1 : 0;
     }
 
     struct WordInfo {

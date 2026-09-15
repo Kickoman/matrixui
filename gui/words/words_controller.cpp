@@ -15,6 +15,21 @@
 #include <iostream>
 #include <utility>
 
+namespace {
+
+Words::CorpusStorage CorpusStorageFromName(const QString& name)
+{
+    if (name == "mapped") {
+        return Words::CorpusStorage::Mapped;
+    }
+    if (name == "loaded") {
+        return Words::CorpusStorage::Loaded;
+    }
+    return Words::CorpusStorage::Auto;
+}
+
+}  // namespace
+
 WordsController::WordsController(QObject* parent)
     : ModeController(parent)
     , settings("words")
@@ -66,6 +81,7 @@ WordsController::Info WordsController::getInfo() const
     info.similarityPath = similarityPath;
 
     info.minCount = minCount;
+    info.corpusStorage = corpusStorage;
     info.config = config;
     info.scoreColumn = scoreColumn;
     info.restrictTo = restrictTo;
@@ -106,6 +122,7 @@ void WordsController::loadSettings()
     similarityPath = settings.getValue("similarity_path", {}).toString();
 
     minCount = settings.getValue("min_count", 5).toULongLong();
+    corpusStorage = CorpusStorageFromName(settings.getValue("corpus_storage", "auto").toString());
     scoreColumn = settings.getValue("score_column", 2).toULongLong();
     restrictTo = settings.getValue("restrict_to", 30000).toULongLong();
     evaluateThreads = settings.getValue("evaluate_threads", 0).toULongLong();
@@ -133,6 +150,9 @@ void WordsController::saveSettings()
     settings.setValue("similarity_path", similarityPath);
 
     settings.setValue("min_count", static_cast<quint64>(minCount));
+    settings.setValue("corpus_storage",
+                      QString::fromUtf8(Words::CorpusStorageName(corpusStorage).data(),
+                                        Words::CorpusStorageName(corpusStorage).size()));
     settings.setValue("score_column", static_cast<quint64>(scoreColumn));
     settings.setValue("restrict_to", static_cast<quint64>(restrictTo));
     settings.setValue("evaluate_threads", static_cast<quint64>(evaluateThreads));
@@ -143,6 +163,8 @@ void WordsController::saveSettings()
 
 void WordsController::setConfig(const Words::WordsConfig& value) { config = value; }
 void WordsController::setMinCount(const std::size_t value) { minCount = value; }
+
+void WordsController::setCorpusStorage(const Words::CorpusStorage value) { corpusStorage = value; }
 
 void WordsController::setEvaluateParams(
     const std::size_t newScoreColumn, const std::size_t newRestrictTo, const std::size_t threads)
@@ -282,15 +304,16 @@ void WordsController::buildCorpus()
     const auto dump = dumpPath.toStdString();
     const auto target = corpusPath.toStdString();
     auto vocab = vocabulary;
-    runTask("Building corpus", false, [this, dump, target, vocab] {
-        auto built = std::make_shared<const Words::TCorpus>(
-            Io::ReadFile(dump, [&vocab](std::istream& in) {
-                return Words::EncodeCorpus(in, *vocab);
-            }));
-        Io::WriteFile(target, [&built](std::ostream& file) {
-            Words::SaveCorpus(file, *built);
+    const auto storage = corpusStorage;
+    runTask("Building corpus", false, [this, dump, target, vocab, storage] {
+        Io::WriteFile(target, [&](std::ostream& file) {
+            Io::ReadFile(dump, [&](std::istream& in) {
+                Words::EncodeCorpusToStream(in, *vocab, file);
+            });
         }, std::ios::binary);
-        out() << "Corpus: " << built->size() << " tokens; saved to " << target << std::endl;
+        auto built = std::make_shared<const Words::Corpus>(Words::Corpus::Open(target, storage));
+        out() << "Corpus: " << built->size() << " tokens ("
+              << Words::CorpusStorageName(built->getStorage()) << "); saved to " << target << std::endl;
         QMetaObject::invokeMethod(this, [this, built] {
             corpus = built;
             emit infoUpdated();
@@ -309,11 +332,11 @@ void WordsController::loadCorpus()
         return;
     }
     const auto path = corpusPath.toStdString();
-    runTask("Loading corpus", false, [this, path] {
-        auto loaded = std::make_shared<const Words::TCorpus>(
-            Io::ReadFile(path, [](std::istream& in) { return Words::LoadCorpus(in); },
-                         std::ios::binary));
-        out() << "Corpus: " << loaded->size() << " tokens." << std::endl;
+    const auto storage = corpusStorage;
+    runTask("Loading corpus", false, [this, path, storage] {
+        auto loaded = std::make_shared<const Words::Corpus>(Words::Corpus::Open(path, storage));
+        out() << "Corpus: " << loaded->size() << " tokens ("
+              << Words::CorpusStorageName(loaded->getStorage()) << ")." << std::endl;
         QMetaObject::invokeMethod(this, [this, loaded] {
             corpus = loaded;
             emit infoUpdated();

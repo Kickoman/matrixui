@@ -16,7 +16,7 @@
 namespace Words {
 
 std::vector<Probe> BuildProbeSet(
-    const TCorpus& corpus,
+    const Corpus& corpus,
     const Subsampler& subsampler,
     const WindowSampler& windowSampler,
     const NegativeSampler& negativeSampler,
@@ -88,7 +88,7 @@ void Trainer::setVocabulary(std::shared_ptr<const Vocabulary> value) {
     vocabulary = std::move(value);
 }
 
-void Trainer::setCorpus(std::shared_ptr<const TCorpus> value) {
+void Trainer::setCorpus(std::shared_ptr<const Corpus> value) {
     if (running.load()) {
         throw Error("cannot change the corpus while training is running");
     }

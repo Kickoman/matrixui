@@ -18,6 +18,7 @@ add_executable(MatrixGui_tests
     words/queries_test.cpp
 
     lib/file_stream_test.cpp
+    lib/mapped_file_test.cpp
     lib/stream_format_test.cpp
     lib/text_test.cpp
     lib/stats_test.cpp
