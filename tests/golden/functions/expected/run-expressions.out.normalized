@@ -5,10 +5,10 @@ Birth | Expression |   Rank | Copies
     0 |        x+1 | 0.7828 |      1
     0 |          x | 0.7199 |      1
 Final world (epoch 2):
-unique 48 / 64
+unique 49 / 64
 Birth | Expression |   Rank | Copies
 ====================================
     1 |        x+x | 0.9904 |      4
+    1 |  x+ceil(x) | 0.9846 |      1
     1 | x+x+0.5947 | 0.9097 |      1
-    1 |      x+x+1 | 0.8660 |      1
 Best: x+x (rank 0.990402)

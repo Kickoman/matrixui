@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QPixmap>
 #include <QPointF>
 #include <QVector>
 #include <QWidget>
@@ -66,8 +67,43 @@ private:
     void drawPoints(QPainter& painter);
     void drawLegend(QPainter& painter);
 
+    struct SampleKey {
+        double xMin = 0;
+        double xMax = 0;
+        double left = 0;
+        double right = 0;
+        quint64 generation = 0;
+
+        bool operator==(const SampleKey& other) const = default;
+    };
+
+    struct LayerKey {
+        double xMin = 0;
+        double xMax = 0;
+        double yMin = 0;
+        double yMax = 0;
+        int width = 0;
+        int height = 0;
+        quint64 curveGeneration = 0;
+        quint64 pointGeneration = 0;
+        bool dark = false;
+
+        bool operator==(const LayerKey& other) const = default;
+    };
+
+    LayerKey currentLayerKey() const;
+    void rebuildLayer(const LayerKey& key);
+    void resampleCurves(const QRectF& rect);
+
     QVector<QPointF> points;
     std::vector<Curve> curves;
+    quint64 curveGeneration = 0;
+    quint64 pointGeneration = 0;
+    QPixmap layer;
+    LayerKey layerKey;
+    SampleKey samplesKey;
+    std::vector<std::vector<double>> samples;
+    std::vector<QString> legendLabels;
     bool editable = true;
 
     double xMin = -10;

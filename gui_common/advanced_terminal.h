@@ -136,9 +136,10 @@ private:
 class ThreadSafeTerminalOStream : public std::ostream
 {
 public:
-    ThreadSafeTerminalOStream(AdvancedTerminalStream* stream)
+    explicit ThreadSafeTerminalOStream(std::unique_ptr<AdvancedTerminalStream> stream)
         : std::ostream(&buffer)
-        , buffer(stream)
+        , owned(std::move(stream))
+        , buffer(owned.get())
     {}
 
     ThreadSafeTerminalOStream(const ThreadSafeTerminalOStream&) = delete;
@@ -146,6 +147,7 @@ public:
 
     ThreadSafeTerminalOStream(ThreadSafeTerminalOStream&& other) noexcept
         : std::ostream(std::move(other))
+        , owned(std::move(other.owned))
         , buffer(std::move(other.buffer)) {
         rdbuf(&buffer);
     }
@@ -153,6 +155,7 @@ public:
     ThreadSafeTerminalOStream& operator=(ThreadSafeTerminalOStream&& other) noexcept {
         if (this != &other) {
             std::ostream::operator=(std::move(other));
+            owned = std::move(other.owned);
             buffer = std::move(other.buffer);
             rdbuf(&buffer);
         }
@@ -160,6 +163,7 @@ public:
     }
 
 private:
+    std::unique_ptr<AdvancedTerminalStream> owned;
     ThreadSafeTerminalBuffer buffer;
 };
 

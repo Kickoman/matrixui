@@ -105,6 +105,39 @@ copies of one string. `--print-top` counts **distinct** expressions, and `Birth`
 is the earliest birth in the clone group (clones tie on rank and the sort is not
 stable, so the first one encountered is not reproducible).
 
+## How a rank is computed
+
+`Expression::run` in [`core/lib/rpn.h`](../../core/lib/rpn.h) interprets an RPN
+directly: a `std::stack` of `Unit` variants per call — a heap allocation and a
+pile of variant traffic for every data point — and every variable resolved by
+hashing its name. That is the reference implementation, and the parser, the
+tests and expression validation still use it.
+
+Ranking does not. `FunctionGenetizerApplier::rankOrganism` compiles the RPN once
+into [`Matematyka::CompiledExpression`](../../core/lib/rpn_compile.h) — a flat
+vector of 8-byte instructions over a preallocated value stack, with variables
+resolved to array slots when the data was loaded — and then runs that over every
+point. On a 200-point fit this takes a rank from ~30 µs to ~6 µs.
+
+Two properties make the two evaluators interchangeable, and
+`tests/lib/rpn_compile_test.cpp` checks both over thousands of random RPNs,
+comparing results with `bit_cast` rather than `==`:
+
+- Every way `run` can throw depends on the **shape** of the RPN alone, never on
+  a variable's value, so whether an expression is evaluable is decided once, at
+  compile time, instead of by an exception on the first data point. A refusal to
+  compile is exactly the old `catch (...)`, and still means a rank of zero.
+- Slot 0 is a permanent zero, which is what `VariableHolder::getVariableSafe`
+  returned for a name it had never been told, and slot values persist between
+  points, which is what a shared `VariableHolder` did.
+
+Ranks are memoised in an LRU cache keyed on **the RPN itself**, not on its
+printed form: printing rounds numbers to four decimals, so two organisms whose
+constants differed beyond that used to share a key and the second was handed the
+first's rank. Keying on structure makes the cache transparent — a run produces
+the same result with it as without it, which is what lets any later change be
+checked end to end.
+
 ## Early stopping
 
 `--patience` stops the run when the best rank has not improved for that many

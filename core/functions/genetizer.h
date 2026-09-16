@@ -24,7 +24,7 @@ using Crossover = std::function<TOrganism(const TOrganism&, const TOrganism&)>;
 
 
 struct GenetizerConfig {
-    std::size_t maxPopulation = 100000;
+    std::size_t maxPopulation = 5000;
     std::size_t tournamentSize = 3;
     double populationDecreaseFactor = 0.9;
 };
@@ -110,10 +110,10 @@ public:
         }
 
         std::size_t winnerIdx = tournamentCompetitors[0];
-        TRank highestRank = rankFunction(world[tournamentCompetitors[0]].organism);
+        TRank highestRank = world[winnerIdx].rank;
         for (std::size_t i = 1; i < tournamentCompetitors.size(); ++i) {
             const auto organismIdx = tournamentCompetitors[i];
-            const auto organismRank = rankFunction(world[organismIdx].organism);
+            const auto organismRank = world[organismIdx].rank;
             if (organismRank > highestRank) {
                 winnerIdx = organismIdx;
                 highestRank = organismRank;
@@ -152,7 +152,6 @@ private:
 
     GenetizerConfig config;
     TWorld world;
-    std::size_t epochNumber;
     std::size_t rankedPopulationCount = 0;
 
     std::mt19937 generator;

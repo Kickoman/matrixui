@@ -82,6 +82,8 @@ public:
 
     OperationType getType() const { return type; }
 
+    bool operator==(const Operation& other) const = default;
+
 private:
     OperationType type;
     Operation(OperationType type) : type(type) {}
@@ -99,6 +101,8 @@ template<class T>
 struct FunctionHolder {
     TFunction<T> function;
     std::string_view name;
+
+    bool operator==(const FunctionHolder& other) const = default;
 };
 
 template<class T, class F>
@@ -184,7 +188,7 @@ public:
         }
     }
 
-    const std::string toString() const {
+    std::string toString() const {
         switch (type) {
             case UnitType::Number: {
                 if constexpr (std::is_floating_point_v<T>) {
@@ -207,6 +211,8 @@ public:
     const TValue& getValue() const {
         return value;
     }
+
+    bool operator==(const Unit& other) const = default;
 
     UnitType getType() const { return type; }
 
@@ -288,6 +294,35 @@ T ApplyFunction(const rpn::Unit<T> functionUnit, const rpn::Unit<T>& argumentUni
 template<class T>
 using RpnHolder = std::vector<rpn::Unit<T>>;
 
+template<class T>
+struct RpnHash {
+    std::size_t operator()(const RpnHolder<T>& rpn) const {
+        std::size_t seed = rpn.size();
+        const auto mix = [&seed](const std::size_t value) {
+            seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+        };
+        for (const auto& unit : rpn) {
+            mix(static_cast<std::size_t>(unit.getType()));
+            switch (unit.getType()) {
+                case rpn::UnitType::Number:
+                    mix(std::hash<T>{}(unit.getScalar()));
+                    break;
+                case rpn::UnitType::Variable:
+                    mix(std::hash<std::string>{}(unit.getVariable()));
+                    break;
+                case rpn::UnitType::Function:
+                    mix(std::hash<const void*>{}(
+                        reinterpret_cast<const void*>(unit.getFunction().function)));
+                    break;
+                case rpn::UnitType::Operator:
+                    mix(static_cast<std::size_t>(unit.getOperation().getType()));
+                    break;
+            }
+        }
+        return seed;
+    }
+};
+
 class ExpressionValidator {
 public:
     enum class Error {
@@ -365,7 +400,7 @@ public:
 
     Expression() = default;
     Expression(const Expression& other) = default;
-    Expression(Expression&& other) : expression(std::move(other.expression)) {}
+    Expression(Expression&& other) noexcept : expression(std::move(other.expression)) {}
     Expression& operator=(Expression&& other) = default;
     explicit Expression(const TRpn& rpn) : expression(rpn) {}
     explicit Expression(TRpn&& rpn) : expression(std::move(rpn)) {}
@@ -563,12 +598,24 @@ public:
         };
 
 
+        const auto rawSequence = [this] {
+            std::string out = "<ill-formed:";
+            for (const TUnit& unit : expression) {
+                out += ' ';
+                out += unit.toString();
+            }
+            out += '>';
+            return out;
+        };
 
         std::stack<Node> stack;
 
         for (const TUnit& unit : expression) {
             if (unit.getType() == rpn::UnitType::Operator) {
                 const auto op = unit.getOperation();
+                if (stack.size() < 2) {
+                    return rawSequence();
+                }
 
                 if (op.getType() == rpn::OperationType::FunctionApplication) {
                     const Node right = stack.top(); stack.pop();
@@ -592,6 +639,9 @@ public:
                 leafPrec = 0;
             }
             stack.push(Node{ unit.toString(), leafPrec });
+        }
+        if (stack.size() != 1) {
+            return rawSequence();
         }
         return stack.top().text;
     }

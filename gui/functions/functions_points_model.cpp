@@ -59,7 +59,7 @@ void FunctionsPointsModel::setValue(const int row, const int column, const doubl
     } else {
         return;
     }
-    emit changed();
+    emit rowChanged(row);
 }
 
 void FunctionsPointsModel::addRow() {
@@ -162,5 +162,5 @@ void FunctionsPointsModel::movePoint(const int row, const double x, const double
     }
     rows[row].values.assign(1, x);
     rows[row].expected = expected;
-    emit changed();
+    emit rowChanged(row);
 }

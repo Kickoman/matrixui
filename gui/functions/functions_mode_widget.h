@@ -35,6 +35,7 @@ private slots:
     void updateInfo();
     void handleSnapshot(const FunctionsSnapshot& snapshot);
     void handlePointsChanged();
+    void handleRowChanged(int row);
     void handleTableEdited(int row, int column);
 
 private:

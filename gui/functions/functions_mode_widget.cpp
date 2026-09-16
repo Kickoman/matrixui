@@ -5,6 +5,8 @@
 #include "gui/functions/functions_config_widget.h"
 #include "gui_common/advanced_terminal.h"
 
+#include "core/lib/rpn_compile.h"
+
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -27,6 +29,7 @@ FunctionsModeWidget::FunctionsModeWidget(QWidget* parent)
     buildLayout();
 
     connect(&model, &FunctionsPointsModel::changed, this, &FunctionsModeWidget::handlePointsChanged);
+    connect(&model, &FunctionsPointsModel::rowChanged, this, &FunctionsModeWidget::handleRowChanged);
     connect(plot, &FunctionPlotWidget::pointAdded, &model, &FunctionsPointsModel::addPoint);
     connect(plot, &FunctionPlotWidget::pointMoved, &model, &FunctionsPointsModel::movePoint);
     connect(plot, &FunctionPlotWidget::pointDeleted, &model, &FunctionsPointsModel::removeRow);
@@ -348,6 +351,27 @@ void FunctionsModeWidget::handlePointsChanged() {
     }
 }
 
+void FunctionsModeWidget::handleRowChanged(const int row) {
+    refreshingTable = true;
+    const auto columns = model.getVariables().size() + 1;
+    for (int column = 0; column < columns; ++column) {
+        const auto text = QString::number(model.getValue(row, column), 'g', 10);
+        if (auto* item = pointsTable->item(row, column); item != nullptr) {
+            item->setText(text);
+        } else {
+            pointsTable->setItem(row, column, new QTableWidgetItem(text));
+        }
+    }
+    refreshingTable = false;
+
+    if (model.getVariables().size() == 1) {
+        plot->setPoints(model.toPlotPoints());
+    }
+    if (controller != nullptr) {
+        controller->markSessionDirty();
+    }
+}
+
 void FunctionsModeWidget::handleTableEdited(const int row, const int column) {
     if (refreshingTable) {
         return;
@@ -407,19 +431,24 @@ void FunctionsModeWidget::rebuildCurves() {
     curves.reserve(wanted);
     for (std::size_t i = 0; i < wanted; ++i) {
         const auto& row = lastSnapshot.rows[i];
+        auto program = std::make_shared<Matematyka::CompiledExpression<double>>();
+        const auto status = program->compile(
+            row.expressionCopy->getRpn(),
+            [&variable](const std::string& name) -> std::uint32_t {
+                return name == variable ? 1 : 0;
+            });
+        const bool runnable = status == Matematyka::CompiledExpression<double>::Status::Ok;
+        auto stack = std::make_shared<std::vector<double>>(runnable ? program->getStackDepth() + 1 : 1);
+
         curves.push_back(FunctionPlotWidget::Curve{
             .label = QString("%1  (%2)").arg(row.expression).arg(row.rank, 0, 'f', 4),
-            // The expression was copied on the worker and run() is const, so
-            // evaluating during paint touches nothing the worker still owns.
-            .evaluate = [expression = row.expressionCopy,
-                         holder = std::make_shared<Genetizer::VariableHolder>(),
-                         variable](const double x) -> double {
-                try {
-                    holder->setVariable(variable, x);
-                    return expression->run(*holder);
-                } catch (...) {
+
+            .evaluate = [program, stack, runnable](const double x) -> double {
+                if (!runnable) {
                     return std::numeric_limits<double>::quiet_NaN();
                 }
+                const double values[] = {0.0, x};
+                return program->eval(values, stack->data());
             },
         });
     }

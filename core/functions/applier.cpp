@@ -32,6 +32,10 @@ std::size_t subtreeBegin(const Expression::TRpn& rpn, std::size_t root) {
     }
 }
 
+std::size_t functionAppliedAt(const Expression::TRpn& rpn, const std::size_t application) {
+    return subtreeBegin(rpn, application - 1) - 1;
+}
+
 std::mt19937& rng() {
     static thread_local std::mt19937 gen{std::random_device{}()};
     return gen;
@@ -132,6 +136,12 @@ void pointMutate(Expression::TRpn& rpn, const MutationConfig& c) {
             rpn[i] = Expression::TUnit::createFunction(randomFunction(c));
             break;
         case Matematyka::rpn::UnitType::Operator:
+            if (rpn[i].getOperation().getType()
+                == Matematyka::rpn::OperationType::FunctionApplication) {
+                rpn[functionAppliedAt(rpn, i)] =
+                    Expression::TUnit::createFunction(randomFunction(c));
+                break;
+            }
             rpn[i] = Expression::TUnit::createOperator(randomOperator(c));
             break;
     }
@@ -156,12 +166,14 @@ void jitterConstant(Expression::TRpn& rpn, const MutationConfig& c) {
 }
 
 void insertUnary(Expression::TRpn& rpn, const MutationConfig& c) {
-    const std::size_t root = randIndex(rpn.size());
-    rpn.insert(rpn.begin() + root + 1, Expression::TUnit::createFunction(randomFunction(c)));
+    const std::size_t root = randomRoot(rpn);
+    const std::size_t begin = subtreeBegin(rpn, root);
+    rpn.insert(rpn.begin() + root + 1, Expression::TUnit::createOperator('#'));
+    rpn.insert(rpn.begin() + begin, Expression::TUnit::createFunction(randomFunction(c)));
 }
 
 void wrapBinary(Expression::TRpn& rpn, const MutationConfig& c) {
-    const std::size_t root = randIndex(rpn.size());
+    const std::size_t root = randomRoot(rpn);
     rpn.insert(rpn.begin() + root + 1, randomOperand(c));
     rpn.insert(rpn.begin() + root + 2, Expression::TUnit::createOperator(randomOperator(c)));
 }
@@ -178,9 +190,18 @@ void FunctionGenetizerApplier::resetExpected() {
     expectedEntries.resize(0);
     mutationConfig = {};
     knownVariables.clear();
+    variableSlots.clear();
+    slotAssignments.clear();
+    flatEntries.clear();
+    slotValues.assign(1, TScalar{});
     expectedMagnitudeSum = 0;
     errorScale = 1.;
     rankCache.clear();
+}
+
+std::uint32_t FunctionGenetizerApplier::slotOf(const std::string& name) const {
+    const auto found = variableSlots.find(name);
+    return found == variableSlots.end() ? kZeroSlot : found->second;
 }
 
 void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, const double result) {
@@ -188,8 +209,23 @@ void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, co
         if (!knownVariables.contains(var.name)) {
             mutationConfig.variables.push_back(var.name);
             knownVariables.insert(var.name);
+            variableSlots.emplace(var.name, static_cast<std::uint32_t>(slotValues.size()));
+            slotValues.push_back(TScalar{});
         }
     }
+
+    flatEntries.push_back(FlatEntry{
+        .firstAssignment = static_cast<std::uint32_t>(slotAssignments.size()),
+        .assignmentCount = static_cast<std::uint32_t>(variables.size()),
+        .expectedResult = result,
+    });
+    for (const auto& var : variables) {
+        slotAssignments.push_back(SlotAssignment{
+            .slot = slotOf(var.name),
+            .value = var.value,
+        });
+    }
+
     expectedEntries.emplace_back(Entry{
         .variables = std::move(variables),
         .expectedResult = result,
@@ -229,15 +265,35 @@ DistinctWorld FunctionGenetizerApplier::CollectDistinct(const FunctionGenetizer:
     DistinctWorld result;
     result.totalCount = world.size();
 
-    std::unordered_map<std::string_view, std::size_t> seen;
+    struct Key {
+        std::string_view text;
+        std::size_t hash;
+    };
+    struct KeyHash {
+        std::size_t operator()(const Key& key) const { return key.hash; }
+    };
+    struct KeyEqual {
+        bool operator()(const Key& left, const Key& right) const {
+            return left.hash == right.hash && left.text == right.text;
+        }
+    };
+
+    constexpr std::size_t kBeyondTop = static_cast<std::size_t>(-1);
+
+    std::unordered_map<Key, std::size_t, KeyHash, KeyEqual> seen;
     seen.reserve(world.size());
 
+    std::size_t uniqueCount = 0;
     for (const auto& info : world) {
-        const auto& presentation = info.organism.getPresentation();
-        const auto [it, inserted] = seen.try_emplace(presentation, result.rows.size());
+        const Key key{info.organism.getPresentation(), info.organism.getPresentationHash()};
+        const auto wanted = (top == 0 || result.rows.size() < top) ? result.rows.size() : kBeyondTop;
+        const auto [it, inserted] = seen.try_emplace(key, wanted);
         if (inserted) {
-            result.rows.push_back(DistinctRow{&info, info.organism.epochOfBirth, 1});
-        } else {
+            ++uniqueCount;
+            if (wanted != kBeyondTop) {
+                result.rows.push_back(DistinctRow{&info, info.organism.epochOfBirth, 1});
+            }
+        } else if (it->second != kBeyondTop) {
             auto& row = result.rows[it->second];
             ++row.copies;
             // Clones tie on rank, and std::sort is not stable, so the earliest
@@ -246,10 +302,7 @@ DistinctWorld FunctionGenetizerApplier::CollectDistinct(const FunctionGenetizer:
         }
     }
 
-    result.uniqueCount = result.rows.size();
-    if (top != 0 && top < result.rows.size()) {
-        result.rows.resize(top);
-    }
+    result.uniqueCount = uniqueCount;
     return result;
 }
 
@@ -274,34 +327,40 @@ std::string FunctionGenetizerApplier::PrintWorld(const FunctionGenetizer::TWorld
 }
 
 double FunctionGenetizerApplier::rankOrganism(const OrganismInfo& organism) {
-    const auto& expression = organism.expression;
-    const auto& readable = organism.getPresentation();
-    const auto& rpn = expression.getRpn();
+    const auto& rpn = organism.expression.getRpn();
 
-    if (auto rank = rankCache.get(readable); rank.has_value()) {
+    if (auto rank = rankCache.get(rpn); rank.has_value()) {
         return *rank;
     }
 
-    if (!std::any_of(expectedEntries.cbegin(), expectedEntries.cend(), [&rpn](const Entry& entry) -> bool {
-        const auto& variables = entry.variables;
-        return std::any_of(variables.cbegin(), variables.cend(), [&rpn](const Variable& var) -> bool {
-            return std::find_if(rpn.cbegin(), rpn.cend(), [&var](const Expression::TUnit& unit) -> bool {
-                return unit.getType() == Matematyka::rpn::UnitType::Variable && unit.toString() == var.name;
-            }) != rpn.cend();
+    const auto mentionsKnownVariable = std::any_of(
+        rpn.cbegin(), rpn.cend(), [this](const Expression::TUnit& unit) -> bool {
+            return unit.getType() == Matematyka::rpn::UnitType::Variable
+                && knownVariables.contains(unit.getVariable());
         });
-    })) {
+    if (!mentionsKnownVariable) {
         constexpr auto res = 0.00001;
-        rankCache.put(readable, res);
+        rankCache.put(rpn, res);
         return res;
     }
 
-    try {
+    if (program.compile(rpn, [this](const std::string& name) { return slotOf(name); })
+            != Matematyka::CompiledExpression<TScalar>::Status::Ok) {
+        rankCache.put(rpn, 0.);
+        return 0.;
+    }
+    if (evaluationStack.size() < program.getStackDepth()) {
+        evaluationStack.resize(program.getStackDepth());
+    }
+
+    {
         long double error = 0;
-        for (const auto& entry : expectedEntries) {
-            for (const auto& var : entry.variables) {
-                vars.setVariable(var.name, var.value);
+        for (const auto& entry : flatEntries) {
+            for (std::uint32_t i = 0; i < entry.assignmentCount; ++i) {
+                const auto& assignment = slotAssignments[entry.firstAssignment + i];
+                slotValues[assignment.slot] = assignment.value;
             }
-            const auto result = expression.run(vars);
+            const auto result = program.eval(slotValues.data(), evaluationStack.data());
             if (std::isinf(result) || std::isnan(result)) {
                 error += kInvalidResultPenalty;
             } else {
@@ -311,7 +370,7 @@ double FunctionGenetizerApplier::rankOrganism(const OrganismInfo& organism) {
 
         const auto complexity = rpn.size();
         const auto complexityFitness = 1. / (1. + complexity / 50.);
-        const auto expressionFitness = 1. / (1. + readable.size() / 50.);
+        const auto expressionFitness = 1. / (1. + organism.getPresentation().size() / 50.);
         const auto accuracyFitness = 1. / (1. + static_cast<double>(error) / expectedEntries.size());
 
         const auto accWeightRaw = fitnessConfig.accuracyWeight;
@@ -323,11 +382,8 @@ double FunctionGenetizerApplier::rankOrganism(const OrganismInfo& organism) {
         const auto expWeight = expWeightRaw / sumWeight;
 
         const auto res = accWeight * accuracyFitness + comWeight * complexityFitness + expWeight * expressionFitness;
-        rankCache.put(readable, res);
+        rankCache.put(rpn, res);
         return res;
-    } catch (...) {
-        rankCache.put(readable, 0);
-        return 0.;
     }
 }
 

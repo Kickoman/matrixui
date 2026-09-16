@@ -36,6 +36,7 @@ public:
 
 signals:
     void changed();
+    void rowChanged(int row);
 
 private:
     struct Row {

@@ -22,12 +22,16 @@ add_executable(MatrixGui_tests
     functions/applier_test.cpp
     functions/expected_csv_test.cpp
     functions/validate_test.cpp
+    functions/genetizer_test.cpp
 
     lib/file_stream_test.cpp
     lib/mapped_file_test.cpp
     lib/stream_format_test.cpp
     lib/text_test.cpp
     lib/stats_test.cpp
+    lib/rpn_test.cpp
+    lib/cache_test.cpp
+    lib/rpn_compile_test.cpp
 
     cli/argv_scan_test.cpp
     cli/json_config_test.cpp

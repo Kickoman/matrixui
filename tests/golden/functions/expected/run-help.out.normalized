@@ -13,7 +13,7 @@ OPTIONS:
                               Stop when the best rank has not improved for this many epochs (0
                               = never)
           --seed UINT [0]     Random seed (0 = nondeterministic)
-          --max-population UINT [100000]  
+          --max-population UINT [5000]  
                               World size
           --tournament-size UINT [3]  
                               Tournament selection size

@@ -52,6 +52,36 @@ a world that keeps changing, so the worker copies the expression string and the
 to draw the curves — `Expression::run` is const and each curve owns its own
 `VariableHolder`, so nothing is shared with the worker.
 
+## What a repaint costs
+
+The plot is immediate-mode: no `QChart`, no series objects, just a `paintEvent`.
+Two things keep that affordable.
+
+Curves are **compiled once** per snapshot rather than interpreted once per pixel
+(see [`core/lib/rpn_compile.h`](../../core/lib/rpn_compile.h)), and the sampled
+values are cached against the curve set and the horizontal window.
+
+More importantly, the **finished picture is cached**. Rasterising ten
+antialiased polylines costs far more than sampling them did — about 9 ms of a
+13 ms frame — and hovering a point changes none of it. So the background, grid,
+curves and resting points are drawn into a `QPixmap` that is invalidated only by
+the view, the curve set, the points, the size or the palette, and each frame
+blits that and draws just the highlight on top. A hover repaint went from 13.3 ms
+to 0.95 ms, with the rendered result unchanged pixel for pixel.
+
+Text is deliberately **not** in the cached layer: glyphs drawn into an offscreen
+surface lose the subpixel antialiasing they get on a widget. Axis labels and the
+legend are redrawn every frame, which is what keeps the output identical.
+
+Dragging a point emits `FunctionsPointsModel::rowChanged` rather than `changed()`,
+so only that row of the table is rewritten; `changed()` is for structural edits,
+where the whole table really does have to be rebuilt.
+
+`--print-top 0` means "all", and on the CLI that is reasonable. Here the log
+goes into a text widget, so `PrintWorld` for the terminal is capped at a couple
+of hundred rows. The snapshot feeding the table and the plot is a separate path
+and was already bounded.
+
 ## Traps
 
 - **`SeedThreadRng` seeds a `thread_local` engine.** It has to be called from the

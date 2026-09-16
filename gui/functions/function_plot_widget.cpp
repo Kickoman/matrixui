@@ -41,6 +41,7 @@ QSize FunctionPlotWidget::minimumSizeHint() const {
 
 void FunctionPlotWidget::setPoints(const QVector<QPointF>& value) {
     points = value;
+    ++pointGeneration;
     if (hoverIndex >= points.size()) {
         hoverIndex = -1;
     }
@@ -49,6 +50,8 @@ void FunctionPlotWidget::setPoints(const QVector<QPointF>& value) {
 
 void FunctionPlotWidget::setCurves(std::vector<Curve> value) {
     curves = std::move(value);
+    ++curveGeneration;
+    legendLabels.clear();
     update();
 }
 
@@ -174,18 +177,57 @@ QColor FunctionPlotWidget::curveColor(const int index) const {
     return QColor::fromHsv(hue, 200, isDarkPalette() ? 235 : 170);
 }
 
-void FunctionPlotWidget::paintEvent(QPaintEvent*) {
-    QPainter painter(this);
+FunctionPlotWidget::LayerKey FunctionPlotWidget::currentLayerKey() const {
+    return LayerKey{
+        .xMin = xMin,
+        .xMax = xMax,
+        .yMin = yMin,
+        .yMax = yMax,
+        .width = width(),
+        .height = height(),
+        .curveGeneration = curveGeneration,
+        .pointGeneration = pointGeneration,
+        .dark = isDarkPalette(),
+    };
+}
+
+void FunctionPlotWidget::rebuildLayer(const LayerKey& key) {
+    const auto ratio = devicePixelRatioF();
+    layer = QPixmap(size() * ratio);
+    layer.setDevicePixelRatio(ratio);
+
+    QPainter painter(&layer);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.fillRect(rect(), palette().color(QPalette::Base));
-
-    painter.save();
     painter.setClipRect(plotRect());
     drawGrid(painter);
     drawCurves(painter);
     drawPoints(painter);
-    painter.restore();
 
+    layerKey = key;
+}
+
+void FunctionPlotWidget::paintEvent(QPaintEvent*) {
+    if (const auto key = currentLayerKey(); key != layerKey || layer.isNull()) {
+        rebuildLayer(key);
+    }
+
+    QPainter painter(this);
+    painter.drawPixmap(0, 0, layer);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    if (const auto highlighted = drag == Drag::Point ? activeIndex : hoverIndex;
+        highlighted >= 0 && highlighted < points.size()) {
+        painter.save();
+        painter.setClipRect(plotRect());
+        painter.setPen(QPen(palette().color(QPalette::Base), 1.5));
+        painter.setBrush(palette().color(QPalette::Highlight));
+        painter.drawEllipse(
+            QPointF(toPixelX(points[highlighted].x()), toPixelY(points[highlighted].y())), 6.0, 6.0);
+        painter.restore();
+    }
+
+    painter.setBrush(Qt::NoBrush);
     drawAxes(painter);
     drawLegend(painter);
 }
@@ -245,13 +287,39 @@ void FunctionPlotWidget::drawAxes(QPainter& painter) {
     }
 }
 
+void FunctionPlotWidget::resampleCurves(const QRectF& rect) {
+    const SampleKey key{
+        .xMin = xMin,
+        .xMax = xMax,
+        .left = rect.left(),
+        .right = rect.right(),
+        .generation = curveGeneration,
+    };
+    if (key == samplesKey && samples.size() == curves.size()) {
+        return;
+    }
+    samplesKey = key;
+
+    samples.assign(curves.size(), {});
+    for (std::size_t i = 0; i < curves.size(); ++i) {
+        if (!curves[i].evaluate) {
+            continue;
+        }
+        auto& column = samples[i];
+        column.reserve(static_cast<std::size_t>((rect.width() / kSampleStepPx) + 2));
+        for (auto px = rect.left(); px <= rect.right(); px += kSampleStepPx) {
+            column.push_back(curves[i].evaluate(toDataX(px)));
+        }
+    }
+}
+
 void FunctionPlotWidget::drawCurves(QPainter& painter) {
     const auto rect = plotRect();
     const auto limit = rect.height() * 10;
+    resampleCurves(rect);
 
     for (std::size_t i = 0; i < curves.size(); ++i) {
-        const auto& curve = curves[i];
-        if (!curve.evaluate) {
+        if (i >= samples.size() || samples[i].empty()) {
             continue;
         }
         painter.setPen(QPen(curveColor(static_cast<int>(i)), 2));
@@ -264,8 +332,9 @@ void FunctionPlotWidget::drawCurves(QPainter& painter) {
             segment.clear();
         };
 
-        for (auto px = rect.left(); px <= rect.right(); px += kSampleStepPx) {
-            const auto value = curve.evaluate(toDataX(px));
+        std::size_t column = 0;
+        for (auto px = rect.left(); px <= rect.right() && column < samples[i].size(); px += kSampleStepPx, ++column) {
+            const auto value = samples[i][column];
             if (!std::isfinite(value)) {
                 flush();
                 continue;
@@ -283,14 +352,10 @@ void FunctionPlotWidget::drawCurves(QPainter& painter) {
 
 void FunctionPlotWidget::drawPoints(QPainter& painter) {
     const auto base = palette().color(QPalette::Base);
-    for (int i = 0; i < points.size(); ++i) {
-        const QPointF position(toPixelX(points[i].x()), toPixelY(points[i].y()));
-        const auto active = (i == hoverIndex) || (drag == Drag::Point && i == activeIndex);
-        const auto radius = active ? 6.0 : 4.0;
-        painter.setPen(QPen(base, 1.5));
-        painter.setBrush(active ? palette().color(QPalette::Highlight)
-                                : palette().color(QPalette::WindowText));
-        painter.drawEllipse(position, radius, radius);
+    painter.setPen(QPen(base, 1.5));
+    painter.setBrush(palette().color(QPalette::WindowText));
+    for (const auto& point : points) {
+        painter.drawEllipse(QPointF(toPixelX(point.x()), toPixelY(point.y())), 4.0, 4.0);
     }
     painter.setBrush(Qt::NoBrush);
 }
@@ -305,13 +370,18 @@ void FunctionPlotWidget::drawLegend(QPainter& painter) {
     constexpr int swatchWidth = 16;
     constexpr int padding = 8;
 
+    if (legendLabels.size() != curves.size()) {
+        legendLabels.clear();
+        legendLabels.reserve(curves.size());
+        for (const auto& curve : curves) {
+            legendLabels.push_back(metrics.elidedText(curve.label, Qt::ElideRight, 260));
+        }
+    }
+    const auto& labels = legendLabels;
+
     int textWidth = 0;
-    std::vector<QString> labels;
-    labels.reserve(curves.size());
-    for (const auto& curve : curves) {
-        auto label = metrics.elidedText(curve.label, Qt::ElideRight, 260);
+    for (const auto& label : labels) {
         textWidth = std::max(textWidth, metrics.horizontalAdvance(label));
-        labels.push_back(std::move(label));
     }
 
     const QRectF box(plotRect().left() + padding, plotRect().top() + padding,

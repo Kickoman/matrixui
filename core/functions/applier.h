@@ -2,11 +2,13 @@
 
 #include "core/lib/cache.h"
 #include "core/lib/rpn.h"
+#include "core/lib/rpn_compile.h"
 #include "core/functions/genetizer.h"
 
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace Genetizer {
@@ -33,10 +35,18 @@ struct OrganismInfo {
     const std::string& getPresentation() const {
         if (!parsedPresentation.has_value()) [[ unlikely ]] {
             parsedPresentation = expression.toString();
+            presentationHash = std::hash<std::string>{}(*parsedPresentation);
         }
         return *parsedPresentation;
     }
+
+    std::size_t getPresentationHash() const {
+        getPresentation();
+        return presentationHash;
+    }
+
     mutable std::optional<std::string> parsedPresentation = std::nullopt;
+    mutable std::size_t presentationHash = 0;
 };
 
 struct MutationConfig {
@@ -96,16 +106,41 @@ private:
     OrganismInfo crossoverFunction(const OrganismInfo& mother, const OrganismInfo& father);
     void mutateFunction(OrganismInfo& organism);
 
+    // Slot 0 holds zero and is never written. It is where every variable the
+    // data never mentioned resolves to, which is what VariableHolder did by
+    // returning T{} for a name it had not been told.
+    static constexpr std::uint32_t kZeroSlot = 0;
+
+    struct FlatEntry {
+        std::uint32_t firstAssignment;
+        std::uint32_t assignmentCount;
+        TScalar expectedResult;
+    };
+    struct SlotAssignment {
+        std::uint32_t slot;
+        TScalar value;
+    };
+
+    std::uint32_t slotOf(const std::string& name) const;
+
     MutationConfig mutationConfig;
     FitnessConfig fitnessConfig;
     std::unordered_set<std::string> knownVariables;
-    VariableHolder vars;
     std::vector<Entry> expectedEntries;
+
+    std::unordered_map<std::string, std::uint32_t> variableSlots;
+    std::vector<SlotAssignment> slotAssignments;
+    std::vector<FlatEntry> flatEntries;
+
+    std::vector<TScalar> slotValues{TScalar{}};
+
+    Matematyka::CompiledExpression<TScalar> program;
+    std::vector<TScalar> evaluationStack;
 
     TScalar expectedMagnitudeSum = 0;
     TScalar errorScale = 1.;
 
-    cache::LRUCache<std::string, double> rankCache{};
+    cache::LRUCache<Expression::TRpn, double, Matematyka::RpnHash<TScalar>> rankCache{};
 };
 
 }

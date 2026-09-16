@@ -7,6 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -17,6 +18,12 @@
 namespace {
 
 constexpr auto kSnapshotInterval = std::chrono::milliseconds(100);
+
+constexpr std::size_t kLoggedRowCap = 200;
+
+std::size_t LoggedRows(const std::size_t printTop) {
+    return printTop == 0 ? kLoggedRowCap : std::min(printTop, kLoggedRowCap);
+}
 
 }  // namespace
 
@@ -56,10 +63,12 @@ FunctionsController::Info FunctionsController::getInfo() const {
 }
 
 void FunctionsController::waitUntilFinished() {
-    if (internalRunner != nullptr && internalRunner->isRunning()) {
-        internalRunner->quit();
-        internalRunner->wait();
+    if (internalRunner == nullptr || !internalRunner->isRunning()) {
+        return;
     }
+    stopRequested.store(true, std::memory_order_relaxed);
+    internalRunner->quit();
+    internalRunner->wait();
 }
 
 void FunctionsController::setConfig(const Genetizer::FunctionsConfig& value) {
@@ -307,7 +316,7 @@ void FunctionsController::launch(std::shared_ptr<Session> shared, const bool fre
                 publish(MakeSnapshot(*shared->genetizer, 0, top));
                 out() << "Start world:\n"
                       << Genetizer::FunctionGenetizerApplier::PrintWorld(
-                             shared->genetizer->getWorld(), configCopy.printTop)
+                             shared->genetizer->getWorld(), LoggedRows(configCopy.printTop))
                       << std::endl;
             } else {
                 out() << "Resuming at epoch " << shared->epochsDone << std::endl;
@@ -328,7 +337,7 @@ void FunctionsController::launch(std::shared_ptr<Session> shared, const bool fre
 
             const auto& world = shared->genetizer->getWorld();
             out() << "Stopped at epoch " << shared->epochsDone << ":\n"
-                  << Genetizer::FunctionGenetizerApplier::PrintWorld(world, configCopy.printTop)
+                  << Genetizer::FunctionGenetizerApplier::PrintWorld(world, LoggedRows(configCopy.printTop))
                   << "\nBest: " << world.front().organism.getPresentation()
                   << " (rank " << world.front().rank << ")" << std::endl;
             shared->valid = true;
@@ -337,11 +346,11 @@ void FunctionsController::launch(std::shared_ptr<Session> shared, const bool fre
             shared->valid = false;
         }
 
-        runningFlag.store(false, std::memory_order_relaxed);
         QMetaObject::invokeMethod(this, [this, shared] {
             if (shared->valid) {
                 session = std::make_unique<Session>(std::move(*shared));
             }
+            runningFlag.store(false, std::memory_order_relaxed);
             emit infoUpdated();
         });
         QThread::currentThread()->quit();
