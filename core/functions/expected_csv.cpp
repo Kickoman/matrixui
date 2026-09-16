@@ -1,5 +1,7 @@
 #include "core/functions/expected_csv.h"
 
+#include "core/lib/text.h"
+
 #include <algorithm>
 #include <format>
 #include <istream>
@@ -11,61 +13,27 @@ namespace Genetizer {
 
 namespace {
 
-std::string Trim(const std::string& text) {
-    const auto begin = text.find_first_not_of(" \t");
-    if (begin == std::string::npos) {
-        return "";
+std::vector<std::string> SplitCells(const std::string& line) {
+    auto cells = Text::Split(line, ",");
+    for (auto& cell : cells) {
+        cell = std::string(Text::Trim(cell));
     }
-    const auto end = text.find_last_not_of(" \t");
-    return text.substr(begin, end - begin + 1);
+    return cells;
 }
 
-std::vector<std::string> SplitLine(std::string line) {
-    if (!line.empty() && line.back() == '\r') {
-        line.pop_back();
-    }
-    std::vector<std::string> cells;
-    std::size_t begin = 0;
-    while (true) {
-        const auto comma = line.find(',', begin);
-        cells.push_back(Trim(line.substr(begin, comma - begin)));
-        if (comma == std::string::npos) {
-            return cells;
-        }
-        begin = comma + 1;
-    }
-}
-
-[[noreturn]] static void ThrowNotANumber(const std::string& cell, std::size_t lineNumber,
-                                         const std::string& column) {
+[[noreturn]] void ThrowNotANumber(const std::string& cell, std::size_t lineNumber,
+                                  const std::string& column) {
     throw std::runtime_error(
         "line " + std::to_string(lineNumber) + ", column '" + column +
         "': not a number: '" + cell + "'");
 }
 
 double ParseNumber(const std::string& cell, std::size_t lineNumber, const std::string& column) {
-    std::string_view s = cell;
-
-    const auto first = s.find_first_not_of(" \t\r\n");
-    if (first == std::string_view::npos) {
+    const auto value = Text::ParseNumber<double>(cell);
+    if (!value.has_value()) {
         ThrowNotANumber(cell, lineNumber, column);
     }
-    const auto last = s.find_last_not_of(" \t\r\n");
-    s = s.substr(first, last - first + 1);
-
-    if (s.front() == '+') {
-        s.remove_prefix(1);
-        if (s.empty() || s.front() == '-') {
-            ThrowNotANumber(cell, lineNumber, column);
-        }
-    }
-
-    double value{};
-    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value);
-    if (ec != std::errc{} || ptr != s.data() + s.size()) {
-        ThrowNotANumber(cell, lineNumber, column);
-    }
-    return value;
+    return *value;
 }
 
 }  // namespace
@@ -76,7 +44,7 @@ std::vector<Entry> ParseExpectedCsv(std::istream& in) {
         throw std::runtime_error("empty CSV: expected a header row");
     }
 
-    const auto header = SplitLine(line);
+    const auto header = SplitCells(line);
     if (header.size() < 2) {
         throw std::runtime_error(
             "CSV needs at least one variable column and 'expected', got header: " + line);
@@ -95,7 +63,7 @@ std::vector<Entry> ParseExpectedCsv(std::istream& in) {
     std::size_t lineNumber = 1;
     while (std::getline(in, line)) {
         ++lineNumber;
-        auto cells = SplitLine(line);
+        auto cells = SplitCells(line);
         if (cells.size() == 1 && cells[0].empty()) {
             continue;  // blank line
         }

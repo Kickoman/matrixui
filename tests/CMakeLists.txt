@@ -17,6 +17,8 @@ add_executable(MatrixGui_tests
     words/inspect_test.cpp
     words/queries_test.cpp
 
+    nn/neural_network_test.cpp
+
     functions/applier_test.cpp
     functions/expected_csv_test.cpp
     functions/validate_test.cpp

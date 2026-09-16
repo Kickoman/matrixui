@@ -227,7 +227,7 @@ OddOneOutReport QueryOddOneOut(
 ) {
     OddOneOutReport report;
 
-    const auto tokens = SplitWords(words);
+    const auto tokens = Text::SplitWords(words);
     if (tokens.size() < 3) {
         report.status = {false, "need at least three words"};
         return report;
@@ -264,7 +264,7 @@ AxisReport QueryAxis(
 
     const auto axis = Normalized(BuildExpressionVector(index, terms));
 
-    const auto tokens = SplitWords(words);
+    const auto tokens = Text::SplitWords(words);
     if (!tokens.empty()) {
         const auto ids = ResolveWords(vocabulary, tokens, report.status);
         if (ids.empty()) {

@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "core/functions/applier.h"
+#include "core/lib/text.h"
 
 #include <string>
 #include <vector>
@@ -49,28 +50,15 @@ const std::vector<double> kZeroToNineteen{0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 // The tabulator pads cells to the column width, so tests match on what a row
 // says rather than on where it says it.
 std::vector<std::string> CellsOfRowWith(const std::string& table, const std::string& needle) {
-    for (std::size_t begin = 0; begin < table.size();) {
-        const auto end = table.find('\n', begin);
-        const auto line = table.substr(begin, end - begin);
-        if (line.find(needle) != std::string::npos) {
-            std::vector<std::string> cells;
-            for (std::size_t cellBegin = 0; cellBegin < line.size();) {
-                const auto separator = line.find('|', cellBegin);
-                auto cell = line.substr(cellBegin, separator - cellBegin);
-                const auto first = cell.find_first_not_of(' ');
-                const auto last = cell.find_last_not_of(' ');
-                cells.push_back(first == std::string::npos ? "" : cell.substr(first, last - first + 1));
-                if (separator == std::string::npos) {
-                    break;
-                }
-                cellBegin = separator + 1;
-            }
-            return cells;
+    for (const auto& line : Text::Split(table, "\n")) {
+        if (line.find(needle) == std::string::npos) {
+            continue;
         }
-        if (end == std::string::npos) {
-            break;
+        auto cells = Text::Split(line, "|");
+        for (auto& cell : cells) {
+            cell = std::string(Text::Trim(cell));
         }
-        begin = end + 1;
+        return cells;
     }
     return {};
 }

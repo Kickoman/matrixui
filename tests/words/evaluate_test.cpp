@@ -221,3 +221,34 @@ TEST_CASE("EvaluateSimilarity reports zero correlation when one side is constant
     CHECK(report.pearson == doctest::Approx(0.));
     CHECK(report.spearman == doctest::Approx(0.));
 }
+
+TEST_CASE("EvaluateSimilarity ignores padding and short lines") {
+    const auto vocabulary = Tests::ToyVocabulary(1);
+    const auto index = AngledIndex();
+
+    std::istringstream file("  a\t b   9.0  \n"
+        "a c\n"               // too few fields -> not a pair at all
+        "a\n"
+        "\n"
+        "a d 3.0 extra\n");   // extra fields are ignored
+
+    const auto report = EvaluateSimilarity(vocabulary, index, file, /*scoreColumn=*/2);
+
+    CHECK(report.asked == 2);
+    CHECK(report.skipped == 0);
+}
+
+TEST_CASE("EvaluateSimilarity drops a pair whose score is not a number") {
+    const auto vocabulary = Tests::ToyVocabulary(1);
+    const auto index = AngledIndex();
+
+    std::istringstream file("a b 9.0\n"
+        "a c abc\n"      // not a number -> the whole pair is dropped
+        "a d 7.5abc\n"   // not exactly one number -> dropped as well
+        "a e 3.0\n");
+
+    const auto report = EvaluateSimilarity(vocabulary, index, file, /*scoreColumn=*/2);
+
+    CHECK(report.asked == 2);
+    CHECK(report.skipped == 0);
+}

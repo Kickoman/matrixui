@@ -118,3 +118,63 @@ TEST_CASE("WriteExpectedCsv names a point that is missing a variable") {
     CHECK_THROWS_WITH_AS(WriteExpectedCsv(out, {"x", "y"}, entries),
                          doctest::Contains("point 1 has no value for 'y'"), std::runtime_error);
 }
+
+TEST_CASE("ParseExpectedCsv trims padding around header names and cells") {
+    std::istringstream in(" x ,\ty , expected \n 1 , 2\t, 3 \n");
+    const auto entries = ParseExpectedCsv(in);
+
+    REQUIRE(entries.size() == 1);
+    REQUIRE(entries[0].variables.size() == 2);
+    CHECK(entries[0].variables[0].name == "x");
+    CHECK(entries[0].variables[0].value == 1);
+    CHECK(entries[0].variables[1].name == "y");
+    CHECK(entries[0].variables[1].value == 2);
+    CHECK(entries[0].expectedResult == 3);
+}
+
+TEST_CASE("ParseExpectedCsv accepts an explicit plus sign") {
+    std::istringstream in("x,expected\n+1,+2.5\n");
+    const auto entries = ParseExpectedCsv(in);
+
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0].variables[0].value == 1);
+    CHECK(entries[0].expectedResult == 2.5);
+}
+
+TEST_CASE("ParseExpectedCsv rejects a cell that is not exactly one number") {
+    SUBCASE("two signs") {
+        std::istringstream in("x,expected\n+-1,2\n");
+        CHECK_THROWS_WITH_AS(ParseExpectedCsv(in), doctest::Contains("not a number"),
+                             std::runtime_error);
+    }
+    SUBCASE("two numbers in one cell") {
+        std::istringstream in("x,expected\n1 2,3\n");
+        CHECK_THROWS_WITH_AS(ParseExpectedCsv(in), doctest::Contains("not a number"),
+                             std::runtime_error);
+    }
+    SUBCASE("trailing junk") {
+        std::istringstream in("x,expected\n1abc,2\n");
+        CHECK_THROWS_WITH_AS(ParseExpectedCsv(in), doctest::Contains("not a number"),
+                             std::runtime_error);
+    }
+    SUBCASE("a lone sign") {
+        std::istringstream in("x,expected\n+,2\n");
+        CHECK_THROWS_WITH_AS(ParseExpectedCsv(in), doctest::Contains("not a number"),
+                             std::runtime_error);
+    }
+}
+
+TEST_CASE("ParseExpectedCsv names the offending cell without its padding") {
+    std::istringstream in("x,expected\n abc , 2 \n");
+    CHECK_THROWS_WITH_AS(ParseExpectedCsv(in), doctest::Contains("not a number: 'abc'"),
+                         std::runtime_error);
+}
+
+TEST_CASE("ParseExpectedCsv skips blank lines and needs no trailing newline") {
+    std::istringstream in("x,expected\n1,2\n\n   \n3,4");
+    const auto entries = ParseExpectedCsv(in);
+
+    REQUIRE(entries.size() == 2);
+    CHECK(entries[0].variables[0].value == 1);
+    CHECK(entries[1].variables[0].value == 3);
+}
