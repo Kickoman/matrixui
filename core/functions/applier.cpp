@@ -225,45 +225,51 @@ void FunctionGenetizerApplier::seedRandom(FunctionGenetizer& genetizer, const st
     }
 }
 
-std::string FunctionGenetizerApplier::PrintWorld(const FunctionGenetizer::TWorld &world, std::size_t top) {
-    if (world.empty()) {
-        // Tabulator cannot render an empty table (max over no rows).
-        return "<empty world>\n";
-    }
+DistinctWorld FunctionGenetizerApplier::CollectDistinct(const FunctionGenetizer::TWorld& world, std::size_t top) {
+    DistinctWorld result;
+    result.totalCount = world.size();
 
-    struct Distinct {
-        const std::string* expression;  // owned by the organism's memoized presentation
-        std::size_t birth;
-        double rank;
-        std::size_t copies;
-    };
-    std::vector<Distinct> distinct;
     std::unordered_map<std::string_view, std::size_t> seen;
     seen.reserve(world.size());
 
     for (const auto& info : world) {
         const auto& presentation = info.organism.getPresentation();
-        const auto [it, inserted] = seen.try_emplace(presentation, distinct.size());
+        const auto [it, inserted] = seen.try_emplace(presentation, result.rows.size());
         if (inserted) {
-            distinct.push_back(Distinct{&presentation, info.organism.epochOfBirth, info.rank, 1});
+            result.rows.push_back(DistinctRow{&info, info.organism.epochOfBirth, 1});
         } else {
-            auto& row = distinct[it->second];
+            auto& row = result.rows[it->second];
             ++row.copies;
+            // Clones tie on rank, and std::sort is not stable, so the earliest
+            // birth in the group is the one reproducible answer to "since when".
             row.birth = std::min(row.birth, info.organism.epochOfBirth);
         }
     }
 
-    if (top == 0 || top > distinct.size()) {
-        top = distinct.size();
+    result.uniqueCount = result.rows.size();
+    if (top != 0 && top < result.rows.size()) {
+        result.rows.resize(top);
     }
+    return result;
+}
+
+std::string FunctionGenetizerApplier::PrintWorld(const FunctionGenetizer::TWorld &world, std::size_t top) {
+    if (world.empty()) {
+        return "<empty world>\n";
+    }
+
+    const auto distinct = CollectDistinct(world, top);
 
     tabs::Tabulator tabulator;
     tabulator.addHeader() << "Birth" << "Expression" << "Rank" << "Copies";
-    for (std::size_t i = 0; i < top; ++i) {
-        const auto& row = distinct[i];
-        tabulator.addRow() << row.birth << *row.expression << row.rank << row.copies;
+    for (const auto& row : distinct.rows) {
+        tabulator.addRow()
+            << row.birth
+            << row.representative->organism.getPresentation()
+            << row.representative->rank
+            << row.copies;
     }
-    return "unique " + std::to_string(distinct.size()) + " / " + std::to_string(world.size())
+    return "unique " + std::to_string(distinct.uniqueCount) + " / " + std::to_string(distinct.totalCount)
         + "\n" + tabulator.tabulate();
 }
 

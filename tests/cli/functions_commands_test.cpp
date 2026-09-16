@@ -1,7 +1,6 @@
 #include <doctest/doctest.h>
 
 #include "cli/functions/commands.h"
-#include "cli/functions/csv.h"
 #include "cli/functions/options.h"
 #include "cli/lib/json_config.h"
 #include "core/functions/config_json.h"
@@ -27,66 +26,6 @@ Genetizer::FunctionsConfig SmallConfig() {
 }
 
 }  // namespace
-
-TEST_CASE("ParseExpectedCsv reads a two-variable file") {
-    std::istringstream in("x,y,expected\n1,2,3\n4,5,9\n");
-    const auto entries = FunctionsCli::ParseExpectedCsv(in);
-
-    REQUIRE(entries.size() == 2);
-    REQUIRE(entries[0].variables.size() == 2);
-    CHECK(entries[0].variables[0].name == "x");
-    CHECK(entries[0].variables[0].value == 1);
-    CHECK(entries[0].variables[1].name == "y");
-    CHECK(entries[0].variables[1].value == 2);
-    CHECK(entries[0].expectedResult == 3);
-    CHECK(entries[1].variables[0].value == 4);
-    CHECK(entries[1].expectedResult == 9);
-}
-
-TEST_CASE("ParseExpectedCsv tolerates CRLF and a trailing blank line") {
-    std::istringstream in("x,expected\r\n1,2\r\n\r\n");
-    const auto entries = FunctionsCli::ParseExpectedCsv(in);
-
-    REQUIRE(entries.size() == 1);
-    CHECK(entries[0].variables[0].name == "x");
-    CHECK(entries[0].expectedResult == 2);
-}
-
-TEST_CASE("ParseExpectedCsv rejects a header without an expected column") {
-    std::istringstream in("x,y\n1,2\n");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("'expected'"), std::runtime_error);
-}
-
-TEST_CASE("ParseExpectedCsv rejects a header with no variable columns") {
-    std::istringstream in("expected\n1\n");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("at least one variable column"), std::runtime_error);
-}
-
-TEST_CASE("ParseExpectedCsv reports a non-numeric cell with its position") {
-    std::istringstream in("x,expected\n1,2\nabc,4\n");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("line 3, column 'x'"), std::runtime_error);
-}
-
-TEST_CASE("ParseExpectedCsv rejects an empty stream") {
-    std::istringstream in("");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("empty"), std::runtime_error);
-}
-
-TEST_CASE("ParseExpectedCsv rejects a row with the wrong column count") {
-    std::istringstream in("x,y,expected\n1,2\n");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("line 2"), std::runtime_error);
-}
-
-TEST_CASE("ParseExpectedCsv rejects a file with no data rows") {
-    std::istringstream in("x,expected\n");
-    CHECK_THROWS_WITH_AS(FunctionsCli::ParseExpectedCsv(in),
-                         doctest::Contains("no data rows"), std::runtime_error);
-}
 
 TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     Tests::TempDir dir;

@@ -12,7 +12,7 @@ The layout follows [`cli/words`](../words/README.md) — same four files, same
 | `options.h` | `RunOptions`: the three paths plus the whole `FunctionsConfig` |
 | `commands.h` | `int Run(std::ostream&, std::ostream&, const RunOptions&)` and the exit-code constants |
 | `commands.cpp` | The body, plus config validation and the config dump |
-| `csv.h` / `csv.cpp` | `ParseExpectedCsv` — the only piece with logic worth unit-testing |
+| — | The data format itself lives in [`core/functions/expected_csv.{h,cpp}`](../../core/functions/expected_csv.h) |
 | `main.cpp` | The CLI11 app: flag definitions and dispatch |
 
 ## The data file
@@ -32,9 +32,12 @@ they are the same names the evolved expressions use, and `addExpected` is what
 teaches the mutation config that they exist. Parse failures name the line and
 the column: `line 3, column 'x': not a number: 'abc'`.
 
-`ParseExpectedCsv` lives here rather than in `core/functions` because it is a
-CLI input format, not part of the algorithm; it is in the CLI *library* rather
-than `main.cpp` so the tests can reach it.
+`ParseExpectedCsv` started here as a CLI input format, but the GUI's point
+import and export made it an interchange format both front ends read and write,
+so it lives in `core/functions/expected_csv.{h,cpp}` next to a writer,
+`WriteExpectedCsv`. The same is true of `Genetizer::Validate`
+([`core/functions/validate.h`](../../core/functions/validate.h)): the GUI has to
+run the same checks before a run, so they are no longer private to this file.
 
 ## Config
 

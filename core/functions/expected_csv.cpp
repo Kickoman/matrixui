@@ -1,10 +1,13 @@
-#include "cli/functions/csv.h"
+#include "core/functions/expected_csv.h"
 
+#include <algorithm>
+#include <format>
 #include <istream>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 
-namespace FunctionsCli {
+namespace Genetizer {
 
 namespace {
 
@@ -33,30 +36,41 @@ std::vector<std::string> SplitLine(std::string line) {
     }
 }
 
+[[noreturn]] static void ThrowNotANumber(const std::string& cell, std::size_t lineNumber,
+                                         const std::string& column) {
+    throw std::runtime_error(
+        "line " + std::to_string(lineNumber) + ", column '" + column +
+        "': not a number: '" + cell + "'");
+}
+
 double ParseNumber(const std::string& cell, std::size_t lineNumber, const std::string& column) {
-    const auto fail = [&] {
-        throw std::runtime_error(
-            "line " + std::to_string(lineNumber) + ", column '" + column +
-            "': not a number: '" + cell + "'");
-    };
-    try {
-        std::size_t consumed = 0;
-        const auto value = std::stod(cell, &consumed);
-        if (consumed != cell.size()) {
-            fail();
-        }
-        return value;
-    } catch (const std::invalid_argument&) {
-        fail();
-    } catch (const std::out_of_range&) {
-        fail();
+    std::string_view s = cell;
+
+    const auto first = s.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos) {
+        ThrowNotANumber(cell, lineNumber, column);
     }
-    return 0;  // unreachable
+    const auto last = s.find_last_not_of(" \t\r\n");
+    s = s.substr(first, last - first + 1);
+
+    if (s.front() == '+') {
+        s.remove_prefix(1);
+        if (s.empty() || s.front() == '-') {
+            ThrowNotANumber(cell, lineNumber, column);
+        }
+    }
+
+    double value{};
+    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value);
+    if (ec != std::errc{} || ptr != s.data() + s.size()) {
+        ThrowNotANumber(cell, lineNumber, column);
+    }
+    return value;
 }
 
 }  // namespace
 
-std::vector<Genetizer::Entry> ParseExpectedCsv(std::istream& in) {
+std::vector<Entry> ParseExpectedCsv(std::istream& in) {
     std::string line;
     if (!std::getline(in, line)) {
         throw std::runtime_error("empty CSV: expected a header row");
@@ -77,13 +91,13 @@ std::vector<Genetizer::Entry> ParseExpectedCsv(std::istream& in) {
         }
     }
 
-    std::vector<Genetizer::Entry> entries;
+    std::vector<Entry> entries;
     std::size_t lineNumber = 1;
     while (std::getline(in, line)) {
         ++lineNumber;
         auto cells = SplitLine(line);
         if (cells.size() == 1 && cells[0].empty()) {
-            continue;
+            continue;  // blank line
         }
         if (cells.size() != header.size()) {
             throw std::runtime_error(
@@ -91,9 +105,9 @@ std::vector<Genetizer::Entry> ParseExpectedCsv(std::istream& in) {
                 std::to_string(header.size()) + " columns, got " + std::to_string(cells.size()));
         }
 
-        Genetizer::Entry entry;
+        Entry entry;
         for (std::size_t i = 0; i + 1 < cells.size(); ++i) {
-            entry.variables.push_back(Genetizer::Variable{
+            entry.variables.push_back(Variable{
                 .name = header[i],
                 .value = ParseNumber(cells[i], lineNumber, header[i]),
             });
@@ -108,4 +122,28 @@ std::vector<Genetizer::Entry> ParseExpectedCsv(std::istream& in) {
     return entries;
 }
 
-}  // namespace FunctionsCli
+void WriteExpectedCsv(std::ostream& out,
+                      const std::vector<std::string>& variableNames,
+                      const std::vector<Entry>& entries) {
+    for (const auto& name : variableNames) {
+        out << name << ',';
+    }
+    out << "expected\n";
+
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+        const auto& entry = entries[i];
+        for (const auto& name : variableNames) {
+            const auto found = std::find_if(
+                entry.variables.cbegin(), entry.variables.cend(),
+                [&name](const Variable& variable) { return variable.name == name; });
+            if (found == entry.variables.cend()) {
+                throw std::runtime_error(
+                    "point " + std::to_string(i + 1) + " has no value for '" + name + "'");
+            }
+            out << std::format("{}", found->value) << ',';
+        }
+        out << std::format("{}", entry.expectedResult) << '\n';
+    }
+}
+
+}  // namespace Genetizer

@@ -1,8 +1,9 @@
 #include "cli/functions/commands.h"
-#include "cli/functions/csv.h"
 
 #include "core/functions/applier.h"
 #include "core/functions/config_json.h"
+#include "core/functions/expected_csv.h"
+#include "core/functions/validate.h"
 
 #include <nlohmann/json.hpp>
 
@@ -16,35 +17,6 @@ namespace FunctionsCli {
 
 namespace {
 
-void ValidateConfig(const Genetizer::FunctionsConfig& config) {
-    if (config.mutation.operators.empty()) {
-        throw std::runtime_error("config: operators must not be empty");
-    }
-    if (config.genetizer.maxPopulation == 0) {
-        throw std::runtime_error("config: maxPopulation must be positive");
-    }
-    if (config.genetizer.tournamentSize == 0) {
-        throw std::runtime_error("config: tournamentSize must be positive");
-    }
-    if (config.epochs == 0) {
-        throw std::runtime_error("config: epochs must be positive");
-    }
-    if (config.randomCount > 0 && config.randomDepth == 0) {
-        throw std::runtime_error("config: randomDepth must be positive when randomCount is");
-    }
-    if (config.randomCount == 0 && config.initialExpressions.empty()) {
-        throw std::runtime_error(
-            "config: nothing to seed -- need randomCount > 0 or initialExpressions");
-    }
-    const auto& fitness = config.fitness;
-    if (fitness.accuracyWeight < 0 || fitness.complexityWeight < 0 || fitness.lengthWeight < 0) {
-        throw std::runtime_error("config: fitness weights must not be negative");
-    }
-    if (fitness.accuracyWeight + fitness.complexityWeight + fitness.lengthWeight <= 0) {
-        throw std::runtime_error("config: at least one fitness weight must be positive");
-    }
-}
-
 void SaveConfig(const std::string& path, const Genetizer::FunctionsConfig& config) {
     std::ofstream out(path);
     if (!out) {
@@ -55,13 +27,13 @@ void SaveConfig(const std::string& path, const Genetizer::FunctionsConfig& confi
 
 void RunRun(std::ostream& out, const RunOptions& options) {
     const auto& config = options.config;
-    ValidateConfig(config);
+    Genetizer::Validate(config);
 
     std::ifstream data(options.dataPath);
     if (!data) {
         throw std::runtime_error("cannot open data file: " + options.dataPath);
     }
-    auto entries = ParseExpectedCsv(data);
+    auto entries = Genetizer::ParseExpectedCsv(data);
     Genetizer::FunctionGenetizerApplier applier;
     if (config.seed != 0) {
         Genetizer::FunctionGenetizerApplier::SeedThreadRng(config.seed);

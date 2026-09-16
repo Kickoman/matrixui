@@ -179,6 +179,38 @@ TEST_CASE("PrintWorld collapses duplicate expressions") {
     CHECK(single[3] == "1");
 }
 
+TEST_CASE("CollectDistinct collapses clones and counts the whole world") {
+    const FunctionGenetizer::TWorld world{
+        Organism("x+x", 5, 0.9),
+        Organism("x+x", 2, 0.9),
+        Organism("x+x", 7, 0.9),
+        Organism("x", 1, 0.4),
+    };
+
+    const auto all = FunctionGenetizerApplier::CollectDistinct(world);
+    CHECK(all.uniqueCount == 2);
+    CHECK(all.totalCount == 4);
+    REQUIRE(all.rows.size() == 2);
+    CHECK(all.rows[0].representative->organism.getPresentation() == "x+x");
+    CHECK(all.rows[0].representative->rank == 0.9);
+    CHECK(all.rows[0].birth == 2);  // earliest of the clone group
+    CHECK(all.rows[0].copies == 3);
+    CHECK(all.rows[1].copies == 1);
+
+    // Truncating the rows still reports how many distinct ones exist.
+    const auto topOne = FunctionGenetizerApplier::CollectDistinct(world, 1);
+    CHECK(topOne.rows.size() == 1);
+    CHECK(topOne.uniqueCount == 2);
+    CHECK(topOne.totalCount == 4);
+
+    CHECK(FunctionGenetizerApplier::CollectDistinct(world, 99).rows.size() == 2);
+
+    const auto empty = FunctionGenetizerApplier::CollectDistinct({});
+    CHECK(empty.rows.empty());
+    CHECK(empty.uniqueCount == 0);
+    CHECK(empty.totalCount == 0);
+}
+
 TEST_CASE("PrintWorld handles the degenerate worlds") {
     CHECK(FunctionGenetizerApplier::PrintWorld({}) == "<empty world>\n");
 

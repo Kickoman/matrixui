@@ -18,6 +18,8 @@ add_executable(MatrixGui_tests
     words/queries_test.cpp
 
     functions/applier_test.cpp
+    functions/expected_csv_test.cpp
+    functions/validate_test.cpp
 
     lib/file_stream_test.cpp
     lib/mapped_file_test.cpp

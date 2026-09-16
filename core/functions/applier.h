@@ -53,6 +53,18 @@ struct FitnessConfig {
 
 using FunctionGenetizer = genetyka::Genetizer<OrganismInfo, double>;
 
+struct DistinctRow {
+    const FunctionGenetizer::OrganismInfo* representative;
+    std::size_t birth;
+    std::size_t copies;
+};
+
+struct DistinctWorld {
+    std::vector<DistinctRow> rows;
+    std::size_t uniqueCount = 0;
+    std::size_t totalCount = 0;
+};
+
 class FunctionGenetizerApplier {
 public:
     static void SeedThreadRng(std::uint64_t seed);
@@ -76,6 +88,7 @@ public:
         return [this](OrganismInfo& o) { return mutateFunction(o); };
     }
 
+    static DistinctWorld CollectDistinct(const FunctionGenetizer::TWorld& world, std::size_t top = 0);
     static std::string PrintWorld(const FunctionGenetizer::TWorld& world, std::size_t top = 0);
 
 private:

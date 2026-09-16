@@ -33,6 +33,12 @@ add_executable(MatrixGui
     words/words_evaluate_tab_widget.cpp
     words/words_train_config_widget.cpp
 
+    functions/functions_controller.cpp
+    functions/functions_mode_widget.cpp
+    functions/functions_config_widget.cpp
+    functions/functions_points_model.cpp
+    functions/function_plot_widget.cpp
+
     main_controller.cpp
     main_window.cpp
     main.cpp
@@ -48,6 +54,7 @@ target_link_libraries(MatrixGui PRIVATE
     matrixgui_classifier
     matrixgui_generator
     matrixgui_words
+    matrixgui_functions
     matrixgui_nn
     matrixgui_png
     matrixgui_matrix

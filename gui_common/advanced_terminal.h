@@ -87,6 +87,10 @@ private:
             const auto& remaining = content.substr(newLinePosition + 1);
             buffer.str(remaining);
             buffer.clear();
+            // str() rewinds the put pointer, so without this the next write
+            // would overwrite the partial line instead of continuing it --
+            // which is what a multi-line chunk not ending in '\n' produces.
+            buffer.seekp(0, std::ios_base::end);
         }
     }
 

@@ -1,6 +1,5 @@
 add_library(matrixgui_cli_functions ${MATRIXGUI_LIB_TYPE}
     commands.cpp
-    csv.cpp
 )
 
 target_link_libraries(matrixgui_cli_functions PUBLIC
