@@ -28,6 +28,16 @@ TEST_CASE("Validate names the offending field") {
         CHECK_THROWS_WITH_AS(Genetizer::Validate(config),
                              doctest::Contains("operators"), std::runtime_error);
     }
+    SUBCASE("unknown function") {
+        config.mutation.functions = {"sin", "sqrt"};
+        CHECK_THROWS_WITH_AS(Genetizer::Validate(config),
+                             doctest::Contains("sqrt"), std::runtime_error);
+    }
+    SUBCASE("duplicate function") {
+        config.mutation.functions = {"sin", "sin"};
+        CHECK_THROWS_WITH_AS(Genetizer::Validate(config),
+                             doctest::Contains("duplicate"), std::runtime_error);
+    }
     SUBCASE("zero population") {
         config.genetizer.maxPopulation = 0;
         CHECK_THROWS_WITH_AS(Genetizer::Validate(config),
@@ -64,6 +74,14 @@ TEST_CASE("Validate names the offending field") {
         CHECK_THROWS_WITH_AS(Genetizer::Validate(config),
                              doctest::Contains("positive"), std::runtime_error);
     }
+}
+
+TEST_CASE("Validate accepts an empty function set") {
+    // Deliberate: no functions means pure arithmetic, unlike an empty operator
+    // set, which leaves mutation nothing at all to build with.
+    auto config = Workable();
+    config.mutation.functions.clear();
+    CHECK_NOTHROW(Genetizer::Validate(config));
 }
 
 TEST_CASE("Validate accepts seeding by expression alone") {

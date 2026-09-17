@@ -9,7 +9,7 @@ and the two read and write the same config JSON and the same points CSV.
 |---|---|
 | `functions_controller.{h,cpp}` | Owns the session and the worker thread; publishes snapshots |
 | `functions_mode_widget.{h,cpp}` | The whole mode: layout, wiring, the world table |
-| `functions_config_widget.{h,cpp}` | Spinbox form over `Genetizer::FunctionsConfig` |
+| `functions_config_widget.{h,cpp}` | Spinbox form over `Genetizer::FunctionsConfig`, plus the mutation function checkboxes |
 | `functions_points_model.{h,cpp}` | The data points, the single source of truth behind the table and the plot |
 | `function_plot_widget.{h,cpp}` | The interactive plot: axes, pan, zoom, point editing, curve drawing |
 
@@ -87,9 +87,21 @@ and was already bounded.
 - **`SeedThreadRng` seeds a `thread_local` engine.** It has to be called from the
   worker thread, which is why seeding happens inside the run lambda and not
   where the config is read.
-- **`resetExpected()` wipes the mutation options.** The worker therefore builds a
-  fresh applier per Restart and calls `setMutationOptions` / `setFitnessOptions`
-  *before* `addExpected`, exactly as `cli/functions/commands.cpp` does.
+- **`resetExpected()` wipes the mutation options** — operators, scalar range and
+  the function set, which resets to *all* functions rather than to none. The
+  worker therefore builds a fresh applier per Restart and calls
+  `setMutationOptions` / `setFitnessOptions` *before* `addExpected`, exactly as
+  `cli/functions/commands.cpp` does.
+- **The function checkboxes limit only what mutation introduces.** An initial
+  expression may use any function in the build, and crossover will happily carry
+  it through the population — so unchecking `sin` does not purge an existing
+  `sin(x)`, it only stops new ones appearing. With every box cleared the search
+  evolves pure arithmetic, which is the point of allowing an empty set.
+- **A function name the build does not know is dropped, not preserved.** The form
+  rebuilds the list from the boxes, so a hand-edited config naming `sqrt` loses
+  it on the next `getConfig()`. That is deliberate: unlike `epochs`, which is
+  hidden but representable and survives through `stored`, an unknown name has no
+  widget that could ever show or clear it.
 - **An empty points table is not a valid run.** With no points the mutation config
   has no variables and a random organism indexes an empty list, so `start()`
   refuses before touching the worker.

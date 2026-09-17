@@ -13,7 +13,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
 
 namespace Genetizer {
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MutationOptions, operators, scalarRange);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
+    MutationOptions, operators, functions, scalarRange);
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
     FitnessConfig, accuracyWeight, complexityWeight, lengthWeight);

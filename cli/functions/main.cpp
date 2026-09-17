@@ -60,6 +60,14 @@ int main(int argc, char** argv) {
     runCmd->add_option("--operators", run.config.mutation.operators,
             "Binary operators available to mutation")
         ->capture_default_str();
+    auto functionChoices = Genetizer::AllFunctionNames();
+    functionChoices.emplace_back(FunctionsCli::kNoFunctionsToken);
+    runCmd->add_option("--functions", run.config.mutation.functions,
+            "Unary functions mutation may introduce; 'none' for pure arithmetic. "
+            "Initial expressions may still use any function.")
+        ->delimiter(',')
+        ->check(CLI::IsMember(functionChoices))
+        ->capture_default_str();
     runCmd->add_option("--scalar-range", run.config.mutation.scalarRange,
             "Random constants are drawn from [-range, range]")
         ->capture_default_str();

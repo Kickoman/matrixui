@@ -1,0 +1,2 @@
+--functions: sqrt not in {sin,cos,tan,exp,log,floor,ceil,none}
+Run with --help for more information.

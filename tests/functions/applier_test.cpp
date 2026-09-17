@@ -228,6 +228,29 @@ Genetizer::OrganismInfo Mutated(FunctionGenetizerApplier& applier,
     return organism;
 }
 
+// setMutationOptions must run before addExpected -- addExpected is what teaches
+// the variable list, and resetExpected would wipe the options again.
+FunctionGenetizerApplier TaughtWithFunctions(const std::vector<std::string>& functions) {
+    FunctionGenetizerApplier applier;
+    applier.setMutationOptions({'+', '-', '*', '/', '^'}, functions, 5.0);
+    const std::vector<double> xs{1, 2, 3, 4};
+    const std::vector<double> expected{2, 4, 6, 8};
+    for (std::size_t i = 0; i < xs.size(); ++i) {
+        applier.addExpected({Variable{.name = "x", .value = xs[i]}}, expected[i]);
+    }
+    return applier;
+}
+
+std::size_t FunctionUnits(const Genetizer::Expression& expression) {
+    std::size_t count = 0;
+    for (const auto& unit : expression.getRpn()) {
+        if (unit.getType() == Matematyka::rpn::UnitType::Function) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 bool Runnable(const Genetizer::Expression& expression) {
     Genetizer::VariableHolder holder;
     holder.setVariable("x", 1.5);
@@ -339,6 +362,72 @@ TEST_CASE("Mutation actually changes the expression") {
     // Guarding '#' against pointMutate must not turn that draw into a no-op for
     // every expression that happens to contain a function application.
     auto applier = TaughtOnLine();
+    unsigned changed = 0;
+    for (unsigned seed = 1; seed <= 500; ++seed) {
+        const auto before = Genetizer::Expression("1+sin(x)").toString();
+        if (Mutated(applier, "1+sin(x)", seed).expression.toString() != before) {
+            ++changed;
+        }
+    }
+    CHECK(changed > 450);
+}
+
+TEST_CASE("Naming every function explicitly is the same as the default") {
+    // The default set is the whole table in table order, so pinning it must not
+    // move the RNG stream -- this is what keeps the seeded goldens valid.
+    auto byDefault = TaughtOnLine();
+    auto explicitly = TaughtWithFunctions(Genetizer::AllFunctionNames());
+    const auto sample = [](FunctionGenetizerApplier& applier) {
+        std::vector<std::string> out;
+        FunctionGenetizerApplier::SeedThreadRng(77);
+        for (int i = 0; i < 20; ++i) {
+            out.push_back(applier.makeRandomOrganism(3, i % 2 == 0).getPresentation());
+        }
+        for (unsigned seed = 1; seed <= 20; ++seed) {
+            out.push_back(Mutated(applier, "1+sin(x)", seed).expression.toString());
+        }
+        return out;
+    };
+    CHECK(sample(byDefault) == sample(explicitly));
+}
+
+TEST_CASE("Random organisms use only the configured functions") {
+    auto applier = TaughtWithFunctions({"sin"});
+    FunctionGenetizerApplier::SeedThreadRng(11);
+    for (int i = 0; i < 200; ++i) {
+        const auto text = applier.makeRandomOrganism(4, i % 2 == 0).getPresentation();
+        for (const auto* absent : {"cos(", "tan(", "exp(", "log(", "floor(", "ceil("}) {
+            CHECK(text.find(absent) == std::string::npos);
+        }
+    }
+}
+
+TEST_CASE("An empty function set grows pure arithmetic") {
+    auto applier = TaughtWithFunctions({});
+    FunctionGenetizerApplier::SeedThreadRng(5);
+    for (int i = 0; i < 200; ++i) {
+        CHECK(FunctionUnits(applier.makeRandomOrganism(4, i % 2 == 0).expression) == 0);
+    }
+}
+
+TEST_CASE("An empty function set never introduces a function") {
+    // A seeded expression may still carry one (the set only limits what evolution
+    // adds), so the count may never *grow* -- it is not required to be zero.
+    auto applier = TaughtWithFunctions({});
+    for (const auto* base : {"x+1", "1+sin(x)", "1+sin(x)*cos(x)"}) {
+        const auto before = FunctionUnits(Genetizer::Expression(base));
+        for (unsigned seed = 1; seed <= 500; ++seed) {
+            const auto mutated = Mutated(applier, base, seed);
+            CHECK(FunctionUnits(mutated.expression) <= before);
+            CHECK(Runnable(mutated.expression));
+        }
+    }
+}
+
+TEST_CASE("An empty function set still changes the expression") {
+    // The guards must degrade to another mutation, not quietly do nothing:
+    // a no-op draw is the bug the default-set case above already guards against.
+    auto applier = TaughtWithFunctions({});
     unsigned changed = 0;
     for (unsigned seed = 1; seed <= 500; ++seed) {
         const auto before = Genetizer::Expression("1+sin(x)").toString();

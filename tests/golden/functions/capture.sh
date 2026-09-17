@@ -41,6 +41,15 @@ run run-weights run --data "$DATA" --seed 42 --epochs 3 \
     --accuracy-weight 1 --complexity-weight 0 --length-weight 0 \
     --max-population 64 --random-count 16 --print-top 3 --print-every 0
 
+# --- the mutation function set ---
+run run-functions-subset run --data "$DATA" --seed 42 --epochs 5 \
+    --functions sin,cos --max-population 64 --random-count 16 \
+    --print-top 5 --print-every 0
+
+run run-functions-none run --data "$DATA" --seed 42 --epochs 5 \
+    --functions none --max-population 64 --random-count 16 \
+    --print-top 5 --print-every 0
+
 run save-config run --data "$DATA" --seed 42 --epochs 1 \
     --max-population 64 --random-count 16 --print-top 2 \
     --save-config "$WORK/cfg.json"
@@ -54,6 +63,8 @@ printf 'x,y\n1,2\n' > "$WORK/bad.csv"
 run err-bad-header run --data "$WORK/bad.csv" --seed 42
 printf 'x,expected\n1,abc\n' > "$WORK/nan.csv"
 run err-bad-cell run --data "$WORK/nan.csv" --seed 42
+run err-unknown-function run --data "$DATA" --seed 42 --functions sqrt
+run err-none-combined run --data "$DATA" --seed 42 --functions none,sin
 
 # The work directory and the binary path (echoed in help usage lines) are
 # absolute; nothing else in the output is volatile, since --seed pins both

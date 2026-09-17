@@ -3,8 +3,11 @@
 #include "core/functions/config.h"
 
 #include <string>
+#include <string_view>
 
 namespace FunctionsCli {
+
+inline constexpr std::string_view kNoFunctionsToken = "none";
 
 struct RunOptions {
     std::string dataPath;

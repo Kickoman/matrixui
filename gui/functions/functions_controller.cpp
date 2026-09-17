@@ -287,6 +287,7 @@ void FunctionsController::launch(std::shared_ptr<Session> shared, const bool fre
                 }
                 shared->applier->setMutationOptions(
                     {configCopy.mutation.operators.begin(), configCopy.mutation.operators.end()},
+                    configCopy.mutation.functions,
                     configCopy.mutation.scalarRange);
                 shared->applier->setFitnessOptions(configCopy.fitness);
                 for (auto& entry : pointsCopy) {

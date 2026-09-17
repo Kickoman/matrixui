@@ -7,11 +7,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <fstream>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace FunctionsCli {
 
@@ -25,8 +27,20 @@ void SaveConfig(const std::string& path, const Genetizer::FunctionsConfig& confi
     out << nlohmann::json(config).dump(2) << '\n';
 }
 
+std::vector<std::string> WithoutNoneSentinel(std::vector<std::string> names) {
+    const auto found = std::find(names.begin(), names.end(), kNoFunctionsToken);
+    if (found == names.end()) {
+        return names;
+    }
+    if (names.size() != 1) {
+        throw std::runtime_error("--functions: 'none' cannot be combined with function names");
+    }
+    return {};
+}
+
 void RunRun(std::ostream& out, const RunOptions& options) {
-    const auto& config = options.config;
+    auto config = options.config;
+    config.mutation.functions = WithoutNoneSentinel(std::move(config.mutation.functions));
     Genetizer::Validate(config);
 
     std::ifstream data(options.dataPath);
@@ -40,6 +54,7 @@ void RunRun(std::ostream& out, const RunOptions& options) {
     }
     applier.setMutationOptions(
         {config.mutation.operators.begin(), config.mutation.operators.end()},
+        config.mutation.functions,
         config.mutation.scalarRange);
     applier.setFitnessOptions(config.fitness);
     for (auto& entry : entries) {

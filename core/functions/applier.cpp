@@ -55,9 +55,9 @@ char randomOperator(const MutationConfig& cfg) {
     return cfg.operators[randIndex(cfg.operators.size())];
 }
 
-std::string_view randomFunction(const MutationConfig&) {
-    static auto& functions = Matematyka::rpn::FUNCTIONS_AVAILABLE<double>;
-    return functions[randIndex(functions.size())].name;
+std::string_view randomFunction(const MutationConfig& cfg) {
+    assert(!cfg.functions.empty());
+    return cfg.functions[randIndex(cfg.functions.size())];
 }
 
 std::string randomVarId(const MutationConfig& cfg) {
@@ -107,7 +107,7 @@ void growTree(Expression::TRpn& out, const MutationConfig& c,
         return;
     }
 
-    if (unitInterval() < 0.25) {
+    if (!c.functions.empty() && unitInterval() < 0.25) {
         out.push_back(Expression::TUnit::createFunction(randomFunction(c)));
         growTree(out, c, depthLeft - 1, full);
         out.push_back(Expression::TUnit::createOperator('#'));
@@ -125,6 +125,12 @@ Expression randomExpression(const MutationConfig& c, std::size_t maxDepth, bool 
 }
 
 
+void wrapBinary(Expression::TRpn& rpn, const MutationConfig& c) {
+    const std::size_t root = randomRoot(rpn);
+    rpn.insert(rpn.begin() + root + 1, randomOperand(c));
+    rpn.insert(rpn.begin() + root + 2, Expression::TUnit::createOperator(randomOperator(c)));
+}
+
 void pointMutate(Expression::TRpn& rpn, const MutationConfig& c) {
     const std::size_t i = randIndex(rpn.size());
     switch (rpn[i].getType()) {
@@ -133,11 +139,19 @@ void pointMutate(Expression::TRpn& rpn, const MutationConfig& c) {
             rpn[i] = randomOperand(c);
             break;
         case Matematyka::rpn::UnitType::Function:
+            if (c.functions.empty()) {
+                wrapBinary(rpn, c);
+                break;
+            }
             rpn[i] = Expression::TUnit::createFunction(randomFunction(c));
             break;
         case Matematyka::rpn::UnitType::Operator:
             if (rpn[i].getOperation().getType()
                 == Matematyka::rpn::OperationType::FunctionApplication) {
+                if (c.functions.empty()) {
+                    wrapBinary(rpn, c);
+                    break;
+                }
                 rpn[functionAppliedAt(rpn, i)] =
                     Expression::TUnit::createFunction(randomFunction(c));
                 break;
@@ -166,16 +180,11 @@ void jitterConstant(Expression::TRpn& rpn, const MutationConfig& c) {
 }
 
 void insertUnary(Expression::TRpn& rpn, const MutationConfig& c) {
+    assert(!c.functions.empty());
     const std::size_t root = randomRoot(rpn);
     const std::size_t begin = subtreeBegin(rpn, root);
     rpn.insert(rpn.begin() + root + 1, Expression::TUnit::createOperator('#'));
     rpn.insert(rpn.begin() + begin, Expression::TUnit::createFunction(randomFunction(c)));
-}
-
-void wrapBinary(Expression::TRpn& rpn, const MutationConfig& c) {
-    const std::size_t root = randomRoot(rpn);
-    rpn.insert(rpn.begin() + root + 1, randomOperand(c));
-    rpn.insert(rpn.begin() + root + 2, Expression::TUnit::createOperator(randomOperator(c)));
 }
 
 
@@ -236,8 +245,11 @@ void FunctionGenetizerApplier::addExpected(std::vector<Variable>&& variables, co
     rankCache.clear();
 }
 
-void FunctionGenetizerApplier::setMutationOptions(std::vector<char> operators, const TScalar scalarRange) {
+void FunctionGenetizerApplier::setMutationOptions(
+        std::vector<char> operators, std::vector<std::string> functions,
+        const TScalar scalarRange) {
     mutationConfig.operators = std::move(operators);
+    mutationConfig.functions = std::move(functions);
     mutationConfig.scalarRange = scalarRange;
 }
 
@@ -428,8 +440,11 @@ void FunctionGenetizerApplier::mutateFunction(OrganismInfo& organism) {
             pointMutate(rpn, mutationConfig);
             break;
         case InsertUnary:
-            insertUnary(rpn, mutationConfig);
-            break;
+            if (!mutationConfig.functions.empty()) {
+                insertUnary(rpn, mutationConfig);
+                break;
+            }
+            [[fallthrough]];
         case WrapBinary:
             wrapBinary(rpn, mutationConfig);
             break;

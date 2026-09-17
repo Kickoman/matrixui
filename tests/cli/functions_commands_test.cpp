@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -31,7 +32,7 @@ TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     Tests::TempDir dir;
     const auto path = dir.write("config.json", R"json({
         "genetizer": {"maxPopulation": 128, "tournamentSize": 5, "populationDecreaseFactor": 0.8},
-        "mutation": {"operators": "+-", "scalarRange": 2.5},
+        "mutation": {"operators": "+-", "functions": ["sin", "cos"], "scalarRange": 2.5},
         "fitness": {"accuracyWeight": 2.0, "complexityWeight": 0.5, "lengthWeight": 0.001},
         "initialExpressions": ["x", "sin(x)"],
         "randomCount": 16, "randomDepth": 2,
@@ -44,6 +45,7 @@ TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     CHECK(config.genetizer.maxPopulation == 128);
     CHECK(config.genetizer.tournamentSize == 5);
     CHECK(config.mutation.operators == "+-");
+    CHECK(config.mutation.functions == std::vector<std::string>{"sin", "cos"});
     CHECK(config.mutation.scalarRange == 2.5);
     CHECK(config.fitness.accuracyWeight == 2.0);
     CHECK(config.fitness.complexityWeight == 0.5);
@@ -52,6 +54,56 @@ TEST_CASE("FunctionsConfig loads from JSON including nested fields") {
     CHECK(config.epochs == 7);
     CHECK(config.patience == 3);
     CHECK(config.seed == 99);
+}
+
+TEST_CASE("A config written before the function set still loads") {
+    // MutationOptions deserialises leniently on purpose: every config file and
+    // every stored GUI blob predates the "functions" key, and a throw here would
+    // reset the whole configuration to defaults.
+    Tests::TempDir dir;
+    const auto path = dir.write("config.json", R"json({
+        "genetizer": {"maxPopulation": 128, "tournamentSize": 5, "populationDecreaseFactor": 0.8},
+        "mutation": {"operators": "+-*/^", "scalarRange": 5.0},
+        "fitness": {"accuracyWeight": 2.0, "complexityWeight": 0.5, "lengthWeight": 0.001},
+        "initialExpressions": [],
+        "randomCount": 16, "randomDepth": 2,
+        "epochs": 7, "patience": 3, "printTop": 4, "printEvery": 0, "seed": 99
+    })json");
+
+    Genetizer::FunctionsConfig config;
+    std::ostringstream err;
+    REQUIRE(CliLib::LoadJsonConfig(err, path.string(), config, "functions"));
+    CHECK(config.mutation.functions == Genetizer::AllFunctionNames());
+    CHECK(config.genetizer.maxPopulation == 128);
+}
+
+TEST_CASE("Run resolves the 'none' function token before saving the config") {
+    Tests::TempDir dir;
+    FunctionsCli::RunOptions options;
+    options.dataPath = dir.write("data.csv", "x,expected\n1,2\n2,4\n");
+    options.saveConfigPath = dir.file("saved.json");
+    options.config = SmallConfig();
+    options.config.mutation.functions = {std::string(FunctionsCli::kNoFunctionsToken)};
+
+    std::ostringstream out, err;
+    REQUIRE(FunctionsCli::Run(out, err, options) == FunctionsCli::kSuccess);
+
+    Genetizer::FunctionsConfig reloaded;
+    std::ostringstream loadErr;
+    REQUIRE(CliLib::LoadJsonConfig(loadErr, options.saveConfigPath, reloaded, "functions"));
+    CHECK(reloaded.mutation.functions.empty());
+}
+
+TEST_CASE("Run rejects 'none' mixed with a function name") {
+    Tests::TempDir dir;
+    FunctionsCli::RunOptions options;
+    options.dataPath = dir.write("data.csv", "x,expected\n1,2\n2,4\n");
+    options.config = SmallConfig();
+    options.config.mutation.functions = {"sin", std::string(FunctionsCli::kNoFunctionsToken)};
+
+    std::ostringstream out, err;
+    CHECK(FunctionsCli::Run(out, err, options) == FunctionsCli::kFailure);
+    CHECK(err.str().find("'none' cannot be combined") != std::string::npos);
 }
 
 TEST_CASE("Malformed config JSON is reported") {
@@ -153,6 +205,7 @@ TEST_CASE("Run writes the effective config when asked") {
     CHECK(reloaded.seed == 42);
     CHECK(reloaded.genetizer.maxPopulation == 64);
     CHECK(reloaded.patience == options.config.patience);
+    CHECK(reloaded.mutation.functions == options.config.mutation.functions);
     CHECK(reloaded.fitness.accuracyWeight == options.config.fitness.accuracyWeight);
 }
 

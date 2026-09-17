@@ -49,9 +49,19 @@ struct OrganismInfo {
     mutable std::size_t presentationHash = 0;
 };
 
+inline std::vector<std::string> AllFunctionNames() {
+    std::vector<std::string> names;
+    names.reserve(Matematyka::rpn::FUNCTIONS_AVAILABLE<TScalar>.size());
+    for (const auto& holder : Matematyka::rpn::FUNCTIONS_AVAILABLE<TScalar>) {
+        names.emplace_back(holder.name);
+    }
+    return names;
+}
+
 struct MutationConfig {
     std::vector<std::string> variables;
     std::vector<char> operators{'+', '-', '*', '/', '^'};
+    std::vector<std::string> functions{AllFunctionNames()};
     TScalar scalarRange = 5.;
 };
 
@@ -82,7 +92,7 @@ public:
     void resetExpected();
     void addExpected(std::vector<Variable>&& variables, double result);
 
-    void setMutationOptions(std::vector<char> operators, TScalar scalarRange);
+    void setMutationOptions(std::vector<char> operators, std::vector<std::string> functions, TScalar scalarRange);
     void setFitnessOptions(const FitnessConfig& fitness);
 
     OrganismInfo makeRandomOrganism(std::size_t maxDepth, bool full) const;

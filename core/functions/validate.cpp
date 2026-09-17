@@ -1,12 +1,22 @@
 #include "core/functions/validate.h"
 
 #include <stdexcept>
+#include <unordered_set>
 
 namespace Genetizer {
 
 void Validate(const FunctionsConfig& config) {
     if (config.mutation.operators.empty()) {
         throw std::runtime_error("config: operators must not be empty");
+    }
+    std::unordered_set<std::string> seenFunctions;
+    for (const auto& name : config.mutation.functions) {
+        if (Matematyka::rpn::FindFunction<double>(name) == nullptr) {
+            throw std::runtime_error("config: unknown function '" + name + "'");
+        }
+        if (!seenFunctions.insert(name).second) {
+            throw std::runtime_error("config: duplicate function '" + name + "'");
+        }
     }
     if (config.genetizer.maxPopulation == 0) {
         throw std::runtime_error("config: maxPopulation must be positive");

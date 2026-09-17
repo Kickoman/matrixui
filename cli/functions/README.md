@@ -55,9 +55,40 @@ file supplies the defaults, a flag still overrides its one field, and
 `capture_default_str()` snapshots the loaded values so `--help` shows what will
 actually be used.
 
+`MutationOptions` deserialises leniently, so a config file written before a knob
+existed still loads and the missing key falls back to its default. The other
+sections do not: a partial `genetizer` or `fitness` block is still a parse error.
+
 `--save-config` writes the effective config back out. That file is a valid
 `--config` input, which is how a run is reproduced: it carries the seed, the
 starting population and every GA parameter.
+
+## The mutation vocabulary
+
+Mutation builds expressions out of two sets, and both are configurable:
+`--operators` (binary, a string of characters) and `--functions` (unary, by
+name). `--functions` takes the names `--help` lists, comma-separated or repeated:
+
+```bash
+MatrixGui_functions run --data points.csv --functions sin,cos
+MatrixGui_functions run --data points.csv --functions none     # pure arithmetic
+```
+
+`none` is the command-line spelling of the empty set, which has no other one —
+the JSON spelling is `"functions": []`. It is resolved before the run and before
+`--save-config`, so the token never reaches a config file, and it cannot be
+combined with a function name. **An empty set is a deliberate mode, not an
+error**, unlike an empty operator set: fitting a polynomial, `sin`/`tan`/`floor`
+only inflate the tree and cost rank. With no functions available, every mutation
+that would have introduced one wraps the tree in a binary operator instead.
+
+**The set only limits what evolution introduces on its own.** An initial
+expression may name any function in the build, and such an organism keeps
+working, crossing over and mutating — so `--functions none --expression "sin(x)"`
+is legal, and that `sin` survives without ever spreading to a new lineage.
+
+Repeating a name simply weights the draw, exactly as repeating an operator
+character does; naming a function this build does not have fails the run.
 
 The starting population comes from `initialExpressions` (or repeated
 `--expression`) plus `randomCount` random trees. An expression that does not

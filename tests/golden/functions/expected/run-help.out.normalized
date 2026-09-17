@@ -21,6 +21,9 @@ OPTIONS:
                               Survivor share kept between epochs
           --operators TEXT [+-*/^]  
                               Binary operators available to mutation
+          --functions TEXT:{sin,cos,tan,exp,log,floor,ceil,none} [[sin,cos,tan,exp,log,floor,ceil]]  ... 
+                              Unary functions mutation may introduce; 'none' for pure
+                              arithmetic. Initial expressions may still use any function.
           --scalar-range FLOAT [5]  
                               Random constants are drawn from [-range, range]
           --expression TEXT ... 

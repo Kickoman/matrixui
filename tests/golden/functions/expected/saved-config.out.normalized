@@ -12,6 +12,15 @@
   },
   "initialExpressions": [],
   "mutation": {
+    "functions": [
+      "sin",
+      "cos",
+      "tan",
+      "exp",
+      "log",
+      "floor",
+      "ceil"
+    ],
     "operators": "+-*/^",
     "scalarRange": 5.0
   },

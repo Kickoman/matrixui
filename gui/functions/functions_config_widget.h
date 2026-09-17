@@ -4,6 +4,9 @@
 
 #include <QWidget>
 
+#include <vector>
+
+class QCheckBox;
 class QDoubleSpinBox;
 class QLineEdit;
 class QPlainTextEdit;
@@ -29,6 +32,8 @@ private:
     QDoubleSpinBox* populationDecrease = nullptr;
     QLineEdit* operators = nullptr;
     QDoubleSpinBox* scalarRange = nullptr;
+
+    std::vector<QCheckBox*> functionChecks;
 
     QDoubleSpinBox* accuracyWeight = nullptr;
     QDoubleSpinBox* complexityWeight = nullptr;

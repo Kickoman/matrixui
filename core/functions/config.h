@@ -12,6 +12,7 @@ namespace Genetizer {
 
 struct MutationOptions {
     std::string operators{"+-*/^"};
+    std::vector<std::string> functions{AllFunctionNames()};
     double scalarRange{5.0};
 };
 
