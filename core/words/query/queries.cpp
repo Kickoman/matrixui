@@ -156,6 +156,37 @@ NeighbourReport QueryNeighbours(
     return report;
 }
 
+SubwordNeighbourReport QuerySubwordNeighbours(
+    const EmbeddingIndex& index,
+    const SubwordVectors& subwords,
+    const std::string& word,
+    const std::size_t count
+) {
+    SubwordNeighbourReport report;
+    report.word = word;
+
+    if (subwords.getDim() != index.getDim()) {
+        report.status = {
+            false,
+            "the subword vectors have dimension " + std::to_string(subwords.getDim())
+                + " but the embeddings have " + std::to_string(index.getDim()),
+        };
+        return report;
+    }
+
+    const auto vector = subwords.compose(word, report.subwords);
+    if (vector.empty()) {
+        report.status = {
+            false,
+            "'" + word + "' is not in the vocabulary and is too short for an n-gram",
+        };
+        return report;
+    }
+
+    report.neighbours = index.nearestToVector(vector, {}, count);
+    return report;
+}
+
 AnalogyQueryReport QueryAnalogy(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,

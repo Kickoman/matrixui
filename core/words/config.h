@@ -12,6 +12,9 @@ struct ModelConfig {
     std::size_t negatives{5};
     double initialLearningRate{0.025};
     double minLearningRateFactor{1e-4};
+    std::size_t minN{3};
+    std::size_t maxN{6};
+    std::size_t buckets{0};
 };
 
 struct SamplingConfig {

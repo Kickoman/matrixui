@@ -118,6 +118,7 @@ visible to the user rather than surfacing from deep inside a constructor.
 ```cpp
 struct WorkerContext {                       // one per thread, reused per pair
     std::vector<TFloat> gradient;
+    std::vector<TFloat> hidden;              // the composed centre vector
     std::vector<TWordId> negatives;
     XorShift rng;
 };
@@ -126,23 +127,68 @@ SkipGramNegativeSamplingModel(const Vocabulary&, ModelConfig, XorShift& rng);
 
 void   trainPair(const Pair&, double learningRate, const NegativeSampler&, WorkerContext&) const;
 void   applyUpdate(const Pair&, std::span<const TWordId> negatives, double lr, std::vector<TFloat>& gradient) const;
+void   applyUpdate(const Pair&, std::span<const TWordId> negatives, double lr,
+                   std::vector<TFloat>& gradient, std::vector<TFloat>& hidden) const;
 double computeLoss(const Pair&, std::span<const TWordId> negatives) const;
 double getLearningRateForStep(std::size_t processed, std::size_t total) const;
 
-const Embeddings& getInput()  const;   Embeddings& getInputMutable();
-const Embeddings& getOutput() const;   Embeddings& getOutputMutable();
+const Embeddings& getInput()        const;   Embeddings& getInputMutable();
+const Embeddings& getOutput()       const;   Embeddings& getOutputMutable();
+const Embeddings& getSubwordInput() const;   Embeddings& getSubwordInputMutable();
+const SubwordTable& getSubwordTable() const;
+
+Embeddings composeWords() const;
+void       composeInto(TWordId id, std::vector<TFloat>& hidden) const;
+
 const ModelConfig& getConfig() const;
 std::size_t getBytes() const;
 
 using SGNSModel = SkipGramNegativeSamplingModel;
 ```
 
-Two matrices: `input` holds the vectors you keep (one row per word), `output`
-the auxiliary context vectors discarded after training. `input` starts uniform,
-`output` at zero.
+Three matrices: `input` holds one row per word, `output` the auxiliary context
+vectors discarded after training, and `subwordInput` one row per hash bucket
+(`ModelConfig::buckets` rows, **zero rows when subwords are off**). `input` and
+`subwordInput` start uniform, `output` at zero.
+
+**Word ids and bucket ids never meet.** `input.row()` and `output.row()` take a
+`TWordId`, `subwordInput.row()` a `TBucketId`, and nothing computes `V + b`. That
+is what keeps a bucket id from being printed as a word: the two spaces are
+separate matrices, not two halves of one.
+
+### Subwords
+
+With `ModelConfig::buckets > 0` the centre vector is composed on the fly:
+
+```
+h = (input[word] + Σ subwordInput[b] for b in n-grams(word)) / (1 + |n-grams|)
+```
+
+and **the whole accumulated gradient is applied to every one of those rows**,
+not a `1 / (1 + k)` share of it. That is fastText's convention for skipgram
+(`normalizeGradient_` is only set for its supervised mode): the composed vector
+then moves exactly as far as a plain word2vec row would, so `--lr` means the
+same thing with and without `--buckets` and the two runs stay comparable. A
+bucket that appears twice in one word takes the gradient twice.
+
+`composeCenter` returns a pointer straight into `input` when the word has no
+n-grams, so with `--buckets 0` the hot path is byte for byte the code that was
+there before subwords existed — no copy, no scaling, no second loop. That is
+checked by training the golden corpus and comparing the output file bit for bit.
+
+`composeInto` and `composeWords` go through the same composition as the hot
+path, in the same order, so the materialised matrix matches what training used
+down to the last bit rather than approximately.
 
 `WorkerContext` exists so the per-pair scratch buffers are allocated once per
-thread rather than once per pair.
+thread rather than once per pair — `hidden` included, which is why the five-
+argument `applyUpdate` is the one the trainer calls. The four-argument overload
+allocates its own buffer and is there for tests and one-off calls.
+
+**`computeLoss` composes into a local buffer, never a member.** The monitor
+thread calls it while workers are running, so a shared scratch vector on the
+model would be a real race rather than the benign one below. It runs on a few
+hundred probes every few seconds; the allocation does not matter.
 
 **`trainPair` is `const` while mutating both matrices** — they are declared
 `mutable`. This is deliberate: word2vec's Hogwild-style updates are lock-free,
@@ -209,7 +255,16 @@ void         requestStop();
 
 const SGNSModel*  getModel() const;
 const Embeddings& getInputEmbeddings() const;
+const Embeddings& getWordEmbeddings() const;
 ```
+
+`getInputEmbeddings()` is the raw word matrix — the rows the optimiser touches.
+`getWordEmbeddings()` is what you save and query: with subwords off it **is**
+`getInputEmbeddings()` (same object, no copy), and with subwords on it is the
+`V × N` matrix composed once at the end of `train()`, including after
+`requestStop()`. Composing is `V × (1 + k) × dim` additions — seconds even on a
+600k-word vocabulary — and doing it here rather than in the CLI is what lets the
+GUI build an `EmbeddingIndex` straight from the trainer with no file in between.
 
 Shaped after `Neural::Classifier::Trainer` so a GUI controller drives it the
 same way: configure, attach a progress callback and an output stream, run on a
@@ -241,5 +296,11 @@ worker thread, cancel with `requestStop()`. It builds its own `Subsampler`,
   same rows. It is formally a data race and ThreadSanitizer will report it. It
   is left as-is on purpose: the reported loss is a progress indicator, and
   contention-free updates are the point of the design.
+- **Subwords sharpen that race.** With n-grams every pair updates `1 + k` input
+  rows instead of one, and a few buckets (`<th`, `ing>`, `ого>`) are touched by
+  almost every pair on every thread. Hogwild assumes updates are sparse, and for
+  those rows they are not: expect lost updates and cache-line ping-pong. fastText
+  lives with the same trade; measure `--threads` scaling against `--buckets 0`
+  rather than assuming it holds.
 - `trainer.cpp` is the one place in `core/words` where computation calls into
   `report/` — it prints its own banner, ticks and summary. `trainer.h` does not.

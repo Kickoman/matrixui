@@ -1,6 +1,7 @@
 #pragma once
 
 #include <charconv>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -13,6 +14,17 @@ inline constexpr std::string_view kWhitespace = " \t\n\r\f\v";
 
 // ascii-only. utf-8 would be unchanged.
 std::string ToLower(std::string value);
+
+inline bool IsUtf8Continuation(const unsigned char byte) {
+    return (byte & 0xC0) == 0x80;
+}
+
+// byte offsets where each utf-8 character starts, plus text.size() as the last
+// entry, so character i spans [offsets[i], offsets[i + 1]). a stray
+// continuation byte starts a character of its own rather than running past the
+// end.
+std::vector<std::size_t> Utf8CharacterOffsets(std::string_view text);
+void Utf8CharacterOffsets(std::string_view text, std::vector<std::size_t>& offsets);
 
 // a view into `text`, so the caller keeps `text` alive
 std::string_view Trim(std::string_view text, std::string_view whitespace = kWhitespace);

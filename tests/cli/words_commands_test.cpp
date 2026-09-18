@@ -3,9 +3,13 @@
 #include "cli/words/commands.h"
 #include "cli/words/options.h"
 
+#include "core/lib/file_stream.h"
+#include "core/words/data/embeddings.h"
+#include "core/words/data/subwords.h"
 #include "tests/support/fixtures.h"
 #include "tests/support/temp_dir.h"
 
+#include <filesystem>
 #include <sstream>
 #include <string>
 
@@ -105,4 +109,111 @@ TEST_CASE("Inspect summarises a small text file") {
     CHECK(WordsCli::Inspect(out, err, options) == WordsCli::kSuccess);
     CHECK(err.str().empty());
     CHECK_FALSE(out.str().empty());
+}
+
+TEST_CASE("Neighbours refuses embeddings whose row count is not the vocabulary size") {
+    Tests::TempDir dir;
+    const auto text = dir.write("dump.txt", Tests::ToyCorpusText());
+
+    WordsCli::BuildVocabularyOptions buildVocabulary;
+    buildVocabulary.input = text;
+    buildVocabulary.output = dir.file("built.voc");
+    buildVocabulary.minCount = 1;
+
+    std::ostringstream out, err;
+    REQUIRE(WordsCli::BuildVocabulary(out, err, buildVocabulary) == WordsCli::kSuccess);
+
+    // A matrix with the wrong number of rows -- what feeding the n-gram half of
+    // a subword model to a query would look like.
+    Words::Embeddings mismatched(99, 4);
+    mismatched.initializeZero();
+    std::ostringstream bytes;
+    Words::Embeddings::Save(bytes, mismatched);
+
+    WordsCli::NeighboursOptions neighbours;
+    neighbours.vocabulary = buildVocabulary.output;
+    neighbours.embeddings = dir.write("emb.bin", bytes.str());
+    neighbours.word = "a";
+
+    std::ostringstream queryOut, queryErr;
+    CHECK(WordsCli::Neighbours(queryOut, queryErr, neighbours) == WordsCli::kFailure);
+    CHECK(queryErr.str().find("99 rows but the vocabulary has 6 words") != std::string::npos);
+}
+
+TEST_CASE("Train writes n-gram vectors beside the embeddings when buckets are asked for") {
+    Tests::TempDir dir;
+    const auto text = dir.write("dump.txt", Tests::ToyCorpusText());
+
+    WordsCli::BuildVocabularyOptions buildVocabulary;
+    buildVocabulary.input = text;
+    buildVocabulary.output = dir.file("built.voc");
+    buildVocabulary.minCount = 1;
+
+    WordsCli::BuildCorpusOptions buildCorpus;
+    buildCorpus.input = text;
+    buildCorpus.output = dir.file("built.cor");
+    buildCorpus.vocabulary = buildVocabulary.output;
+
+    std::ostringstream out, err;
+    REQUIRE(WordsCli::BuildVocabulary(out, err, buildVocabulary) == WordsCli::kSuccess);
+    REQUIRE(WordsCli::BuildCorpus(out, err, buildCorpus) == WordsCli::kSuccess);
+
+    WordsCli::TrainOptions train;
+    train.vocabulary = buildVocabulary.output;
+    train.corpus = buildCorpus.output;
+    train.output = dir.file("emb.bin");
+    train.config.model.dim = 4;
+    train.config.model.buckets = 500;
+    train.config.train.epochs = 1;
+    train.config.train.threads = 1;
+
+    std::ostringstream trainOut, trainErr;
+    REQUIRE(WordsCli::Train(trainOut, trainErr, train) == WordsCli::kSuccess);
+    CHECK(trainOut.str().find("subwords: n 3..6, 500 buckets") != std::string::npos);
+
+    const auto subwordPath = dir.file("emb.bin.sub");
+    REQUIRE(std::filesystem::exists(subwordPath));
+
+    // The .emb still holds one row per word; the buckets live in the sidecar.
+    const auto embeddings = Io::ReadFile(train.output,
+        [](std::istream& in) { return Words::Embeddings::Load(in); }, std::ios::binary);
+    CHECK(embeddings.getWords() == 6);
+
+    const auto subwords = Io::ReadFile(subwordPath,
+        [](std::istream& in) { return Words::SubwordVectors::Load(in); }, std::ios::binary);
+    CHECK(subwords.getBuckets() == 500);
+    CHECK(subwords.getDim() == 4);
+    CHECK(subwords.getVectors().getWords() == 500);
+}
+
+TEST_CASE("Train writes no n-gram file when subwords are off") {
+    Tests::TempDir dir;
+    const auto text = dir.write("dump.txt", Tests::ToyCorpusText());
+
+    WordsCli::BuildVocabularyOptions buildVocabulary;
+    buildVocabulary.input = text;
+    buildVocabulary.output = dir.file("built.voc");
+    buildVocabulary.minCount = 1;
+
+    WordsCli::BuildCorpusOptions buildCorpus;
+    buildCorpus.input = text;
+    buildCorpus.output = dir.file("built.cor");
+    buildCorpus.vocabulary = buildVocabulary.output;
+
+    std::ostringstream out, err;
+    REQUIRE(WordsCli::BuildVocabulary(out, err, buildVocabulary) == WordsCli::kSuccess);
+    REQUIRE(WordsCli::BuildCorpus(out, err, buildCorpus) == WordsCli::kSuccess);
+
+    WordsCli::TrainOptions train;
+    train.vocabulary = buildVocabulary.output;
+    train.corpus = buildCorpus.output;
+    train.output = dir.file("emb.bin");
+    train.config.model.dim = 4;
+    train.config.train.epochs = 1;
+    train.config.train.threads = 1;
+
+    std::ostringstream trainOut, trainErr;
+    REQUIRE(WordsCli::Train(trainOut, trainErr, train) == WordsCli::kSuccess);
+    CHECK(trainOut.str().find("subwords") == std::string::npos);
+    CHECK_FALSE(std::filesystem::exists(dir.file("emb.bin.sub")));
 }

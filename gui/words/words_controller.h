@@ -3,6 +3,7 @@
 #include "core/words/config.h"
 #include "core/words/data/corpus.h"
 #include "core/words/data/embeddings.h"
+#include "core/words/data/subwords.h"
 #include "core/words/query/similarity.h"
 #include "core/words/train/trainer.h"
 #include "core/words/data/vocabulary.h"
@@ -36,14 +37,18 @@ public:
 
         bool hasVocabulary = false;
         bool hasCorpus = false;
-        bool hasEmbeddings = false;     // raw vectors held (can be saved)
+        bool hasEmbeddings = false;     // composed vectors held (can be saved)
         bool hasIndex = false;          // query index held (can explore/evaluate)
+        bool hasSubwords = false;       // n-gram vectors held (out-of-vocabulary queries work)
 
         std::size_t vocabularySize = 0;
         std::size_t rawTokens = 0;
         std::size_t keptTokens = 0;
         std::size_t corpusTokens = 0;
         std::size_t embeddingDim = 0;
+        std::size_t subwordBuckets = 0;
+        std::size_t subwordMinN = 0;
+        std::size_t subwordMaxN = 0;
 
         QString dumpPath;
         QString vocabularyPath;
@@ -144,6 +149,12 @@ private:
 
     std::shared_ptr<const Words::Vocabulary> vocabulary;
     std::shared_ptr<const Words::Corpus> corpus;
-    std::shared_ptr<const Words::Embeddings> embeddings;   // raw: the only thing worth saving
+    std::shared_ptr<const Words::Embeddings> embeddings;   // composed: the only thing worth saving
     std::shared_ptr<const Words::EmbeddingIndex> index;    // normalized: queries only
+
+    // The n-gram half of a subword model: written beside the embeddings on save,
+    // picked up from beside them on load, and used for words the vocabulary
+    // does not have. Cleared whenever embeddings arrive without a .sub of their
+    // own, so one can never be written next to vectors it does not belong to.
+    std::shared_ptr<const Words::SubwordVectors> subwords;
 };

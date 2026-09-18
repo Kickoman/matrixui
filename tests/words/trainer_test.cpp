@@ -13,6 +13,7 @@
 #include "tests/support/fixtures.h"
 #include "tests/support/temp_dir.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -376,4 +377,130 @@ TEST_CASE("getInputEmbeddings throws before the first run") {
     Trainer trainer;
     CHECK(trainer.getModel() == nullptr);
     CHECK_THROWS_AS(trainer.getInputEmbeddings(), Words::Error);
+}
+
+namespace {
+
+ModelConfig SubwordModelConfig(const std::size_t dim = 16) {
+    ModelConfig config;
+    config.dim = dim;
+    config.negatives = 5;
+    config.minN = 3;
+    config.maxN = 6;
+    config.buckets = 2000;
+    return config;
+}
+
+void Configure(Trainer& trainer, const Pipeline& pipeline, const ModelConfig& modelConfig) {
+    trainer.setVocabulary(std::make_shared<const Vocabulary>(pipeline.vocabulary));
+    trainer.setCorpus(pipeline.shareCorpus());
+    trainer.setModelConfig(modelConfig);
+
+    SamplingConfig samplingConfig;
+    samplingConfig.sample = 1e-3;
+    samplingConfig.negativeTableSize = kTableSize;
+    trainer.setSamplingConfig(samplingConfig);
+    trainer.setVerbose(false);
+}
+
+TrainConfig OneEpoch(const std::size_t probes = 100) {
+    TrainConfig config;
+    config.epochs = 1;
+    config.threads = 1;
+    config.probePairs = probes;
+    config.reportEveryMs = 5;
+    return config;
+}
+
+}  // namespace
+
+TEST_CASE("Without subwords the word embeddings are the input matrix itself") {
+    const Pipeline pipeline;
+    ModelConfig modelConfig;
+    modelConfig.dim = 16;
+
+    Trainer trainer;
+    Configure(trainer, pipeline, modelConfig);
+    trainer.train(OneEpoch());
+
+    // No copy and no composition: the same object comes back.
+    CHECK(&trainer.getWordEmbeddings() == &trainer.getInputEmbeddings());
+}
+
+TEST_CASE("With subwords the word embeddings are the composed matrix") {
+    const Pipeline pipeline;
+    const auto modelConfig = SubwordModelConfig();
+
+    Trainer trainer;
+    Configure(trainer, pipeline, modelConfig);
+    trainer.train(OneEpoch());
+
+    const auto& composed = trainer.getWordEmbeddings();
+    const auto& raw = trainer.getInputEmbeddings();
+
+    REQUIRE(composed.getWords() == pipeline.vocabulary.getSize());
+    REQUIRE(composed.getDim() == modelConfig.dim);
+    CHECK(&composed != &raw);
+
+    const auto* model = trainer.getModel();
+    REQUIRE(model != nullptr);
+    REQUIRE(model->getSubwordTable().isEnabled());
+
+    std::vector<TFloat> hidden;
+    bool anyDifference = false;
+    for (TWordId id = 0; id < pipeline.vocabulary.getSize(); ++id) {
+        CAPTURE(id);
+        model->composeInto(id, hidden);
+        CHECK(std::equal(hidden.begin(), hidden.end(), composed.row(id)));
+        if (!std::equal(hidden.begin(), hidden.end(), raw.row(id))) {
+            anyDifference = true;
+        }
+    }
+    // Composition has to actually change something, or the check above would
+    // pass on a model that quietly ignored its n-grams.
+    CHECK(anyDifference);
+}
+
+TEST_CASE("A stopped subword run still materialises its word embeddings") {
+    const Pipeline pipeline(400, 300'000);
+    auto modelConfig = SubwordModelConfig(32);
+
+    Trainer trainer;
+    Configure(trainer, pipeline, modelConfig);
+    trainer.setProgressCallback([&](const TrainProgress&) { trainer.requestStop(); });
+
+    TrainConfig trainConfig = OneEpoch(20);
+    trainConfig.epochs = 50;
+    trainConfig.threads = 2;
+    trainConfig.reportEveryMs = 1;
+
+    const auto summary = trainer.train(trainConfig);
+    REQUIRE(summary.stopped);
+
+    const auto& composed = trainer.getWordEmbeddings();
+    CHECK(composed.getWords() == pipeline.vocabulary.getSize());
+
+    std::vector<TFloat> hidden;
+    trainer.getModel()->composeInto(0, hidden);
+    CHECK(std::equal(hidden.begin(), hidden.end(), composed.row(0)));
+}
+
+TEST_CASE("A second run without subwords does not hand back the previous composition") {
+    const Pipeline pipeline;
+
+    Trainer trainer;
+    Configure(trainer, pipeline, SubwordModelConfig());
+    trainer.train(OneEpoch());
+    CHECK(&trainer.getWordEmbeddings() != &trainer.getInputEmbeddings());
+
+    ModelConfig plain;
+    plain.dim = 16;
+    trainer.setModelConfig(plain);
+    trainer.train(OneEpoch());
+    CHECK(&trainer.getWordEmbeddings() == &trainer.getInputEmbeddings());
+}
+
+TEST_CASE("getWordEmbeddings throws before the first run") {
+    Trainer trainer;
+    CHECK_THROWS_AS(trainer.getWordEmbeddings(), Words::Error);
 }

@@ -218,9 +218,15 @@ void WordsDataTabWidget::updateInfo(const WordsController::Info& info)
     corpusLabel->setText(info.hasCorpus
         ? QString("Corpus: %1 tokens").arg(info.corpusTokens)
         : QString("No corpus"));
-    embeddingsLabel->setText(info.hasEmbeddings
-        ? QString("Embeddings: dim %1").arg(info.embeddingDim)
-        : QString("No embeddings"));
+    if (!info.hasEmbeddings) {
+        embeddingsLabel->setText("No embeddings");
+    } else if (info.hasSubwords) {
+        embeddingsLabel->setText(QString("Embeddings: dim %1 (+ %2 subword buckets, n %3..%4)")
+            .arg(info.embeddingDim).arg(info.subwordBuckets)
+            .arg(info.subwordMinN).arg(info.subwordMaxN));
+    } else {
+        embeddingsLabel->setText(QString("Embeddings: dim %1").arg(info.embeddingDim));
+    }
 
     const bool idle = !info.busy;
     openDumpButton->setEnabled(idle);

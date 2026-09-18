@@ -113,3 +113,61 @@ TEST_CASE("ParseNumber refuses what does not fit the asked-for type") {
     CHECK_FALSE(Text::ParseNumber<std::size_t>("-1").has_value());
     CHECK_FALSE(Text::ParseNumber<std::size_t>("1.5").has_value());
 }
+
+TEST_CASE("IsUtf8Continuation recognises the 10xxxxxx bytes") {
+    CHECK_FALSE(Text::IsUtf8Continuation(static_cast<unsigned char>('a')));
+    CHECK_FALSE(Text::IsUtf8Continuation(0xD0));
+    CHECK_FALSE(Text::IsUtf8Continuation(0xE2));
+    CHECK_FALSE(Text::IsUtf8Continuation(0xF0));
+    CHECK(Text::IsUtf8Continuation(0x80));
+    CHECK(Text::IsUtf8Continuation(0xBF));
+    CHECK(Text::IsUtf8Continuation(0xBA));
+}
+
+TEST_CASE("Utf8CharacterOffsets walks ASCII one byte at a time") {
+    const std::vector<std::size_t> expected{0, 1, 2, 3};
+    CHECK(Text::Utf8CharacterOffsets("cat") == expected);
+}
+
+TEST_CASE("Utf8CharacterOffsets keeps two-byte Cyrillic characters whole") {
+    // "кот" is three characters and six bytes.
+    const std::vector<std::size_t> expected{0, 2, 4, 6};
+    CHECK(Text::Utf8CharacterOffsets("кот") == expected);
+    CHECK(std::string("кот").size() == 6);
+}
+
+TEST_CASE("Utf8CharacterOffsets handles mixed character widths") {
+    // 'a' is one byte, the euro sign three, 'б' two.
+    const std::vector<std::size_t> expected{0, 1, 4, 6};
+    CHECK(Text::Utf8CharacterOffsets("a€б") == expected);
+
+    // Four-byte characters count once too.
+    const std::vector<std::size_t> emoji{0, 4, 5};
+    CHECK(Text::Utf8CharacterOffsets("\xF0\x9F\x99\x82x") == emoji);
+}
+
+TEST_CASE("Utf8CharacterOffsets ends with the size, so an empty text gives one entry") {
+    const std::vector<std::size_t> expected{0};
+    CHECK(Text::Utf8CharacterOffsets("") == expected);
+}
+
+TEST_CASE("Utf8CharacterOffsets does not run past the end on broken UTF-8") {
+    // A stray continuation byte becomes a character of its own rather than
+    // attaching to a lead byte that is not there.
+    const std::vector<std::size_t> stray{0, 1};
+    CHECK(Text::Utf8CharacterOffsets("\x80") == stray);
+
+    // A truncated two-byte sequence still terminates.
+    const std::vector<std::size_t> truncated{0, 1};
+    CHECK(Text::Utf8CharacterOffsets("\xD0") == truncated);
+
+    const std::vector<std::size_t> mixed{0, 2, 3};
+    CHECK(Text::Utf8CharacterOffsets("\xD0\xBA\x41") == mixed);
+}
+
+TEST_CASE("Utf8CharacterOffsets reuses the buffer it is handed") {
+    std::vector<std::size_t> offsets{99, 99, 99, 99, 99};
+    Text::Utf8CharacterOffsets("ab", offsets);
+    const std::vector<std::size_t> expected{0, 1, 2};
+    CHECK(offsets == expected);
+}

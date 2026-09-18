@@ -95,7 +95,7 @@ std::optional<NeuralNetworkConfiguration> LoadConfig(std::istream& in) {
         for (auto& layer : config.layersSizes) {
             std::uint64_t size;
             ReadBinaryLE(in, size);
-            layer = static_cast<decltype(layer)>(size);
+            layer = static_cast<std::remove_reference_t<decltype(layer)>>(size);
         }
         return config;
     } catch (...) {

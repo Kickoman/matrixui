@@ -29,4 +29,7 @@ private:
     QDoubleSpinBox* sample = nullptr;
     QDoubleSpinBox* learningRate = nullptr;
     QSpinBox* threads = nullptr;
+    QSpinBox* buckets = nullptr;
+    QSpinBox* minN = nullptr;
+    QSpinBox* maxN = nullptr;
 };

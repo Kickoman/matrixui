@@ -3,6 +3,7 @@ add_library(matrixgui_words ${MATRIXGUI_LIB_TYPE}
 
     data/inspect.cpp
     data/vocabulary.cpp
+    data/subwords.cpp
     data/corpus.cpp
     data/embeddings.cpp
 

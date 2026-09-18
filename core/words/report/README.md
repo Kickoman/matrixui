@@ -83,6 +83,7 @@ That is what makes the banner and the summary directly comparable.
 
 ```cpp
 void PrintNeighbourReport(std::ostream&, const Vocabulary&, const NeighbourReport&);
+void PrintSubwordNeighbourReport(std::ostream&, const Vocabulary&, const SubwordNeighbourReport&);
 void PrintAnalogyQueryReport(std::ostream&, const Vocabulary&, const AnalogyQueryReport&);
 void PrintExpressionReport(std::ostream&, const Vocabulary&, const ExpressionReport&);
 void PrintOddOneOutReport(std::ostream&, const Vocabulary&, const OddOneOutReport&);
@@ -95,6 +96,11 @@ and only the vocabulary can turn one back into a word.
 
 A report whose `QueryStatus` is not `ok` prints its message instead of a table;
 the caller does not need to check first.
+
+`PrintSubwordNeighbourReport` still takes the `Vocabulary`: the query word is
+not in it, but every *answer* is. Its header says `(out of vocabulary, N
+n-grams)` instead of an id and a count, which is why it is a separate printer
+rather than a flag on the neighbour one.
 
 Two row layouts are shared internally: an indented `word  score` used by the
 neighbour, analogy and expression reports, and a signed `score  word` used by

@@ -2,6 +2,7 @@ add_executable(MatrixGui_tests
     main.cpp
 
     words/vocabulary_test.cpp
+    words/subwords_test.cpp
     words/corpus_test.cpp
     words/embeddings_test.cpp
     words/subsampler_test.cpp

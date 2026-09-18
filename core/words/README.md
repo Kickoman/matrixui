@@ -14,7 +14,7 @@ guarantees, and what will bite you.
 | Folder | Stage | README |
 |---|---|---|
 | *(this root)* | Configuration and the exception taxonomy — needed by all four folders | below |
-| `data/` | Survey a raw dump; build and persist the vocabulary, the corpus and the embedding matrix | [`data/README.md`](data/README.md) |
+| `data/` | Survey a raw dump; build and persist the vocabulary, the corpus, the embedding matrix and the character n-grams | [`data/README.md`](data/README.md) |
 | `train/` | Turn a corpus into embeddings: samplers, the SGNS model, the trainer | [`train/README.md`](train/README.md) |
 | `query/` | Use trained embeddings: nearest neighbours, expressions, benchmarks | [`query/README.md`](query/README.md) |
 | `report/` | Render the structs the other three return, to a `std::ostream` | [`report/README.md`](report/README.md) |
@@ -46,6 +46,7 @@ exception, `train/trainer.cpp`, which prints its own banner and progress ticks.
 config.h  error.h  data/types.h                       no words dependencies
 data/inspect.h
 data/corpus.h  data/embeddings.h  data/vocabulary.h
+data/subwords.h
 train/negativesampler.h  train/subsampler.h  train/windowsampler.h
 query/similarity.h  train/model.h
 query/expressions.h  query/evaluate.h  train/trainer.h
@@ -82,7 +83,7 @@ part it cares about:
 
 | Struct | Governs | Fields |
 |---|---|---|
-| `ModelConfig` | the shape of the model itself | `dim` (100), `negatives` (5), `initialLearningRate` (0.025), `minLearningRateFactor` (1e-4) |
+| `ModelConfig` | the shape of the model itself | `dim` (100), `negatives` (5), `initialLearningRate` (0.025), `minLearningRateFactor` (1e-4), `minN` (3), `maxN` (6), `buckets` (0 — subwords off) |
 | `SamplingConfig` | which (centre, context) pairs exist and how negatives are drawn | `window` (5), `sample` (1e-4), `negativeTableSize` (10'000'000), `negativePower` (0.75) |
 | `TrainConfig` | how the run is scheduled | `epochs` (5), `threads` (0), `chunkSize` (1000), `syncEvery` (10000), `reportEveryMs` (3000), `probePairs` (500), `seed` (20260831) |
 | `WordsConfig` | all three together — what the CLI and the GUI pass around | `model`, `sampling`, `train` |
@@ -93,6 +94,9 @@ part it cares about:
 ```cpp
 void Validate(const WordsConfig& config, std::size_t vocabularySize);
 ```
+
+`buckets` defaults to **0**, so a run is plain SGNS unless it is asked for
+otherwise; `minN`/`maxN` are only checked when it is non-zero.
 
 Throws `ConfigError` when a setting cannot produce a usable run. It takes the
 vocabulary size so it can also catch a negative-sampling table smaller than the

@@ -151,7 +151,11 @@ void WordsExploreTabWidget::updateInfo(const WordsController::Info& info)
     loadVocabularyButton->setEnabled(idle);
     loadEmbeddingsButton->setEnabled(idle && info.hasVocabulary);
 
-    if (info.hasIndex) {
+    if (info.hasIndex && info.hasSubwords) {
+        statusLabel->setText(
+            QString("Model ready: %1 words, dim %2 -- unknown words answered from %3 n-gram buckets")
+                .arg(info.vocabularySize).arg(info.embeddingDim).arg(info.subwordBuckets));
+    } else if (info.hasIndex) {
         statusLabel->setText(QString("Model ready: %1 words, dim %2")
             .arg(info.vocabularySize).arg(info.embeddingDim));
     } else if (info.hasVocabulary) {
