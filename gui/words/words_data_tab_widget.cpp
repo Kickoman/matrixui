@@ -14,6 +14,34 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
+
+namespace {
+
+QString formatTime(const double seconds) {
+    const int totalSeconds = static_cast<int>(seconds);
+
+    const int days = totalSeconds / (24 * 60 * 60);
+    const int hours = (totalSeconds / (60 * 60)) % 24;
+    const int minutes = (totalSeconds / 60) % 60;
+    const int secs = totalSeconds % 60;
+
+    QString result;
+
+    if (days > 0) {
+        result += QString("%1d ").arg(days);
+    }
+    if (hours > 0 || days > 0) {
+        result += QString("%1h ").arg(hours);
+    }
+    if (minutes > 0 || hours > 0 || days > 0) {
+        result += QString("%1m ").arg(minutes);
+    }
+    result += QString("%1s").arg(secs);
+    return result;
+}
+
+}
+
 WordsDataTabWidget::WordsDataTabWidget(QWidget* parent)
     : QWidget(parent)
 {
@@ -262,7 +290,5 @@ void WordsDataTabWidget::handleTrainProgress(const Words::TrainProgress& progres
     lossChart->addPoint(progress.loss, "loss");
     speedChart->addPoint(progress.pairsPerSecond / 1e6, "pairs/s");
     progressBar->setValue(static_cast<int>(progress.progress * 1000));
-    etaLabel->setText(QString("ETA: %1m %2s")
-        .arg(static_cast<int>(progress.etaSeconds) / 60)
-        .arg(static_cast<int>(progress.etaSeconds) % 60));
+    etaLabel->setText(QString("ETA: %1").arg(formatTime(progress.etaSeconds)));
 }
