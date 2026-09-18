@@ -8,6 +8,8 @@
 #include "gui/generator/digits_generator_mode_widget.h"
 #include "gui/words/words_controller.h"
 #include "gui/words/words_mode_widget.h"
+#include "gui/functions/functions_controller.h"
+#include "gui/functions/functions_mode_widget.h"
 
 #include <stdexcept>
 
@@ -45,6 +47,17 @@ namespace {
         };
     }
 
+    Mode CreateFunctionsMode() {
+        auto* controller = new FunctionsController();
+        auto* view = new FunctionsModeWidget();
+        controller->setLogger(view->getTerminalStream());
+        view->setController(controller);
+        return {
+            .controller = controller,
+            .view = view,
+        };
+    }
+
     Mode CreateDigitsGeneratorMode() {
         auto* controller = new DigitsGeneratorController();
         auto* view = new DigitsGeneratorModeWidget();
@@ -68,6 +81,8 @@ Mode CreateMode(ModeType mode) {
             return CreateDigitsGeneratorMode();
         case ModeType::Words:
             return CreateWordsMode();
+        case ModeType::Functions:
+            return CreateFunctionsMode();
     }
     throw std::runtime_error("Unsupported mode");
 }

@@ -16,8 +16,9 @@ a framework for models, training and inference from nothing.
 | Recognizer | `MatrixGui_headless predict` | Draw or load an image and classify it |
 | Generator (GAN) | `MatrixGui_gan` | Train a conditional GAN and generate synthetic digit images |
 | Words | `MatrixGui_words` | Train SGNS word embeddings and explore them (neighbours, analogies, evaluation) |
+| Functions | `MatrixGui_functions` | Genetic symbolic regression: evolve an arithmetic expression fitting a table of data points |
 
-All four are also available as modes in the GUI.
+All five are also available as modes in the GUI.
 
 ## Quick start
 
@@ -119,8 +120,9 @@ Tut jość nabor klasaŭ dlia vykarystańńia ŭ svaich pragramach, jość versi
 | Raspaznavaĺnik | `MatrixGui_headless predict` | Klasifikuje zadadzienuju vyjavu (z fajlu) |
 | Generatar GAN | `MatrixGui_gan` | Navučaje cGAN-madeĺ i generuje syntetyčnyja vyjavy ličbaŭ |
 | Słovy | `MatrixGui_words` | Navučaje viektarnyja pradstaŭleńni słovaŭ (SGNS) i dazvalaje ich dasledavać |
+| Funkcyi | `MatrixGui_functions` | Genetyčnaja simvaĺnaja regresija: evalucyja arytmetyčnaha vyrazu pad zadadzienyja punkty |
 
-Usie čatyry režymy dostupnyja taksama ŭ grafičnym interfejsie.
+Usie piać režymaŭ dastupnyja taksama ŭ grafičnym interfejsie.
 
 ## Chutki start
 

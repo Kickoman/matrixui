@@ -20,7 +20,7 @@ std::vector<ExpressionTerm> ParseExpression(
         if (token.empty()) {
             return true;
         }
-        const auto id = vocabulary.getId(ToLower(token));
+        const auto id = vocabulary.getId(Text::ToLower(token));
         if (!id.has_value()) {
             error = "'" + token + "' is not in the vocabulary";
             return false;

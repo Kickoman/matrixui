@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <istream>
-#include <sstream>
 #include <stdexcept>
 #include <thread>
 
@@ -99,8 +98,7 @@ AnalogyReport EvaluateAnalogies(
             continue;
         }
         if (line[0] == ':') {
-            std::string name = line.substr(1);
-            name.erase(0, name.find_first_not_of(" \t"));
+            const std::string name(Text::Trim(std::string_view(line).substr(1)));
             report.categories.push_back(AnalogyStats{name, 0, 0, 0, 0});
             currentCategory = report.categories.size() - 1;
             continue;
@@ -109,19 +107,15 @@ AnalogyReport EvaluateAnalogies(
             continue;
         }
 
-        std::istringstream stream(line);
-        std::string wordA;
-        std::string wordB;
-        std::string wordC;
-        std::string wordD;
-        if (!(stream >> wordA >> wordB >> wordC >> wordD)) {
+        const auto words = Text::SplitWords(line);
+        if (words.size() < 4) {
             continue;
         }
 
-        const auto idA = vocabulary.getId(ToLower(wordA));
-        const auto idB = vocabulary.getId(ToLower(wordB));
-        const auto idC = vocabulary.getId(ToLower(wordC));
-        const auto idD = vocabulary.getId(ToLower(wordD));
+        const auto idA = vocabulary.getId(words[0]);
+        const auto idB = vocabulary.getId(words[1]);
+        const auto idC = vocabulary.getId(words[2]);
+        const auto idD = vocabulary.getId(words[3]);
 
         if (!idA.has_value() || !idB.has_value() || !idC.has_value() || !idD.has_value()) {
             ++report.categories[currentCategory].skipped;
@@ -209,33 +203,25 @@ SimilarityReport EvaluateSimilarity(
             continue;
         }
 
-        std::vector<std::string> fields;
-        std::string field;
-        std::istringstream stream(line);
-        while (stream >> field) {
-            fields.push_back(field);
-        }
-
+        const auto fields = Text::SplitWords(line);
         if (fields.size() <= scoreColumn) {
             continue;
         }
 
-        double score = 0.;
-        try {
-            score = std::stod(fields[scoreColumn]);
-        } catch (const std::exception&) {
+        const auto score = Text::ParseNumber<double>(fields[scoreColumn]);
+        if (!score.has_value()) {
             continue;
         }
 
-        const auto first = vocabulary.getId(ToLower(fields[0]));
-        const auto second = vocabulary.getId(ToLower(fields[1]));
+        const auto first = vocabulary.getId(fields[0]);
+        const auto second = vocabulary.getId(fields[1]);
 
         if (!first.has_value() || !second.has_value()) {
             ++report.skipped;
             continue;
         }
 
-        human.push_back(score);
+        human.push_back(*score);
         model.push_back(index.similarity(*first, *second));
         ++report.asked;
     }

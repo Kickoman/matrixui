@@ -1,11 +1,11 @@
 # The desktop application
 
-`MatrixGui` is the Qt front end. It does the same work as the three CLI binaries,
+`MatrixGui` is the Qt front end. It does the same work as the four CLI binaries,
 but interactively: you pick a mode, fill in a form, press a button, and watch the
 training log scroll past in a terminal pane.
 
 The window is a set of tabs. A tab always starts as the **New mode** picker — a
-2×2 grid of large buttons — and turns into whichever mode you choose. You can
+3×2 grid of large buttons — and turns into whichever mode you choose. You can
 open several tabs and run different things in each.
 
 ```bash
@@ -21,6 +21,7 @@ open several tabs and run different things in each.
 | Digits recognition playground | Draw a digit with the mouse, or load a PNG, and classify it | [`MatrixGui_headless predict`](classifier.md) |
 | GAN generative network training | Train a conditional GAN and generate samples | [`MatrixGui_gan`](gan.md) |
 | Word embeddings (SGNS) | Build a vocabulary and corpus, train, then explore and evaluate | [`MatrixGui_words`](words.md) |
+| Functions symbolic regression | Place data points on a plot and evolve an expression fitting them | [`MatrixGui_functions`](../cli/functions/README.md) |
 
 Every mode is a pair: a **controller** that owns the work and a **widget** that
 shows it. `CreateMode()` in `gui/lib/mode_factory.cpp` is the single place they
@@ -134,11 +135,13 @@ Four edits, all mechanical:
 4. Add a button in `gui/lib/new_mode_widget.cpp` that emits
    `modeRequested(ModeType::YourMode)`.
 
-The picker's 2×2 grid is deliberate: four fixed 300 px buttons in a single row
-would overflow any window narrower than about 1260 px. A fifth mode means
+The picker's 3×2 grid is deliberate: three fixed 300 px buttons need about
+940 px, which fits, while a fourth in the same row would overflow any window
+narrower than about 1260 px. The sixth cell is free; a seventh mode means
 rethinking that layout rather than appending to it.
 
-Add the new sources to `GUI_SOURCES` in `CMakeLists.txt`. Keep the actual work in
+Add the new sources to the `add_executable(MatrixGui ...)` list in
+`gui/CMakeLists.txt`, and link the core library the mode needs. Keep the actual work in
 `core/` — taking a `std::ostream&` rather than printing to `std::cout` — so it
 stays usable from a CLI too.
 
@@ -146,5 +149,5 @@ stays usable from a CLI too.
 
 ## See also
 
-- [Classifier](classifier.md), [GAN](gan.md), [Word embeddings](words.md) — what each mode actually does
+- [Classifier](classifier.md), [GAN](gan.md), [Word embeddings](words.md), [Functions](../cli/functions/README.md) — what each mode actually does
 - [Building](building.md) — Qt requirements and the `BUILD_GUI` option

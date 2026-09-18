@@ -1,21 +1,6 @@
 #include "core/nn/neural_network.h"
-#include <charconv>
 
-
-namespace {
-
-constexpr std::string_view WHITESPACES = " \t\n\r\f\v";
-
-constexpr std::string_view Trim(std::string_view sv) {
-    const auto first = sv.find_first_not_of(WHITESPACES);
-    if (first == std::string_view::npos) {
-        return {};
-    }
-    const auto last = sv.find_last_not_of(WHITESPACES);
-    return sv.substr(first, last - first + 1);
-}
-
-}
+#include "core/lib/text.h"
 
 
 namespace Neural {
@@ -32,19 +17,13 @@ std::string LayersToTextRepresentation(const std::vector<std::size_t>& layers) {
 }
 
 std::vector<std::size_t> TextRepresentationToLayers(const std::string& repr) {
+    const auto cells = Text::Split(repr, ",");
+
     std::vector<std::size_t> result;
-    result.reserve(static_cast<std::size_t>(std::ranges::count(repr, ',')) + 1);
-
-    for (auto part : std::views::split(repr, ',')) {
-        const std::string_view token = Trim(std::string_view(part.begin(), part.end()));
-        if (token.empty()) {
-            continue;
-        }
-
-        std::size_t value{};
-        const auto [ptr, ec] = std::from_chars(token.data(), token.data() + token.size(), value);
-        if (ec == std::errc{} && ptr == token.data() + token.size()) {
-            result.push_back(value);
+    result.reserve(cells.size());
+    for (const auto& cell : cells) {
+        if (const auto value = Text::ParseNumber<std::size_t>(cell)) {
+            result.push_back(*value);
         }
     }
     return result;

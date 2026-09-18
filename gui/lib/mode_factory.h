@@ -10,6 +10,7 @@ enum class ModeType {
     DigitsRecognizer,
     DigitsGenerator,
     Words,
+    Functions,
 };
 
 

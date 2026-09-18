@@ -31,9 +31,15 @@ void MainWindow::setController(MainController* controller) {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    const auto allTabs = mainTabWidget->count();
-    for (int i = 0; i < allTabs; ++i) {
-        handleCloseTabRequested(i);
+    QList<QWidget*> openTabs;
+    openTabs.reserve(mainTabWidget->count());
+    for (int i = 0; i < mainTabWidget->count(); ++i) {
+        openTabs.append(mainTabWidget->widget(i));
+    }
+    for (auto* tab : openTabs) {
+        if (const auto index = mainTabWidget->indexOf(tab); index != -1) {
+            handleCloseTabRequested(index);
+        }
     }
     QMainWindow::closeEvent(event);
 }

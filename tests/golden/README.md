@@ -1,9 +1,9 @@
 # Golden CLI snapshots
 
-One subdirectory per tool — `words/`, `classifier/`, `generator/` — each with
-its own `capture.sh` (records a snapshot), `compare.sh` (re-captures and diffs
-against `expected/`) and `expected/` (the committed snapshot). The top-level
-[`compare.sh`](compare.sh) runs all three, or just the ones named:
+One subdirectory per tool — `words/`, `classifier/`, `generator/`, `functions/` —
+each with its own `capture.sh` (records a snapshot), `compare.sh` (re-captures and
+diffs against `expected/`) and `expected/` (the committed snapshot). The top-level
+[`compare.sh`](compare.sh) runs all four, or just the ones named:
 
 ```bash
 tests/golden/compare.sh                 # everything
@@ -46,6 +46,14 @@ unreproducible. Hence:
   the classifier's final accuracy and its epoch chatter on stderr, the GAN's
   per-epoch lines, the classifier's opinion of a freshly generated image.
 
+**functions** is deterministic whenever `--seed` is passed: it seeds both
+sources of randomness — the genetizer's tournament draw and the thread-local
+engine behind mutation, crossover and random tree growth — so every captured
+case pins one. Its data file (`functions/data.csv`) is committed, the run loop
+prints no timings, and its output turned out identical between a Debug and a
+`-march=native` Release binary, so only the work directory and the binary path
+need normalizing.
+
 ## Re-recording
 
 After an intentional output change, re-record the affected tool and review the
@@ -55,4 +63,5 @@ diff before committing:
 tests/golden/words/capture.sh      tests/golden/words/expected
 tests/golden/classifier/capture.sh tests/golden/classifier/expected
 tests/golden/generator/capture.sh  tests/golden/generator/expected
+tests/golden/functions/capture.sh  tests/golden/functions/expected
 ```

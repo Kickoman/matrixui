@@ -1,0 +1,33 @@
+{
+  "epochs": 1,
+  "fitness": {
+    "accuracyWeight": 0.98,
+    "complexityWeight": 0.2,
+    "lengthWeight": 0.0001
+  },
+  "genetizer": {
+    "maxPopulation": 64,
+    "populationDecreaseFactor": 0.9,
+    "tournamentSize": 3
+  },
+  "initialExpressions": [],
+  "mutation": {
+    "functions": [
+      "sin",
+      "cos",
+      "tan",
+      "exp",
+      "log",
+      "floor",
+      "ceil"
+    ],
+    "operators": "+-*/^",
+    "scalarRange": 5.0
+  },
+  "patience": 50,
+  "printEvery": 10,
+  "printTop": 2,
+  "randomCount": 16,
+  "randomDepth": 4,
+  "seed": 42
+}

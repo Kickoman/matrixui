@@ -1,6 +1,6 @@
 # Building MatrixGui
 
-One CMake project builds everything: a Qt desktop application, three command-line
+One CMake project builds everything: a Qt desktop application, four command-line
 tools and a test binary. They share a set of small libraries under `core/`, each
 built once and linked by whichever front end needs it.
 
@@ -42,7 +42,7 @@ sudo apt-get install -y --no-install-recommends \
 | Option | Default | Description |
 |--------|---------|-------------|
 | `BUILD_GUI` | `ON` | Qt-based graphical application (`MatrixGui`) |
-| `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`) |
+| `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`, `MatrixGui_functions`) |
 | `BUILD_TESTS` | `ON` | Unit-test binary (`MatrixGui_tests`) and the `unit` CTest entry |
 | `BUILD_SHARED_LIBS` | `OFF` | Build the `matrixgui_*` libraries as `.so` instead of `.a` |
 
@@ -60,20 +60,23 @@ by default, and they land in `build/lib/`:
 | `matrixgui_classifier` | `core/classifier/` | `nn` | Classifier training loop and its config |
 | `matrixgui_generator` | `core/generator/` | `nn`, `matrix` | Conditional-GAN training loop and its config |
 | `matrixgui_words` | `core/words/` | `core_lib` | The whole SGNS pipeline. Notably does **not** link `nn`, `matrix` or Eigen |
+| `matrixgui_functions` | `core/functions/` | `core_lib` | Genetic symbolic regression: the genetizer, the fitness applier, and the expected-values CSV |
 | `matrixgui_cli_lib` | `cli/lib/` | `matrix` | Helpers shared by the command-line tools: cached PNG reader, JSON config loading, argv pre-scan |
 | `matrixgui_cli_words` | `cli/words/` | `words` | `MatrixGui_words` subcommand bodies, minus `main()` |
 | `matrixgui_cli_classifier` | `cli/classifier/` | `classifier`, `nn` | `MatrixGui_headless` subcommand bodies, minus `main()` |
 | `matrixgui_cli_generator` | `cli/generator/` | `generator` | `MatrixGui_gan` subcommand bodies, minus `main()` |
+| `matrixgui_cli_functions` | `cli/functions/` | `functions` | `MatrixGui_functions` subcommand bodies, minus `main()` |
 | `matrixgui_gui_common` | `gui_common/` | Qt | Reusable widgets; built only with `BUILD_GUI=ON` |
 
 Executables — these land in `build/` itself:
 
 | Target | Kind | Description |
 |--------|------|-------------|
-| `MatrixGui` | GUI application | Full Qt interface for all four modes |
+| `MatrixGui` | GUI application | Full Qt interface for all five modes |
 | `MatrixGui_headless` | CLI | Classifier training and single-image prediction |
 | `MatrixGui_gan` | CLI | GAN training and image generation |
 | `MatrixGui_words` | CLI | Word-embedding (SGNS) pipeline and queries |
+| `MatrixGui_functions` | CLI | Genetic symbolic regression over a CSV of expected values |
 | `MatrixGui_tests` | test binary | doctest suite, built when `BUILD_TESTS=ON` |
 
 ## Common build configurations
@@ -136,8 +139,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The suite is doctest-based and registered with CTest under the name `unit`; you
-can also run `./build/MatrixGui_tests` directly. It currently covers the words
-module only. See [words.md](words.md#tests) for what it asserts and for the
+can also run `./build/MatrixGui_tests` directly. It covers the words and
+functions modules plus the CLI command bodies. See [words.md](words.md#tests) for what it asserts and for the
 separate golden CLI snapshots (`tests/golden/README.md`).
 
 <details>
@@ -153,7 +156,7 @@ into it, as two jobs:
 
 Both check out with `submodules: true`, since Eigen is required to configure.
 
-The golden CLI snapshots (`tests/golden/compare.sh`, covering all three
+The golden CLI snapshots (`tests/golden/compare.sh`, covering all four
 command-line tools) deliberately do not run in CI, for the `-march=native`
 reason given above. They stay a local pre-commit tool; the unit tests carry the
 same invariants with tolerances. See `tests/golden/README.md`.
@@ -168,7 +171,7 @@ file holds only the options, three interface targets and the `add_subdirectory`
 calls:
 
 ```
-core/       the libraries: matrix, png, lib, nn, classifier, generator, words
+core/       the libraries: matrix, png, lib, nn, classifier, generator, words, functions
 cli/        one folder per command-line tool, mirroring gui/
 gui/        the Qt application
 gui_common/ reusable Qt widgets
