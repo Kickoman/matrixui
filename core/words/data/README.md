@@ -11,9 +11,10 @@ the word list, `EncodeCorpus` to turn the same dump into ids, and finally
 
 | File | Contains |
 |---|---|
-| `types.h` | `TWordId`, `Pair` |
+| `types.h` | `TWordId`, `TBucketId`, `Pair` |
 | `inspect.h/.cpp` | `CorpusStatistics`, `InspectDump` — statistics over a raw dump |
 | `vocabulary.h/.cpp` | `class Vocabulary` — the word ↔ id table with counts |
+| `subwords.h/.cpp` | `HashSubword`, `ComputeSubwords`, `class SubwordTable`, `class SubwordVectors` — character n-grams and the `.sub` file |
 | `corpus.h/.cpp` | `class Corpus`, `TCorpus`, `EncodeCorpus`, `EncodeCorpusToStream`, `SaveCorpus`, `LoadCorpus` |
 | `embeddings.h/.cpp` | `TFloat`, `class Embeddings`, `dot`, `addScaled` |
 
@@ -21,8 +22,13 @@ the word list, `EncodeCorpus` to turn the same dump into ids, and finally
 
 ```cpp
 using TWordId = std::uint32_t;
+using TBucketId = std::uint32_t;
 struct Pair { TWordId center; TWordId context; };
 ```
+
+`TBucketId` indexes the subword matrix, `TWordId` the word matrices. They are
+the same width on purpose — the two spaces are kept apart by living in separate
+matrices (`SGNSModel::getInput()` vs `getSubwordInput()`), not by the type.
 
 `TWordId` being 32-bit is the cap on vocabulary size; `Vocabulary` throws
 `VocabularyError` rather than wrapping around. `Pair` is one skip-gram training
@@ -126,6 +132,83 @@ size × {
     u64  count
 }
 ```
+
+## `subwords.h` / `subwords.cpp`
+
+```cpp
+std::uint32_t          HashSubword(std::string_view ngram);          // FNV-1a, 32-bit
+std::vector<TBucketId> ComputeSubwords(std::string_view word,
+                                       std::size_t minN, std::size_t maxN, std::size_t buckets);
+
+class SubwordTable {
+    static SubwordTable Build(const Vocabulary&, std::size_t minN, std::size_t maxN, std::size_t buckets);
+    std::span<const TBucketId> getSubwords(TWordId id) const;
+    std::size_t getWords() const;  std::size_t getMinN() const;  std::size_t getMaxN() const;
+    std::size_t getBuckets() const;  bool isEnabled() const;
+    std::size_t getReferences() const;  double getAverageSubwords() const;  std::size_t getBytes() const;
+};
+
+class SubwordVectors {
+    static void           Save(std::ostream&, const Embeddings&, std::size_t minN, std::size_t maxN, std::size_t buckets);
+    static SubwordVectors Load(std::istream&);
+    std::vector<TFloat>   compose(std::string_view word) const;      // empty when there are no n-grams
+    const Embeddings& getVectors() const;  std::size_t getMinN() const;  std::size_t getMaxN() const;
+    std::size_t getBuckets() const;  std::size_t getDim() const;
+};
+```
+
+A word is wrapped in `<` and `>` and cut into every substring of `minN..maxN`
+**characters**, then each one is hashed into `[0, buckets)`. So `кот` becomes
+`<ко кот от> <кот кот> <кот>` — six n-grams, not the fifteen a byte-wise split
+would produce, because the boundaries come from
+`Text::Utf8CharacterOffsets` (`core/lib/text.h`) rather than from byte offsets.
+That is the whole reason this is not `std::string_view::substr` on raw bytes: a
+Cyrillic character is two bytes, so a byte trigram would cover one and a half
+letters.
+
+The markers are plain bytes and never reach a file — only the hashes do — so
+they cannot collide with any serialisation format here.
+
+**Details worth knowing:**
+
+- The whole wrapped word is itself an n-gram whenever its length falls inside
+  the range, so a short word shares a bucket with its own form.
+- Repeated n-grams inside one word (`аааа` contains `ааа` twice) are kept, not
+  deduplicated, and therefore take the gradient twice. fastText behaves the same.
+- A word shorter than `minN` once wrapped yields **no** n-grams at all. That is
+  not an error: the model then uses its word row alone, which is exactly the
+  `buckets == 0` path.
+- `buckets == 0` disables everything: `Build` returns an empty table,
+  `getSubwords` an empty span for every id, and `ComputeSubwords` an empty vector.
+- The hash is FNV-1a over `unsigned char`. fastText sign-extends to `int8_t`,
+  which yields different buckets for non-ASCII text; the version byte in a
+  `.sub` file is what keeps a matrix from being read under a different hash.
+
+`SubwordTable` is a flat CSR pair — one `std::vector<TBucketId>` and one
+`std::vector<std::uint64_t>` of offsets — so the hot loop gets a
+`std::span` into it and never allocates. Building it for a 1.7M-word vocabulary
+(Russian Wikipedia, n = 3..6) yields 52.3M references, 209 MB, in about a second.
+
+### `.sub` file format
+
+```
+u32  magic     0x57535542
+u32  version   1
+u64  minN
+u64  maxN
+u64  buckets
+u64  words     ┐
+u64  dim       ├ the Embeddings payload, buckets × dim
+f32[words×dim] ┘
+```
+
+Tagged, unlike `.voc`, so handing a `.sub` to `--embeddings` is rejected instead
+of being read as a vocabulary-sized matrix. `Load` also cross-checks that the
+row count matches the declared bucket count.
+
+`compose(word)` is the out-of-vocabulary path: the mean of the word's n-gram
+rows, with no word row to add. It returns an empty vector when the word has no
+n-grams, which callers report rather than dividing by zero.
 
 ## `corpus.h` / `corpus.cpp`
 

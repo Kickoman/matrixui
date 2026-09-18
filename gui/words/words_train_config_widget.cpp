@@ -34,6 +34,17 @@ WordsTrainConfigWidget::WordsTrainConfigWidget(QWidget* parent)
     threads->setRange(0, 256);
     threads->setSpecialValueText("auto");
 
+    buckets = new QSpinBox(this);
+    buckets->setRange(0, 10'000'000);
+    buckets->setSingleStep(100'000);
+    buckets->setSpecialValueText("off");
+
+    minN = new QSpinBox(this);
+    minN->setRange(1, 12);
+
+    maxN = new QSpinBox(this);
+    maxN->setRange(1, 12);
+
     auto* leftColumn = new QFormLayout();
     leftColumn->addRow("Dimension", dimension);
     leftColumn->addRow("Negatives", negatives);
@@ -44,6 +55,9 @@ WordsTrainConfigWidget::WordsTrainConfigWidget(QWidget* parent)
     rightColumn->addRow("Subsample", sample);
     rightColumn->addRow("Initial learning rate", learningRate);
     rightColumn->addRow("Threads", threads);
+    rightColumn->addRow("Subword buckets", buckets);
+    rightColumn->addRow("Subword min n", minN);
+    rightColumn->addRow("Subword max n", maxN);
 
     auto* layout = new QHBoxLayout();
     layout->addLayout(leftColumn);
@@ -63,6 +77,9 @@ void WordsTrainConfigWidget::setConfig(const Words::WordsConfig& config)
     sample->setValue(config.sampling.sample);
     learningRate->setValue(config.model.initialLearningRate);
     threads->setValue(static_cast<int>(config.train.threads));
+    buckets->setValue(static_cast<int>(config.model.buckets));
+    minN->setValue(static_cast<int>(config.model.minN));
+    maxN->setValue(static_cast<int>(config.model.maxN));
 }
 
 Words::WordsConfig WordsTrainConfigWidget::getConfig() const
@@ -75,5 +92,8 @@ Words::WordsConfig WordsTrainConfigWidget::getConfig() const
     result.sampling.sample = sample->value();
     result.model.initialLearningRate = learningRate->value();
     result.train.threads = static_cast<std::size_t>(threads->value());
+    result.model.buckets = static_cast<std::size_t>(buckets->value());
+    result.model.minN = static_cast<std::size_t>(minN->value());
+    result.model.maxN = static_cast<std::size_t>(maxN->value());
     return result;
 }

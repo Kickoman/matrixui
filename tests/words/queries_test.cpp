@@ -7,6 +7,8 @@
 
 #include <cmath>
 #include <numbers>
+#include <sstream>
+#include <string>
 
 using namespace Words;
 
@@ -198,4 +200,60 @@ TEST_CASE("Normalized scales a vector to unit length") {
     const auto zero = Normalized(std::vector<TFloat>{0.f, 0.f});
     CHECK(zero[0] == 0.f);
     CHECK(zero[1] == 0.f);
+}
+
+namespace {
+
+// Every bucket row points along the first axis, so any word composes to (1, 0)
+// and its nearest neighbour is the word sitting at angle zero -- id 0.
+SubwordVectors AxisAlignedSubwords(const std::size_t dim = 2, const std::size_t buckets = 50) {
+    Embeddings matrix(buckets, dim);
+    matrix.initializeZero();
+    for (TWordId bucket = 0; bucket < buckets; ++bucket) {
+        matrix.row(bucket)[0] = TFloat{1};
+    }
+
+    std::stringstream stream;
+    SubwordVectors::Save(stream, matrix, 3, 6, buckets);
+    return SubwordVectors::Load(stream);
+}
+
+}  // namespace
+
+TEST_CASE("A word outside the vocabulary still gets neighbours from its n-grams") {
+    const Fixture fixture;
+    const auto subwords = AxisAlignedSubwords();
+
+    const auto report = QuerySubwordNeighbours(fixture.index, subwords, "unseen", 3);
+
+    CHECK(report.status.ok);
+    CHECK(report.word == "unseen");
+    CHECK(report.subwords > 0);
+    REQUIRE(report.neighbours.size() == 3);
+    CHECK(report.neighbours[0].id == 0);
+    CHECK(report.neighbours[0].similarity == doctest::Approx(1.).epsilon(1e-6));
+    // Nothing is excluded, so the whole vocabulary is a candidate.
+    CHECK(report.neighbours[1].id == 1);
+}
+
+TEST_CASE("A word with no n-grams at all reports why, rather than throwing") {
+    const Fixture fixture;
+    const auto subwords = AxisAlignedSubwords();
+
+    const auto report = QuerySubwordNeighbours(fixture.index, subwords, "", 3);
+
+    CHECK_FALSE(report.status.ok);
+    CHECK(report.status.message.find("too short") != std::string::npos);
+    CHECK(report.neighbours.empty());
+}
+
+TEST_CASE("Subword vectors of the wrong width are refused, not silently misread") {
+    const Fixture fixture;   // dim 2
+    const auto subwords = AxisAlignedSubwords(5);
+
+    const auto report = QuerySubwordNeighbours(fixture.index, subwords, "unseen", 3);
+
+    CHECK_FALSE(report.status.ok);
+    CHECK(report.status.message.find("dimension") != std::string::npos);
+    CHECK(report.neighbours.empty());
 }

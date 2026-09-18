@@ -6,6 +6,7 @@
 
 #include "core/words/data/corpus.h"
 #include "core/words/data/embeddings.h"
+#include "core/words/data/subwords.h"
 #include "core/words/query/evaluate.h"
 #include "core/words/query/queries.h"
 #include "core/words/report/evaluate_report.h"
@@ -63,6 +64,20 @@ Words::Vocabulary ReadVocabulary(const std::filesystem::path& path) {
 Words::EmbeddingIndex ReadEmbeddings(const std::filesystem::path& path) {
     return Io::ReadFile(path, [](std::istream& in) { return Words::EmbeddingIndex::Load(in); },
                         std::ios::binary);
+}
+
+Words::SubwordVectors ReadSubwords(const std::filesystem::path& path) {
+    return Io::ReadFile(path, [](std::istream& in) { return Words::SubwordVectors::Load(in); },
+                        std::ios::binary);
+}
+
+void RequireMatchingVocabulary(
+    const Words::EmbeddingIndex& index, const Words::Vocabulary& vocabulary) {
+    if (index.getWords() != vocabulary.getSize()) {
+        throw Words::IoError(
+            "embeddings hold " + std::to_string(index.getWords())
+            + " rows but the vocabulary has " + std::to_string(vocabulary.getSize()) + " words");
+    }
 }
 
 }  // namespace
@@ -130,39 +145,71 @@ void RunTrain(std::ostream& out, const TrainOptions& options) {
     trainer.setSamplingConfig(options.config.sampling);
     trainer.setOutputStream(&out);
 
+    const auto& model = options.config.model;
+    const std::size_t rows = 2 * vocabulary->getSize() + model.buckets;
+
     out << "vocab " << vocabulary->getSize()
         << ", corpus " << corpus->size()
         << ", model "
-        << 2 * vocabulary->getSize() * options.config.model.dim * sizeof(Words::TFloat) / (1024 * 1024)
+        << rows * model.dim * sizeof(Words::TFloat) / (1024 * 1024)
         << " MB\n";
+    if (model.buckets > 0) {
+        out << "subwords: n " << model.minN << ".." << model.maxN
+            << ", " << model.buckets << " buckets\n";
+    }
 
     trainer.train(options.config.train);
 
     Io::WriteFile(options.output,
                   [&](std::ostream& file) {
-                      Words::Embeddings::Save(file, trainer.getInputEmbeddings());
+                      Words::Embeddings::Save(file, trainer.getWordEmbeddings());
                   },
                   std::ios::binary);
     out << "saved embeddings to " << options.output << '\n';
+
+    if (model.buckets > 0) {
+        const auto subwordPath = options.subwords.empty()
+            ? std::filesystem::path(options.output.string() + ".sub")
+            : options.subwords;
+        Io::WriteFile(subwordPath,
+                      [&](std::ostream& file) {
+                          Words::SubwordVectors::Save(
+                              file, trainer.getModel()->getSubwordInput(),
+                              model.minN, model.maxN, model.buckets);
+                      },
+                      std::ios::binary);
+        out << "saved subword vectors to " << subwordPath << '\n';
+    }
 }
 
 void RunNeighbours(std::ostream& out, const NeighboursOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
+    RequireMatchingVocabulary(index, vocabulary);
 
     out << "words " << index.getWords() << ", dim " << index.getDim() << "\n\n";
 
     if (options.word.empty()) {
         Words::PrintBatteryReport(out, vocabulary, Words::RunDefaultBattery(vocabulary, index));
-    } else {
-        Words::PrintNeighbourReport(
-            out, vocabulary, Words::QueryNeighbours(vocabulary, index, options.word, options.count));
+        return;
     }
+
+    if (!options.subwords.empty() && !vocabulary.getId(options.word).has_value()) {
+        const auto subwords = ReadSubwords(options.subwords);
+        Words::PrintSubwordNeighbourReport(
+            out, vocabulary,
+            Words::QuerySubwordNeighbours(index, subwords, options.word, options.count));
+        return;
+    }
+
+    Words::PrintNeighbourReport(
+        out, vocabulary, Words::QueryNeighbours(vocabulary, index, options.word, options.count));
 }
 
 void RunEvaluate(std::ostream& out, const EvaluateOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
+    RequireMatchingVocabulary(index, vocabulary);
 
     out << "words " << index.getWords() << ", dim " << index.getDim() << '\n';
 
@@ -190,6 +237,7 @@ void RunEvaluate(std::ostream& out, const EvaluateOptions& options) {
 void RunExpression(std::ostream& out, const ExpressionOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
+    RequireMatchingVocabulary(index, vocabulary);
 
     Words::PrintExpressionReport(
         out, vocabulary,
@@ -199,6 +247,7 @@ void RunExpression(std::ostream& out, const ExpressionOptions& options) {
 void RunOddOne(std::ostream& out, const OddOneOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
+    RequireMatchingVocabulary(index, vocabulary);
 
     Words::PrintOddOneOutReport(
         out, vocabulary, Words::QueryOddOneOut(vocabulary, index, options.words));
@@ -207,6 +256,7 @@ void RunOddOne(std::ostream& out, const OddOneOptions& options) {
 void RunAxis(std::ostream& out, const AxisOptions& options) {
     const auto vocabulary = ReadVocabulary(options.vocabulary);
     const auto index = ReadEmbeddings(options.embeddings);
+    RequireMatchingVocabulary(index, vocabulary);
 
     Words::PrintAxisReport(
         out, vocabulary,

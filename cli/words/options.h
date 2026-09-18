@@ -39,6 +39,7 @@ struct TrainOptions {
     std::filesystem::path vocabulary;
     std::filesystem::path corpus;
     std::filesystem::path output;
+    std::filesystem::path subwords;
     std::string corpusStorage{"auto"};
     Words::WordsConfig config;
 };
@@ -46,6 +47,7 @@ struct TrainOptions {
 struct NeighboursOptions {
     std::filesystem::path vocabulary;
     std::filesystem::path embeddings;
+    std::filesystem::path subwords;
     std::string word;
     std::size_t count{10};
 };

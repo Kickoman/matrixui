@@ -156,6 +156,11 @@ formally a data race and ThreadSanitizer will report it. It is left as-is
 deliberately: the reported loss is a progress indicator, and the contention-free
 updates are the point of the design.
 
+Subwords make the same trade louder: each pair now writes `1 + k` input rows,
+and the handful of buckets that every other word contains are written by every
+thread. The updates that collide are lost, which is the accepted cost of
+lock-free training here as it is in fastText.
+
 ## CLI reference
 
 `MatrixGui_words` takes a subcommand. Each one binds to its own options struct in
@@ -228,7 +233,54 @@ vocabulary it was built against must always be used together.
 | `--sample <x>` | `1e-4` | Subsampling threshold; `0` disables subsampling |
 | `--lr <x>` | `0.025` | Initial learning rate |
 | `--threads <n>` | `0` | Worker threads; `0` uses the hardware concurrency |
+| `--buckets <n>` | `0` | Hash buckets for character n-grams. `0` means no subwords at all — the run is then bit-for-bit the plain SGNS it always was |
+| `--min-n <n>` | `3` | Shortest character n-gram; ignored unless `--buckets` is set |
+| `--max-n <n>` | `6` | Longest character n-gram; ignored unless `--buckets` is set |
 | `--corpus-storage <mode>` | `auto` | How the corpus is held: `load` reads it into memory, `mmap` maps the file read-only, `auto` loads only when the file is small (< 4 GB and < ¼ of `MemAvailable`). The chosen mode is printed at startup |
+| `--subwords-file <path>` | `<output-file>.sub` | Where the n-gram vectors go; written only when `--buckets` is non-zero |
+
+</details>
+
+<details>
+<summary>Subword (fastText-style) training</summary>
+
+With `--buckets N` a word's vector during training is the mean of its own row
+and the rows of its character n-grams, so word forms that share a stem share
+most of their vectors. This is what Russian needs: `кот`, `кота` and `котом`
+are three vocabulary entries splitting the statistics of one word.
+
+```bash
+MatrixGui_words train --vocabulary ru.voc --corpus ru.cor --output-file ru.emb \
+                      --dim 300 --buckets 2000000 --min-n 3 --max-n 6
+MatrixGui_words neighbours --vocabulary ru.voc --embeddings ru.emb \
+                           --subwords-file ru.emb.sub --word котёнком
+```
+
+Two files come out of such a run:
+
+| File | Holds | Used by |
+|---|---|---|
+| `--output-file` (`.emb`) | the composed `V × dim` matrix, one row per word, in the usual format | every query command and the GUI, unchanged |
+| `--subwords-file` (`.sub`) | the `buckets × dim` n-gram matrix plus `min-n`/`max-n`/`buckets` | `neighbours --subwords-file`, for words the vocabulary does not have |
+
+The composition happens once, at the end of training, so a query still costs one
+pass over `V` rows rather than recomposing every word. The n-gram rows for
+**words in the vocabulary** are already folded into the `.emb`; the `.sub` file
+exists for the words that are not.
+
+**n-grams are counted in characters, not bytes.** `кот` wrapped as `<кот>` is
+five characters, so `--min-n 3 --max-n 6` gives six n-grams. A byte-wise split
+would give fifteen, each covering one and a half Cyrillic letters.
+
+Cost, measured on a 1.7M-word Russian vocabulary (`n = 3..6`): 30.6 n-grams per
+vocabulary word, 18.5 per corpus token, 4.2M distinct n-grams. Since every one
+of those rows is read and written per pair, training slows down by roughly the
+same factor as the row count grows, and `--buckets 2000000` adds
+`2000000 × dim × 4` bytes — 2.4 GB at `--dim 300`. `--min-n 5 --max-n 5` is the
+cheap end: 4.1 rows per token and 1.3M distinct n-grams.
+
+`--buckets 0` is the default precisely so that an English run stays comparable
+with every run recorded before this existed.
 
 </details>
 
@@ -240,6 +292,7 @@ vocabulary it was built against must always be used together.
 | `--vocabulary <path>` | *required* | Built vocabulary |
 | `--embeddings <path>` | *required* | Trained embeddings |
 | `--word <w>` | *(empty)* | Query word. Leaving it empty runs a default battery of words |
+| `--subwords-file <path>` | — | `.sub` file from a subword run. Only consulted when `--word` is **not** in the vocabulary, in which case its vector is assembled from n-grams alone |
 | `--count <n>` | `10` | How many neighbours to show |
 
 </details>
@@ -325,6 +378,13 @@ Give it at least one of `--analogies` or `--similarity`.
 <details>
 <summary>Memory notes</summary>
 
+Subword training adds a third matrix of `--buckets × --dim` floats on top of the
+two `V × --dim` ones, plus the flat n-gram table (about 4 bytes per n-gram
+reference: 209 MB for a 1.7M-word Russian vocabulary at `n = 3..6`). At
+`--dim 300` and `--buckets 2000000` that is 2.4 GB of matrix on top of whatever
+the vocabulary already costs, so check `--buckets` against available memory
+before a large run.
+
 Building a vocabulary streams the whole raw dump into an `unordered_map`, which
 is pre-sized for roughly a million distinct words so it never rehashes
 mid-stream. That is the right trade for a wiki-scale corpus, but it means
@@ -357,7 +417,8 @@ what follows is specific to this mode:
   same `report/` functions the CLI uses, so the output is identical. A model
   trained elsewhere is loaded right on this tab: Load vocabulary…, then Load
   embeddings… (embeddings are indexed by the vocabulary's word ids, so the
-  vocabulary comes first).
+  vocabulary comes first). When a subword model is loaded, a word the vocabulary
+  does not have is answered from its n-grams instead of rejected.
 - **Evaluate** — analogy and similarity datasets. Analogy evaluation runs on a
   worker thread and cannot be cancelled once started.
 
@@ -365,6 +426,21 @@ After an in-session training run the query index is built in memory
 (`EmbeddingIndex` from the trainer's embeddings) — no save/load round-trip is
 needed before exploring. Reloading or rebuilding the vocabulary resets the
 loaded corpus, since its encoded ids belong to the old vocabulary.
+
+### Subwords in the GUI
+
+The training panel has `Subword buckets` (shown as *off* at zero, the default),
+`min n` and `max n`, matching `--buckets`, `--min-n` and `--max-n`. A run with
+buckets keeps the n-gram matrix alongside the embeddings, and **Save
+embeddings… writes it as `<name>.sub` beside the file you picked** — the same
+name the CLI defaults to. There is no separate dialog: the two files are useless
+apart, so the sidecar's name is derived rather than asked for.
+
+Load embeddings… picks that sidecar back up when it is there and the dimensions
+agree, and says so in the terminal. A sidecar that does not match, or is not a
+`.sub` at all, is named and ignored — the embeddings still load. Loading plain
+embeddings with no sidecar drops any n-grams that were held, so a stale matrix
+can never be written next to vectors it does not belong to.
 
 ## Tests
 

@@ -87,6 +87,7 @@ Five entry points, each returning its own report struct.
 | Function | Report | What it answers |
 |---|---|---|
 | `QueryNeighbours` | `NeighbourReport` | nearest words to one word |
+| `QuerySubwordNeighbours` | `SubwordNeighbourReport` | nearest words to a word the vocabulary never saw |
 | `QueryAnalogy` | `AnalogyQueryReport` | *a is to b as c is to ?* |
 | `QueryExpression` | `ExpressionReport` | nearest words to an arbitrary `a - b + c` |
 | `QueryOddOneOut` | `OddOneOutReport` | which of these words does not belong |
@@ -107,6 +108,25 @@ Field notes that are not obvious from the names:
 - `AxisReport::explicitWordList` is true when `ranked` holds the caller's own
   word list rather than a slice of the vocabulary. `positive` is the top
   `count`; `negative` is the bottom `count`, most negative first.
+
+`QuerySubwordNeighbours` is the out-of-vocabulary path and the reason subword
+training exists:
+
+```cpp
+SubwordNeighbourReport QuerySubwordNeighbours(const EmbeddingIndex&, const SubwordVectors&,
+                                              const std::string& word, std::size_t count);
+```
+
+It takes no `Vocabulary` — the word by definition is not in one. The query
+vector is the mean of the word's n-gram rows (`SubwordVectors::compose`), and
+the search itself is the ordinary `nearestToVector` over the same composed
+index every other query uses, with nothing excluded. A word too short for any
+n-gram, or a `.sub` whose dimension does not match the index, comes back as a
+`QueryStatus` rather than an exception or a wrong answer.
+
+`SubwordNeighbourReport` carries no id and no count, because an unknown word has
+neither; it carries `subwords`, how many n-grams the vector was built from,
+which is the one number that tells you how much evidence the answer rests on.
 
 Shared helpers, exposed for tests and for the report layer:
 

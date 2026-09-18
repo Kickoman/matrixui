@@ -49,6 +49,23 @@ void PrintNeighbourReport(
     out << '\n';
 }
 
+void PrintSubwordNeighbourReport(
+    std::ostream& out,
+    const Vocabulary& vocabulary,
+    const SubwordNeighbourReport& report
+) {
+    const StreamFormatGuard guard(out);
+
+    if (!report.status.ok) {
+        out << "  " << report.status.message << '\n';
+        return;
+    }
+
+    out << report.word << " (out of vocabulary, " << report.subwords << " n-grams):\n";
+    PrintScoreRows(out, vocabulary, report.neighbours, SimilarityOf);
+    out << '\n';
+}
+
 void PrintAnalogyQueryReport(
     std::ostream& out,
     const Vocabulary& vocabulary,

@@ -70,6 +70,11 @@ int Inspect(std::ostream& out, std::ostream& err, const InspectOptions& options)
 `std::cerr`; the tests pass `std::ostringstream`s. Nothing here writes to a
 stream it found on its own.
 
+A third local helper, `RequireMatchingVocabulary`, guards every command that
+loads embeddings: a matrix whose row count is not the vocabulary size does not
+belong to it, and reading one would name the wrong words or index past the end
+of the word list. It is what rejects a `.sub` file passed as `--embeddings`.
+
 Two local helpers in `commands.cpp` — `PrintVocabularyInfo` and
 `PrintCorpusInfo` — print the short summaries the build/load commands share.
 They live here rather than in `report/` because they describe a *CLI step*, not
@@ -101,7 +106,9 @@ before any body runs.
    `int Name(std::ostream&, std::ostream&, const NameOptions&)` via `Guarded`.
 3. Register the flags and a `->callback()` that assigns `exitCode` in `main.cpp`.
 4. Extend `tests/golden/words/capture.sh` so the new subcommand is snapshotted, and
-   re-run it to record the expected output.
+   re-run it to record the expected output. Run `compare.sh` **first** and
+   confirm it is clean, so the re-record only adds files instead of quietly
+   rewriting existing expectations.
 
 Keep computation out of the body. If a command needs logic worth testing, it
 belongs in `core/words` where the unit tests can reach it — this layer is not in

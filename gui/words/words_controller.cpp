@@ -3,6 +3,7 @@
 #include "core/lib/file_stream.h"
 #include "core/words/config_json.h"
 #include "core/words/error.h"
+#include "core/words/data/subwords.h"
 #include "core/words/query/evaluate.h"
 #include "core/words/query/queries.h"
 #include "core/words/report/evaluate_report.h"
@@ -16,6 +17,11 @@
 #include <utility>
 
 namespace {
+
+std::string SubwordPathFor(const std::string& embeddingsPath)
+{
+    return embeddingsPath + ".sub";
+}
 
 Words::CorpusStorage CorpusStorageFromName(const QString& name)
 {
@@ -60,6 +66,7 @@ WordsController::Info WordsController::getInfo() const
     info.hasCorpus = corpus != nullptr;
     info.hasEmbeddings = embeddings != nullptr;
     info.hasIndex = index != nullptr;
+    info.hasSubwords = subwords != nullptr;
 
     if (vocabulary) {
         info.vocabularySize = vocabulary->getSize();
@@ -71,6 +78,11 @@ WordsController::Info WordsController::getInfo() const
     }
     if (embeddings) {
         info.embeddingDim = embeddings->getDim();
+    }
+    if (subwords) {
+        info.subwordBuckets = subwords->getBuckets();
+        info.subwordMinN = subwords->getMinN();
+        info.subwordMaxN = subwords->getMaxN();
     }
 
     info.dumpPath = dumpPath;
@@ -371,12 +383,21 @@ void WordsController::startTraining()
 
         // Keep a raw copy for saving (the index below holds normalized rows
         // only) before any later run overwrites the trainer's model.
-        auto raw = std::make_shared<const Words::Embeddings>(trainer.getInputEmbeddings());
+        auto raw = std::make_shared<const Words::Embeddings>(trainer.getWordEmbeddings());
         auto built = std::make_shared<const Words::EmbeddingIndex>(Words::EmbeddingIndex(*raw));
 
-        QMetaObject::invokeMethod(this, [this, raw, built] {
+        std::shared_ptr<const Words::SubwordVectors> ngrams;
+        if (trainer.getModel() != nullptr && trainer.getModel()->getSubwordTable().isEnabled()) {
+            const auto& table = trainer.getModel()->getSubwordTable();
+            ngrams = std::make_shared<const Words::SubwordVectors>(
+                trainer.getModel()->getSubwordInput(),
+                table.getMinN(), table.getMaxN(), table.getBuckets());
+        }
+
+        QMetaObject::invokeMethod(this, [this, raw, built, ngrams] {
             embeddings = raw;
             index = built;
+            subwords = ngrams;
             emit infoUpdated();
         });
     });
@@ -393,12 +414,24 @@ void WordsController::saveEmbeddings()
         return;
     }
     auto raw = embeddings;
+    auto ngrams = subwords;
     const auto path = embeddingsPath.toStdString();
-    runTask("Saving embeddings", false, [this, raw, path] {
+    runTask("Saving embeddings", false, [this, raw, ngrams, path] {
         Io::WriteFile(path, [&raw](std::ostream& file) {
             Words::Embeddings::Save(file, *raw);
         }, std::ios::binary);
         out() << "Saved embeddings to " << path << std::endl;
+
+        if (!ngrams) {
+            return;
+        }
+        const auto subwordPath = SubwordPathFor(path);
+        Io::WriteFile(subwordPath, [&ngrams](std::ostream& file) {
+            Words::SubwordVectors::Save(
+                file, ngrams->getVectors(),
+                ngrams->getMinN(), ngrams->getMaxN(), ngrams->getBuckets());
+        }, std::ios::binary);
+        out() << "Saved subword vectors to " << subwordPath << std::endl;
     });
 }
 
@@ -425,9 +458,31 @@ void WordsController::loadEmbeddings()
         }
         auto built = std::make_shared<const Words::EmbeddingIndex>(Words::EmbeddingIndex(*raw));
         out() << "Embeddings: " << raw->getWords() << " words, dim " << raw->getDim() << std::endl;
-        QMetaObject::invokeMethod(this, [this, raw, built] {
+
+        std::shared_ptr<const Words::SubwordVectors> ngrams;
+        const auto subwordPath = SubwordPathFor(path);
+        try {
+            if (auto loaded = Io::TryReadFile(subwordPath,
+                    [](std::istream& in) { return Words::SubwordVectors::Load(in); },
+                    std::ios::binary)) {
+                if (loaded->getDim() != raw->getDim()) {
+                    out() << "Ignoring " << subwordPath << ": dim " << loaded->getDim()
+                          << " does not match the embeddings (" << raw->getDim() << ")." << std::endl;
+                } else {
+                    out() << "Subword vectors: " << loaded->getBuckets() << " buckets, n "
+                          << loaded->getMinN() << ".." << loaded->getMaxN()
+                          << " -- words outside the vocabulary can be queried." << std::endl;
+                    ngrams = std::make_shared<const Words::SubwordVectors>(std::move(*loaded));
+                }
+            }
+        } catch (const std::exception& error) {
+            out() << "Ignoring " << subwordPath << ": " << error.what() << std::endl;
+        }
+
+        QMetaObject::invokeMethod(this, [this, raw, built, ngrams] {
             embeddings = raw;
             index = built;
+            subwords = ngrams;
             emit infoUpdated();
         });
     });
@@ -449,8 +504,17 @@ void WordsController::queryNeighbours(const QString& word, const int count)
     if (!requireIndex()) {
         return;
     }
+    const auto text = word.trimmed().toStdString();
+
+    if (subwords && !vocabulary->getId(text).has_value()) {
+        const auto report = Words::QuerySubwordNeighbours(
+            *index, *subwords, text, static_cast<std::size_t>(count));
+        Words::PrintSubwordNeighbourReport(out(), *vocabulary, report);
+        return;
+    }
+
     const auto report = Words::QueryNeighbours(
-        *vocabulary, *index, word.trimmed().toStdString(), static_cast<std::size_t>(count));
+        *vocabulary, *index, text, static_cast<std::size_t>(count));
     Words::PrintNeighbourReport(out(), *vocabulary, report);
 }
 

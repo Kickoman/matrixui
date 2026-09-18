@@ -244,3 +244,42 @@ TEST_CASE("PrintAnalogyReport output is stable") {
     CHECK_FALSE(output.empty());
     CHECK(output.find("capital-common") != std::string::npos);
 }
+
+TEST_CASE("PrintSubwordNeighbourReport output is stable") {
+    const Fixture fixture;
+
+    SubwordNeighbourReport report;
+    report.word = "kotenok";
+    report.subwords = 26;
+    report.neighbours = {{0, 0.98765}, {2, 0.5}};
+
+    std::string output;
+    {
+        Tests::CoutCapture capture;
+        PrintSubwordNeighbourReport(std::cout, fixture.vocabulary, report);
+        output = capture.str();
+    }
+
+    CHECK(output ==
+        "kotenok (out of vocabulary, 26 n-grams):\n"
+        "    a                 0.9877\n"
+        "    c                 0.5000\n"
+        "\n");
+}
+
+TEST_CASE("PrintSubwordNeighbourReport prints its status instead of a table") {
+    const Fixture fixture;
+
+    SubwordNeighbourReport report;
+    report.word = "x";
+    report.status = {false, "'x' is not in the vocabulary and is too short for an n-gram"};
+
+    std::string output;
+    {
+        Tests::CoutCapture capture;
+        PrintSubwordNeighbourReport(std::cout, fixture.vocabulary, report);
+        output = capture.str();
+    }
+
+    CHECK(output == "  'x' is not in the vocabulary and is too short for an n-gram\n");
+}

@@ -11,6 +11,25 @@ std::string ToLower(std::string value) {
     return value;
 }
 
+void Utf8CharacterOffsets(const std::string_view text, std::vector<std::size_t>& offsets) {
+    offsets.clear();
+    std::size_t index = 0;
+    while (index < text.size()) {
+        offsets.push_back(index);
+        ++index;
+        while (index < text.size() && IsUtf8Continuation(static_cast<unsigned char>(text[index]))) {
+            ++index;
+        }
+    }
+    offsets.push_back(text.size());
+}
+
+std::vector<std::size_t> Utf8CharacterOffsets(const std::string_view text) {
+    std::vector<std::size_t> offsets;
+    Utf8CharacterOffsets(text, offsets);
+    return offsets;
+}
+
 std::string_view Trim(const std::string_view text, const std::string_view whitespace) {
     const auto begin = text.find_first_not_of(whitespace);
     if (begin == std::string_view::npos) {

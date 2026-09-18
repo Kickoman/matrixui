@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/words/data/subwords.h"
 #include "core/words/query/expressions.h"
 #include "core/words/query/similarity.h"
 #include "core/words/data/types.h"
@@ -34,6 +35,20 @@ struct NeighbourReport {
 NeighbourReport QueryNeighbours(
     const Vocabulary& vocabulary,
     const EmbeddingIndex& index,
+    const std::string& word,
+    std::size_t count
+);
+
+struct SubwordNeighbourReport {
+    QueryStatus status;
+    std::string word;
+    std::size_t subwords{0};
+    std::vector<Neighbour> neighbours;
+};
+
+SubwordNeighbourReport QuerySubwordNeighbours(
+    const EmbeddingIndex& index,
+    const SubwordVectors& subwords,
     const std::string& word,
     std::size_t count
 );

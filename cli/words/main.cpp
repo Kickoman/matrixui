@@ -79,6 +79,12 @@ int main(int argc, char** argv) {
     trainCmd->add_option("--sample", train.config.sampling.sample, "Subsampling threshold")->capture_default_str();
     trainCmd->add_option("--lr", train.config.model.initialLearningRate, "Initial learning rate")->capture_default_str();
     trainCmd->add_option("--threads", train.config.train.threads, "Worker threads (0 = auto)")->capture_default_str();
+    trainCmd->add_option("--buckets", train.config.model.buckets,
+                         "Character n-gram hash buckets (0 = no subwords)")->capture_default_str();
+    trainCmd->add_option("--min-n", train.config.model.minN, "Shortest character n-gram")->capture_default_str();
+    trainCmd->add_option("--max-n", train.config.model.maxN, "Longest character n-gram")->capture_default_str();
+    trainCmd->add_option("--subwords-file", train.subwords,
+                         "Where to write the n-gram vectors (default: <output-file>.sub)");
     trainCmd->add_option("--corpus-storage", train.corpusStorage, "Corpus storage: auto, mmap or load")
         ->check(CLI::IsMember({"auto", "mmap", "load"}))->capture_default_str();
     trainCmd->callback([&] {
@@ -92,6 +98,9 @@ int main(int argc, char** argv) {
     neighboursCmd->add_option("--embeddings", neighbours.embeddings, "Trained embeddings")
         ->required()->check(CLI::ExistingFile);
     neighboursCmd->add_option("--word", neighbours.word, "Query word (empty runs a default battery)");
+    neighboursCmd->add_option("--subwords-file", neighbours.subwords,
+                              "n-gram vectors, so a word outside the vocabulary still gets one")
+        ->check(CLI::ExistingFile);
     neighboursCmd->add_option("--count", neighbours.count, "How many neighbours")->capture_default_str();
     neighboursCmd->callback([&] {
         exitCode = WordsCli::Neighbours(std::cout, std::cerr, neighbours);

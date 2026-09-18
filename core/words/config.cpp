@@ -2,6 +2,8 @@
 
 #include "core/words/error.h"
 
+#include <cstdint>
+#include <limits>
 #include <string>
 
 namespace Words {
@@ -18,6 +20,19 @@ void Validate(const WordsConfig& config, const std::size_t vocabularySize) {
     }
     if (config.model.initialLearningRate <= 0.) {
         throw ConfigError("learning rate must be positive");
+    }
+    if (config.model.buckets > 0) {
+        if (config.model.minN == 0) {
+            throw ConfigError("min-n must be greater than zero when subwords are enabled");
+        }
+        if (config.model.maxN < config.model.minN) {
+            throw ConfigError(
+                "max-n (" + std::to_string(config.model.maxN) + ") is smaller than min-n ("
+                + std::to_string(config.model.minN) + ")");
+        }
+        if (config.model.buckets > std::numeric_limits<std::uint32_t>::max()) {
+            throw ConfigError("buckets must fit into 32 bits");
+        }
     }
     if (config.sampling.window == 0) {
         throw ConfigError("window must be greater than zero");

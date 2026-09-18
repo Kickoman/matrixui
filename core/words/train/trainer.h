@@ -93,6 +93,7 @@ public:
 
     const SGNSModel* getModel() const { return model.get(); }
     const Embeddings& getInputEmbeddings() const;
+    const Embeddings& getWordEmbeddings() const;
 
 private:
     std::ostream& log() const;
@@ -103,6 +104,7 @@ private:
     SamplingConfig samplingConfig;
 
     std::unique_ptr<SGNSModel> model;
+    Embeddings wordEmbeddings;
 
     std::atomic<bool> stopRequested{false};
     std::atomic<bool> running{false};

@@ -136,6 +136,13 @@ const Embeddings& Trainer::getInputEmbeddings() const {
     return model->getInput();
 }
 
+const Embeddings& Trainer::getWordEmbeddings() const {
+    if (!model) {
+        throw Error("no model yet -- call train() first");
+    }
+    return model->getSubwordTable().isEnabled() ? wordEmbeddings : model->getInput();
+}
+
 std::ostream& Trainer::log() const {
     if (!verbose) {
         return NullStream();
@@ -176,6 +183,7 @@ TrainSummary Trainer::train(const TrainConfig& trainConfig) {
 
     XorShift seedRng(trainConfig.seed);
     model = std::make_unique<SGNSModel>(*vocabulary, modelConfig, seedRng);
+    wordEmbeddings = Embeddings();
 
     const auto probes = BuildProbeSet(
         *corpus, subsampler, windowSampler, negativeSampler,
@@ -301,6 +309,10 @@ TrainSummary Trainer::train(const TrainConfig& trainConfig) {
         : 0.;
     summary.finalLoss = MeanProbeLoss(*model, probes);
     summary.stopped = stopRequested.load(std::memory_order_relaxed);
+
+    if (model->getSubwordTable().isEnabled()) {
+        wordEmbeddings = model->composeWords();
+    }
 
     PrintTrainSummary(log(), summary);
     return summary;

@@ -15,6 +15,7 @@ TEXT=tests/golden/words/corpus.txt
 VOC="$WORK/built.voc"
 COR="$WORK/built.cor"
 EMB="$WORK/emb.bin"
+SUBEMB="$WORK/sub.emb"
 
 run() {
     local name="$1"; shift
@@ -37,6 +38,12 @@ run loadcor   loadcor  --input-file "$COR"
 run train train --vocabulary "$VOC" --corpus "$COR" --output-file "$EMB" \
     --dim 32 --epochs 1 --threads 1 --corpus-storage load
 
+# --- training with character n-grams (same seed and thread count, so the
+#     composed vectors are reproducible too) ---
+run train-subwords train --vocabulary "$VOC" --corpus "$COR" --output-file "$SUBEMB" \
+    --dim 32 --epochs 1 --threads 1 --corpus-storage load \
+    --buckets 1000 --min-n 3 --max-n 6
+
 # --- query commands ---
 run neighbours-word neighbours --vocabulary "$VOC" --embeddings "$EMB" --word king --count 5
 run neighbours-battery neighbours --vocabulary "$VOC" --embeddings "$EMB"
@@ -45,9 +52,16 @@ run oddone      oddone "king queen boy computer" --vocabulary "$VOC" --embedding
 run axis        axis "good - bad" --vocabulary "$VOC" --embeddings "$EMB" --count 5
 run axis-words  axis "good - bad" --words "king queen war music" --vocabulary "$VOC" --embeddings "$EMB"
 
+# --- out-of-vocabulary queries, which are the point of the n-gram vectors ---
+run neighbours-oov neighbours --vocabulary "$VOC" --embeddings "$SUBEMB" \
+    --subwords-file "$SUBEMB.sub" --word zzzznotaword --count 5
+run neighbours-oov-short neighbours --vocabulary "$VOC" --embeddings "$SUBEMB" \
+    --subwords-file "$SUBEMB.sub" --word zz --count 5
+
 # --- error paths (must not terminate) ---
 run err-missing-voc  loadvoc --input-file /dev/null
 run err-unknown-word neighbours --vocabulary "$VOC" --embeddings "$EMB" --word zzzznotaword
+run err-subwords-as-embeddings neighbours --vocabulary "$VOC" --embeddings "$SUBEMB.sub" --word king
 
 # Normalise the volatile parts of the training log.
 #

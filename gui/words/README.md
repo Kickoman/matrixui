@@ -60,19 +60,52 @@ directly.
 `TrainSummary::stopped`. `Trainer::train()` resets its own stop flag, so the
 member `trainer` survives repeated runs and does not need recreating.
 
-### Raw versus normalised embeddings
+### Composed versus normalised embeddings
 
 The controller holds both, and the distinction matters:
 
 ```cpp
-std::shared_ptr<const Words::Embeddings>    embeddings;   // raw: the only thing worth saving
+std::shared_ptr<const Words::Embeddings>     embeddings;  // composed: the only thing worth saving
 std::shared_ptr<const Words::EmbeddingIndex> index;       // normalised: queries only
+std::shared_ptr<const Words::SubwordVectors> subwords;    // n-grams: unknown words only
 ```
 
 `EmbeddingIndex` normalises the rows it is given, so saving from it would write
 unit vectors and silently lose magnitude. Save from `embeddings`; query through
 `index`. `hasEmbeddings` and `hasIndex` are separate `Info` flags for the same
 reason.
+
+`embeddings` comes from `Trainer::getWordEmbeddings()`, not
+`getInputEmbeddings()`: with subwords on, that is the `V × dim` matrix composed
+from each word row and its n-gram rows. Without subwords the two are the same
+object, so nothing is copied that was not copied before.
+
+### Subwords
+
+Training with `Subword buckets` greater than zero also leaves the n-gram matrix
+in `subwords`. Three rules keep it honest:
+
+- **It is saved beside the embeddings**, as `<embeddings path>.sub`, by the same
+  Save embeddings… button. The name is derived rather than asked for, because
+  the two files are useless apart — the same reasoning as a `.voc` and its
+  `.cor`. The CLI's `--subwords-file` defaults to the same name.
+- **It is loaded from beside them too.** Load embeddings… looks for that sidecar
+  and picks it up when the dimensions agree, reporting what it found; a `.sub`
+  whose width does not match is named and ignored rather than half-used.
+- **It is dropped when the embeddings change without one.** Loading a plain
+  `.emb` clears `subwords`, so a stale n-gram matrix can never be written next
+  to vectors it does not belong to, nor answer a query about them.
+
+With it loaded, the Explore tab's neighbours query answers a word the vocabulary
+does not have: the query vector is the mean of the word's n-gram rows and the
+result prints through `PrintSubwordNeighbourReport` (`out of vocabulary, N
+n-grams` instead of an id and a count). A word the vocabulary *does* have never
+takes that path — its composed row is already in the index.
+
+**Cost to know about:** `subwords` is a copy of the bucket matrix, so it holds
+`buckets × dim × 4` bytes on top of the model — 2.4 GB at 2M buckets and dim
+300. The copy is what makes the saved file match the embeddings it sits beside
+even after another run starts.
 
 Vocabulary and corpus are `shared_ptr<const>` because `Words::Trainer` shares
 rather than takes ownership — the tabs keep showing statistics after a run ends,
@@ -94,7 +127,9 @@ which is what makes the mode usable from a console build.
 ## `WordsTrainConfigWidget`
 
 Editor for the knobs the CLI exposes: `dim`, `negatives`, `window`, `epochs`,
-`sample`, learning rate, `threads`.
+`sample`, learning rate, `threads`, and the three subword settings — `buckets`
+(shown as *off* at zero, which is the default and means plain SGNS), `min n` and
+`max n`.
 
 It keeps a full `Words::WordsConfig` in `stored` and overwrites only the fields
 it shows. Everything else — `chunkSize`, `syncEvery`, `reportEveryMs`,
