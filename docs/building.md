@@ -57,6 +57,7 @@ by default, and they land in `build/lib/`:
 | `matrixgui_png` | `core/png/` | `matrix` | Image loading/writing over vendored stb |
 | `matrixgui_core_lib` | `core/lib/` | — | Framework-free utilities: text, stats, stream formatting, file IO, RNG, caches. Knows nothing about matrices or networks |
 | `matrixgui_nn` | `core/nn/` | `matrix`, `core_lib` | Layers, network, applier, loader, datasets |
+| `matrixgui_serving` | `core/serving/` | `nn`, `core_lib` | Reads a model directory — `manifest.json` plus a `.wgt` blob — into a validated, immutable `LoadedModel`. Links neither Qt, nor `classifier`, nor `png` |
 | `matrixgui_classifier` | `core/classifier/` | `nn` | Classifier training loop and its config |
 | `matrixgui_generator` | `core/generator/` | `nn`, `matrix` | Conditional-GAN training loop and its config |
 | `matrixgui_words` | `core/words/` | `core_lib` | The whole SGNS pipeline. Notably does **not** link `nn`, `matrix` or Eigen |
@@ -140,7 +141,8 @@ ctest --test-dir build --output-on-failure
 
 The suite is doctest-based and registered with CTest under the name `unit`; you
 can also run `./build/MatrixGui_tests` directly. It covers the words and
-functions modules plus the CLI command bodies. See [words.md](words.md#tests) for what it asserts and for the
+functions modules, the network loader and the serving loader, plus the CLI
+command bodies. See [words.md](words.md#tests) for what it asserts and for the
 separate golden CLI snapshots (`tests/golden/README.md`).
 
 <details>

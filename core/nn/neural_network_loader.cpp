@@ -17,6 +17,23 @@ namespace Neural {
 namespace {
 
 
+constexpr std::uint32_t kMaxLayers = 1u << 12;
+constexpr std::uint64_t kMaxLayerSize = std::uint64_t{1} << 24;
+constexpr std::uint64_t kMaxWeightBytes = std::uint64_t{4} << 30;
+
+std::int64_t RemainingBytes(std::istream& in) {
+    const auto position = in.tellg();
+    if (position < 0) {
+        in.clear();
+        return -1;
+    }
+    in.seekg(0, std::ios::end);
+    const std::int64_t end = in.tellg();
+    in.seekg(position);
+    return end < 0 ? -1 : end - static_cast<std::int64_t>(position);
+}
+
+
 double StdDevByActivation(const ActivationType activation, const std::size_t inputSize) {
     switch (activation) {
         case ActivationType::ReLU:
@@ -79,23 +96,41 @@ void SaveNetwork(std::ostream& out, const NeuralNetwork& network) {
 }
 
 std::optional<NeuralNetworkConfiguration> LoadConfig(std::istream& in) {
-    in.seekg(sizeof(std::uint32_t), std::ios::cur); // skip version
+    std::uint32_t version = 0;
+    ReadBinaryLE(in, version);
+    if (!in || version != 1) {
+        return std::nullopt;
+    }
 
     NeuralNetworkConfiguration config;
-    std::uint8_t hiddenActivation, outputActivation;
+    std::uint8_t hiddenActivation = 0;
+    std::uint8_t outputActivation = 0;
     ReadBinaryLE(in, hiddenActivation);
     ReadBinaryLE(in, outputActivation);
     config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
     config.outputActivation = static_cast<ActivationType>(outputActivation);
 
     try {
-        std::uint32_t numLayers;
+        std::uint32_t numLayers = 0;
         ReadBinaryLE(in, numLayers);
+        if (!in || numLayers < 2 || numLayers > kMaxLayers) {
+            return std::nullopt;
+        }
+
         config.layersSizes.resize(numLayers);
         for (auto& layer : config.layersSizes) {
-            std::uint64_t size;
+            std::uint64_t size = 0;
             ReadBinaryLE(in, size);
-            layer = static_cast<std::remove_reference_t<decltype(layer)>>(size);
+            layer = static_cast<std::size_t>(size);
+        }
+        if (!in) {
+            return std::nullopt;
+        }
+
+        for (const auto layer : config.layersSizes) {
+            if (layer == 0 || layer > kMaxLayerSize) {
+                return std::nullopt;
+            }
         }
         return config;
     } catch (...) {
@@ -104,29 +139,88 @@ std::optional<NeuralNetworkConfiguration> LoadConfig(std::istream& in) {
 }
 
 NeuralNetwork LoadNetwork(std::istream& in) {
-    std::uint32_t version;
+    std::uint32_t version = 0;
     ReadBinaryLE(in, version);
+    if (!in) {
+        throw std::runtime_error("Network file is truncated: no version header");
+    }
     if (version != 1) {
         throw std::runtime_error("Unsupported network version: " + std::to_string(version));
     }
 
     NeuralNetwork network;
-    std::uint8_t hiddenActivation, outputActivation;
+    std::uint8_t hiddenActivation = 0;
+    std::uint8_t outputActivation = 0;
     ReadBinaryLE(in, hiddenActivation);
     ReadBinaryLE(in, outputActivation);
+    if (!in) {
+        throw std::runtime_error("Network file is truncated: no activation header");
+    }
     network.config.hiddenActivation = static_cast<ActivationType>(hiddenActivation);
     network.config.outputActivation = static_cast<ActivationType>(outputActivation);
 
-    std::uint32_t numLayers;
+    std::uint32_t numLayers = 0;
     ReadBinaryLE(in, numLayers);
-    network.config.layersSizes.resize(numLayers);
-    for (std::uint32_t i = 0; i < numLayers; ++i) {
-        std::uint64_t s;
-        ReadBinaryLE(in, s);
-        network.config.layersSizes[i] = static_cast<std::size_t>(s);
+    if (!in) {
+        throw std::runtime_error("Network file is truncated: no layer count");
+    }
+    if (numLayers < 2) {
+        throw std::runtime_error(
+            "Network file declares " + std::to_string(numLayers)
+            + " layers, at least 2 are required");
+    }
+    if (numLayers > kMaxLayers) {
+        throw std::runtime_error(
+            "Network file declares " + std::to_string(numLayers) + " layers, more than the "
+            + std::to_string(kMaxLayers) + " allowed");
     }
 
+    if (const std::int64_t remaining = RemainingBytes(in);
+        remaining >= 0
+        && static_cast<std::uint64_t>(remaining) < std::uint64_t{numLayers} * sizeof(std::uint64_t)) {
+        throw std::runtime_error(
+            "Network file declares " + std::to_string(numLayers) + " layers but holds only "
+            + std::to_string(remaining) + " bytes after the header");
+    }
+
+    network.config.layersSizes.resize(numLayers);
+    for (std::uint32_t i = 0; i < numLayers; ++i) {
+        std::uint64_t size = 0;
+        ReadBinaryLE(in, size);
+        network.config.layersSizes[i] = static_cast<std::size_t>(size);
+    }
+    if (!in) {
+        throw std::runtime_error("Network file is truncated: layer sizes are incomplete");
+    }
+    for (std::uint32_t i = 0; i < numLayers; ++i) {
+        const std::uint64_t size = network.config.layersSizes[i];
+        if (size == 0 || size > kMaxLayerSize) {
+            throw std::runtime_error(
+                "Network layer " + std::to_string(i) + " declares an unusable size: "
+                + std::to_string(size) + " (allowed 1.." + std::to_string(kMaxLayerSize) + ")");
+        }
+    }
+
+    std::uint64_t weightBytes = 0;
     const std::size_t numTransitions = numLayers - 1;
+    for (std::size_t i = 0; i < numTransitions; ++i) {
+        const std::uint64_t rows = network.config.layersSizes[i];
+        const std::uint64_t cols = network.config.layersSizes[i + 1];
+        weightBytes += (rows * cols + cols) * sizeof(double);
+        if (weightBytes > kMaxWeightBytes) {
+            throw std::runtime_error(
+                "Network file declares more than " + std::to_string(kMaxWeightBytes)
+                + " bytes of weights");
+        }
+    }
+    if (const std::int64_t remaining = RemainingBytes(in);
+        remaining >= 0 && static_cast<std::uint64_t>(remaining) < weightBytes) {
+        throw std::runtime_error(
+            "Network file is shorter than its header claims (expected "
+            + std::to_string(weightBytes) + " bytes of weights, found "
+            + std::to_string(remaining) + ")");
+    }
+
     for (std::size_t i = 0; i < numTransitions; ++i) {
         const std::size_t rows = network.config.layersSizes[i];
         const std::size_t cols = network.config.layersSizes[i + 1];
@@ -154,6 +248,10 @@ NeuralNetwork LoadNetwork(std::istream& in) {
 
         network.layerStack.push_back(std::move(dense));
         PushActivationLayers(network.layerStack, network.config, isLastLayer);
+    }
+
+    if (!in) {
+        throw std::runtime_error("Network file is truncated: weights are incomplete");
     }
 
     return network;

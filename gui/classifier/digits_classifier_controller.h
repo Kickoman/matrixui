@@ -62,6 +62,7 @@ private:
     void updateStatistic(const Neural::Classifier::TestResult& result) const;
     Matrix readCached(const std::filesystem::path& path) const;
     std::vector<std::size_t> getDefaultLayers() const;
+    void adoptNetwork(Neural::NeuralNetwork&& network, const QString& name);
 
     QPointer<QThread> internalRunner;
 

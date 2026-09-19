@@ -47,6 +47,7 @@ run err-train-nonexistent-dataset train --classifier "$CLS" --dataset "$WORK/abs
 
 # --- reported failures ---
 run err-corrupt-generator generate --label 0 --generator "$WORK/corrupt.wgt"
+run err-train-corrupt-classifier train --classifier "$WORK/corrupt.wgt" --dataset "$WORK/dataset"
 run err-train-missing-classifier train --classifier "$WORK/absent.wgt" --dataset "$WORK/dataset"
 
 # --- a bounded real run ---

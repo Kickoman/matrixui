@@ -155,8 +155,14 @@ void DigitsRecognizerModeWidget::handleOpenNetworkClicked() {
         tr("Weight files (*.wgt);;All files (*)"));
     if (path.isEmpty())
         return;
-    if (!controller->loadNetwork(path)) {
+    try {
+        if (!controller->loadNetwork(path)) {
+            QMessageBox::warning(this, tr("Open network"),
+                                 tr("Failed to load network:\n%1").arg(path));
+        }
+    } catch (const std::exception& e) {
         QMessageBox::warning(this, tr("Open network"),
-                             tr("Failed to load network:\n%1").arg(path));
+                             tr("Failed to load network:\n%1\n\n%2")
+                                 .arg(path, QString::fromUtf8(e.what())));
     }
 }

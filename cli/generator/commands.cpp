@@ -107,18 +107,7 @@ int RunGenerate(std::ostream& out, std::ostream& err, const GenerateOptions& opt
     return kSuccess;
 }
 
-}  // namespace
-
-int Generate(std::ostream& out, std::ostream& err, const GenerateOptions& options) {
-    try {
-        return RunGenerate(out, err, options);
-    } catch (const std::exception& e) {
-        err << e.what() << "\n";
-        return kGenerateFailed;
-    }
-}
-
-int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
+int RunTrain(std::ostream& out, std::ostream& err, const TrainOptions& options) {
     auto classifierNet = Io::TryReadFile(options.classifierPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!classifierNet) {
         err << "Failed to load classifier: " << options.classifierPath << "\n";
@@ -175,6 +164,26 @@ int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
     out << "Saved discriminator to " << options.discriminatorPath << "\n";
 
     return kSuccess;
+}
+
+}  // namespace
+
+int Generate(std::ostream& out, std::ostream& err, const GenerateOptions& options) {
+    try {
+        return RunGenerate(out, err, options);
+    } catch (const std::exception& e) {
+        err << e.what() << "\n";
+        return kGenerateFailed;
+    }
+}
+
+int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
+    try {
+        return RunTrain(out, err, options);
+    } catch (const std::exception& e) {
+        err << e.what() << "\n";
+        return kTrainFailed;
+    }
 }
 
 }  // namespace GeneratorCli

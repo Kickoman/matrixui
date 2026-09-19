@@ -57,7 +57,15 @@ DigitsClassifierController::~DigitsClassifierController() {
 }
 
 void DigitsClassifierController::loadSettings() {
-    loadNetwork(settings.getValue("last_network_name", "network.wgt").toString());
+    const auto lastNetwork = settings.getValue("last_network_name", "network.wgt").toString();
+    try {
+        loadNetwork(lastNetwork);
+    } catch (const std::exception& e) {
+        qWarning() << "Couldn't load network" << lastNetwork << ":" << e.what();
+        Neural::NeuralNetworkConfiguration fallback{};
+        fallback.layersSizes = getDefaultLayers();
+        adoptNetwork(Neural::CreateNetwork(fallback), lastNetwork);
+    }
     if (auto d = settings.getValue("last_training_dataset_path"); d.isValid()) {
         setTrainingDataset(d.toString());
     }
@@ -120,16 +128,18 @@ void DigitsClassifierController::loadNetwork(const QString& network, Neural::Neu
 
     std::optional<Neural::NeuralNetwork> loadedNetwork;
     if (QFile::exists(network)) {
-        try {
-            loadedNetwork = Io::TryReadFile(network.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
-        } catch (const std::runtime_error& e) { }
+        loadedNetwork = Io::TryReadFile(network.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     }
     if (!loadedNetwork) {
         loadedNetwork = Neural::CreateNetwork(config);
     }
     assert(loadedNetwork);
-    recognizer.setNetwork(loadedNetwork.value());
-    networkName = network;
+    adoptNetwork(std::move(loadedNetwork.value()), network);
+}
+
+void DigitsClassifierController::adoptNetwork(Neural::NeuralNetwork&& network, const QString& name) {
+    recognizer.setNetwork(network);
+    networkName = name;
 
     emit infoUpdated();
 }

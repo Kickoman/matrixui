@@ -4,6 +4,8 @@
 
 namespace Neural {
 
+Matrix Predict(const NeuralNetwork& network, const Matrix& input);
+
 class NeuralNetworkApplier {
 public:
     NeuralNetworkApplier() = default;

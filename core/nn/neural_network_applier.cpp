@@ -34,16 +34,20 @@ NeuralNetworkApplier::NeuralNetworkApplier(NeuralNetwork&& network) {
     initializeNetwork(std::move(network));
 }
 
+Matrix Predict(const NeuralNetwork& network, const Matrix& input) {
+    const ForwardContext ctx{false, 0.0};
+    Matrix current = input;
+    for (const auto& layer : network.layerStack) {
+        current = std::visit([&](const auto& l) { return l.forward(current, ctx); }, layer);
+    }
+    return current;
+}
+
 Matrix NeuralNetworkApplier::predict(const Matrix& input) const {
     if (!isInitialized()) {
         throw std::runtime_error("Network must be initialized before prediction");
     }
-    const ForwardContext ctx{false, 0.0};
-    Matrix current = input;
-    for (auto& layer : config.layerStack) {
-        current = std::visit([&](auto& l) { return l.forward(current, ctx); }, layer);
-    }
-    return current;
+    return Neural::Predict(config, input);
 }
 
 void NeuralNetworkApplier::zeroGradients() {

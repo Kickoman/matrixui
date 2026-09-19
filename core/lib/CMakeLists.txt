@@ -1,5 +1,6 @@
 add_library(matrixgui_core_lib ${MATRIXGUI_LIB_TYPE}
     mapped_file.cpp
+    sha256.cpp
     stats.cpp
     stream_format.cpp
     text.cpp

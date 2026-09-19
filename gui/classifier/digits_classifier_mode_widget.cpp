@@ -171,7 +171,13 @@ void DigitsClassifierModeWidget::handleOpenNetworkClicked() {
     if (dialog.exec() == QDialog::Accepted) {
         const QString name = dialog.getNetworkName();
         const auto config = dialog.getConfiguration();
-        controller->loadNetwork(name, config);
+        try {
+            controller->loadNetwork(name, config);
+        } catch (const std::exception& e) {
+            QMessageBox::warning(this, tr("Open network"),
+                                 tr("Failed to load network:\n%1\n\n%2")
+                                     .arg(name, QString::fromUtf8(e.what())));
+        }
     }
 }
 

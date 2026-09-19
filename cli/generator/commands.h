@@ -9,6 +9,7 @@ namespace GeneratorCli {
 inline constexpr int kSuccess = 0;
 inline constexpr int kLoadFailed = 2;
 inline constexpr int kGenerateFailed = 4;
+inline constexpr int kTrainFailed = 5;
 
 int Generate(std::ostream& out, std::ostream& err, const GenerateOptions& options);
 int Train(std::ostream& out, std::ostream& err, const TrainOptions& options);

@@ -221,11 +221,18 @@ echo "Predicted: $digit"
 | `0` | Success |
 | `2` | Training: neither `--dataset` nor both of `--train-dataset`/`--test-dataset` resolved |
 | `3` | Dataset root does not contain subdirectories `0`..`N-1` |
-| `4` | `--layers` has fewer than two entries; malformed config JSON; or an exception during prediction |
+| `4` | `--layers` has fewer than two entries; malformed config JSON; or an exception during prediction or training |
 | `5` | Predict: the `.wgt` failed to load — **or** training: `width × height` does not equal the network's input size |
 | `105` | A `--network`/`--image` path that does not exist (CLI11's file check) |
 | `106` | No subcommand, or a missing required option |
 | `109` | An unknown flag |
+
+A `.wgt` that is damaged — truncated by an interrupted run, or with a header
+that does not describe its own contents — is now refused rather than loaded.
+This is deliberate: it used to load silently with every weight past the cut-off
+set to zero, which looks like a network that merely trained badly. `train`
+against such a file reports and exits `4`; it does not quietly start over from
+random weights.
 
 Code `5` covers two different problems; the stderr message distinguishes them.
 Codes `105`/`106`/`109` come from the argument parser; a typo'd flag produces

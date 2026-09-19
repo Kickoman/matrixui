@@ -19,6 +19,10 @@ add_executable(MatrixGui_tests
     words/queries_test.cpp
 
     nn/neural_network_test.cpp
+    nn/neural_network_loader_test.cpp
+
+    serving/manifest_test.cpp
+    serving/model_loader_test.cpp
 
     functions/applier_test.cpp
     functions/expected_csv_test.cpp
@@ -29,6 +33,7 @@ add_executable(MatrixGui_tests
     lib/mapped_file_test.cpp
     lib/stream_format_test.cpp
     lib/text_test.cpp
+    lib/sha256_test.cpp
     lib/stats_test.cpp
     lib/rpn_test.cpp
     lib/cache_test.cpp
@@ -54,6 +59,7 @@ target_link_libraries(MatrixGui_tests PRIVATE
     matrixgui_cli_generator
     matrixgui_cli_functions
     matrixgui_nn
+    matrixgui_serving
     matrixgui_png
     matrixgui_matrix
 )

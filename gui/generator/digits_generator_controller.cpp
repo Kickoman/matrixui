@@ -282,7 +282,13 @@ bool DigitsGeneratorController::loadClassifier() {
     assert(!internalRunner || !internalRunner->isRunning());
 
     out() << "Loading classifier from " << classifierPath.toStdString() << std::endl;
-    auto net = Io::TryReadFile(classifierPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
+    std::optional<Neural::NeuralNetwork> net;
+    try {
+        net = Io::TryReadFile(classifierPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
+    } catch (const std::exception& e) {
+        out() << "Couldn't load classifier: " << e.what() << std::endl;
+        return false;
+    }
     if (!net) {
         out() << "Couldn't load classifier." << std::endl;
         return false;
@@ -336,11 +342,16 @@ bool DigitsGeneratorController::loadGenerator() {
         latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
         return true;
     }
-    if (auto network = Io::TryReadFile(generatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
-        generatorNet = std::move(network);
-        latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
-        out() << "Successfully loaded generator." << std::endl;
-        return true;
+    try {
+        if (auto network = Io::TryReadFile(generatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
+            generatorNet = std::move(network);
+            latentDim = Neural::GAN::inferLatentDim(generatorNet->config.layersSizes, classifierNet->outputSize());
+            out() << "Successfully loaded generator." << std::endl;
+            return true;
+        }
+    } catch (const std::exception& e) {
+        out() << "Couldn't load generator: " << e.what() << std::endl;
+        return false;
     }
 
     out() << "Couldn't load generator." << std::endl;
@@ -368,10 +379,15 @@ bool DigitsGeneratorController::loadDiscriminator() {
         discriminatorNet = Neural::CreateNetwork(discriminatorConfiguration);
         return true;
     }
-    if (auto network = Io::TryReadFile(discriminatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
-        discriminatorNet = std::move(network);
-        out() << "Successfully loaded discriminator." << std::endl;
-        return true;
+    try {
+        if (auto network = Io::TryReadFile(discriminatorPath.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary)) {
+            discriminatorNet = std::move(network);
+            out() << "Successfully loaded discriminator." << std::endl;
+            return true;
+        }
+    } catch (const std::exception& e) {
+        out() << "Couldn't load discriminator: " << e.what() << std::endl;
+        return false;
     }
 
     out() << "Couldn't load discriminator." << std::endl;

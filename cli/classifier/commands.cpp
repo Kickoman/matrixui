@@ -135,18 +135,7 @@ int RunPredict(std::ostream& out, std::ostream& err, const PredictOptions& optio
     return kSuccess;
 }
 
-}  // namespace
-
-int Predict(std::ostream& out, std::ostream& err, const PredictOptions& options) {
-    try {
-        return RunPredict(out, err, options);
-    } catch (const std::exception& e) {
-        err << e.what() << '\n';
-        return kBadConfig;
-    }
-}
-
-int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
+int RunTrain(std::ostream& out, std::ostream& err, const TrainOptions& options) {
     const std::string trainingPath = !options.trainDatasetPath.empty() ? options.trainDatasetPath : options.datasetPath;
     const std::string testingPath  = !options.testDatasetPath.empty()  ? options.testDatasetPath  : options.datasetPath;
 
@@ -235,6 +224,26 @@ int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
     testingLog << json.dump() << std::endl;
 
     return kSuccess;
+}
+
+}  // namespace
+
+int Predict(std::ostream& out, std::ostream& err, const PredictOptions& options) {
+    try {
+        return RunPredict(out, err, options);
+    } catch (const std::exception& e) {
+        err << e.what() << '\n';
+        return kBadConfig;
+    }
+}
+
+int Train(std::ostream& out, std::ostream& err, const TrainOptions& options) {
+    try {
+        return RunTrain(out, err, options);
+    } catch (const std::exception& e) {
+        err << e.what() << '\n';
+        return kBadConfig;
+    }
 }
 
 }  // namespace ClassifierCli

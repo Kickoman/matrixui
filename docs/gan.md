@@ -240,6 +240,7 @@ Generate 10 images of the digit 3, with classifier verification:
 | `0` | Success |
 | `2` | The generator or the classifier failed to load |
 | `4` | An exception during generation |
+| `5` | An exception during training — most often a damaged `--classifier`, `--generator` or `--discriminator` file |
 | `105` | A `--generator`/`--classifier`/`--dataset` path that does not exist (CLI11's file check) |
 | `106` | No subcommand, or a missing required option |
 | `109` | An unknown flag |

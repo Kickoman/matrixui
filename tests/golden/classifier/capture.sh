@@ -44,6 +44,8 @@ run err-nonexistent-network predict --network "$WORK/nope.wgt" --image "$IMG"
 
 # --- reported failures (codes owned by the commands) ---
 run err-corrupt-network  predict --network "$WORK/corrupt.wgt" --image "$IMG"
+run err-train-corrupt-network train --network "$WORK/corrupt.wgt" \
+    --dataset "$WORK/dataset" --working-directory "$WORK/td"
 run err-train-no-dataset train --network "$WORK/out.wgt"
 run err-train-bad-layers train --network "$WORK/out.wgt" --dataset "$WORK/dataset" --layers 64
 run err-train-size-mismatch train --network "$WORK/fresh.wgt" --dataset "$WORK/dataset" --layers 64,16,10
