@@ -397,6 +397,22 @@ compositions at once, so the peak is about **4x**. For scale: twenty
 784/256/128/10 models are 36MB declared, 72MB resident, 144MB at the swap. The
 default exists for a corrupt or hostile tree, not for capacity planning.
 
+## Looking at a tree from the shell
+
+`MatrixGui_models` ([`cli/serving/`](../../cli/serving/)) is the operator-facing
+side of all of the above, and the thing the golden snapshot in
+[`tests/golden/serving/`](../../tests/golden/serving/) pins.
+
+```
+MatrixGui_models list --root models [--default mnist=v3 ...]
+```
+
+It builds a composition, prints what loaded as a table on stdout, and every
+reason the rest did not on stderr. Exit codes: `0` everything loaded, `1` the
+composition is incomplete, `2` the root could not be walked, `3` a malformed
+`--default`. The split matters — a caller can take stdout as the inventory and
+still see the problems, and `1` is what a deployment check would gate on.
+
 ## Not here
 
 HTTP, request serialisation, JSON for any of these structures, worker pools,

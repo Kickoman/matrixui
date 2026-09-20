@@ -1,6 +1,7 @@
 # Golden CLI snapshots
 
-One subdirectory per tool — `words/`, `classifier/`, `generator/`, `functions/` —
+One subdirectory per tool — `words/`, `classifier/`, `generator/`, `functions/`,
+`serving/` —
 each with its own `capture.sh` (records a snapshot), `compare.sh` (re-captures and
 diffs against `expected/`) and `expected/` (the committed snapshot). The top-level
 [`compare.sh`](compare.sh) runs all four, or just the ones named:
@@ -45,6 +46,15 @@ unreproducible. Hence:
 - What cannot be pinned is normalized away by each tool's `capture.sh`:
   the classifier's final accuracy and its epoch chatter on stderr, the GAN's
   per-epoch lines, the classifier's opinion of a freshly generated image.
+
+**serving** builds its tree at capture time and reuses the two frozen `.wgt`
+fixtures above as weight blobs, so nothing depends on a random init —
+`MatrixGui_models list` prints layer sizes, never weight values. The refusal
+paths it pins (bad JSON, a truncated blob, a name+version collision, a contract
+mismatch, a symlink in the root, a dangling default) are the whole point of the
+set: they are the messages an operator reads. Refusals carry paths that come
+back from `weakly_canonical`, so they are absolute and the normalizer strips the
+checkout prefix as well as the work directory.
 
 **functions** is deterministic whenever `--seed` is passed: it seeds both
 sources of randomness — the genetizer's tournament draw and the thread-local

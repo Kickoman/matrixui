@@ -1,0 +1,27 @@
+
+7 problems:
+
+  <WORK>/models/bad-json
+    manifest: manifest.json: [json.exception.parse_error.101] parse error at line 1, column 3: syntax error while parsing object key - invalid literal; last read: '{no'; expected string literal
+
+  <WORK>/models/contract
+    contract: manifest declares input.size 100, but the network takes 64
+
+  <WORK>/models/current
+    skipped: symbolic links in the model root are not followed
+
+  <WORK>/models/dup-a
+    collision: model "dup" version "v1" is declared by two directories:
+      <WORK>/models/dup-a
+      <WORK>/models/dup-b
+
+  <WORK>/models/dup-b
+    collision: model "dup" version "v1" is declared by two directories:
+      <WORK>/models/dup-a
+      <WORK>/models/dup-b
+
+  <WORK>/models/no-manifest
+    skipped: no manifest.json
+
+  <WORK>/models/truncated
+    integrity: Network file is shorter than its header claims (expected 9680 bytes of weights, found 26): <WORK>/models/truncated/weights.wgt

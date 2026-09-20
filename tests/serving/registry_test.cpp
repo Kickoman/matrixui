@@ -283,3 +283,37 @@ TEST_CASE("Lookups and swaps run together without tearing") {
     CHECK(Fingerprint(*held) == before);
     CHECK(held->generation < registry.snapshot()->generation);
 }
+
+
+TEST_CASE("Describe is a view over the snapshot, in a stable order") {
+    const auto snapshot = MakeSnapshot(
+        {{"zebra", "v1", 16}, {"mnist", "v3", 64}, {"mnist", "v1", 64}},
+        {{"mnist", "v3"}});
+
+    const auto described = Serving::Describe(snapshot);
+    REQUIRE(described.models.size() == 3);
+
+    std::vector<std::string> order;
+    for (const auto& entry : described.models) {
+        order.push_back(entry.model->manifest().name + "/" + entry.model->manifest().version);
+    }
+    CHECK(order == std::vector<std::string>{"mnist/v1", "mnist/v3", "zebra/v1"});
+
+    CHECK_FALSE(described.models[0].isDefault);
+    CHECK(described.models[1].isDefault);
+    CHECK_FALSE(described.models[2].isDefault);
+
+    CHECK(described.models[1].model.get() == Find(snapshot, "mnist", "v3").model.get());
+}
+
+TEST_CASE("Describe carries the failures through") {
+    RegistrySnapshot snapshot;
+    snapshot.failures.push_back(Serving::ModelFailure{
+        "/models/broken", Serving::FailureKind::Integrity, "weights are incomplete", std::nullopt});
+
+    const auto described = Serving::Describe(snapshot);
+    CHECK(described.models.empty());
+    REQUIRE(described.failures.size() == 1);
+    CHECK(described.failures[0].kind == Serving::FailureKind::Integrity);
+    CHECK(Serving::ToString(described.failures[0].kind) == "integrity");
+}

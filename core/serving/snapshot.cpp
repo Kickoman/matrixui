@@ -66,6 +66,20 @@ Lookup FindDefault(const RegistrySnapshot& snapshot, const std::string_view name
     return Lookup{LookupStatus::NoDefaultVersion, nullptr, std::move(versions)};
 }
 
+RegistryDescription Describe(const RegistrySnapshot& snapshot) {
+    RegistryDescription description;
+    description.models.reserve(snapshot.models.size());
+    for (const auto& [key, model] : snapshot.models) {
+        const auto chosen = snapshot.defaults.find(key.name);
+        description.models.push_back(ModelEntry{
+            model,
+            chosen != snapshot.defaults.end() && chosen->second == key.version,
+        });
+    }
+    description.failures = snapshot.failures;
+    return description;
+}
+
 std::string_view ToString(const FailureKind kind) {
     switch (kind) {
         case FailureKind::Manifest:  return "manifest";

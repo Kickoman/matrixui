@@ -1,0 +1,5 @@
+
+1 problem:
+
+  <WORK>/clean
+    manifest: default version "v9" for model "mnist" is not loaded (loaded: v1, v3)

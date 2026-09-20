@@ -73,6 +73,18 @@ Lookup FindDefault(const RegistrySnapshot& snapshot, std::string_view name);
 
 std::vector<std::string> VersionsOf(const RegistrySnapshot& snapshot, std::string_view name);
 
+struct ModelEntry {
+    std::shared_ptr<const LoadedModel> model;
+    bool isDefault = false;
+};
+
+struct RegistryDescription {
+    std::vector<ModelEntry> models;
+    std::vector<ModelFailure> failures;
+};
+
+RegistryDescription Describe(const RegistrySnapshot& snapshot);
+
 std::string_view ToString(FailureKind kind);
 std::string_view ToString(LookupStatus status);
 

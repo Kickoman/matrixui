@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 
 TOOLS=("$@")
 if [ "${#TOOLS[@]}" -eq 0 ]; then
-    TOOLS=(words classifier generator functions)
+    TOOLS=(words classifier generator functions serving)
 fi
 
 status=0

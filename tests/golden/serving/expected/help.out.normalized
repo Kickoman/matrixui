@@ -1,0 +1,9 @@
+Inspect a directory of model artifacts
+
+<BIN> [OPTIONS] SUBCOMMAND
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+
+SUBCOMMANDS:
+  list                        Load every model under a root and print what came up

@@ -1,0 +1,4 @@
+MODEL  VERSION  INPUT           OUTPUT             INTEGRITY     DEFAULT
+gen    v1       18              64                 not declared  
+mnist  v1       64              10                 not declared  
+mnist  v3       64 (hwc 8x8x1)  10 classification  verified      

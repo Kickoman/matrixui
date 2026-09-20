@@ -1,0 +1,10 @@
+Load every model under a root and print what came up
+
+<BIN> list [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --root TEXT:DIR REQUIRED 
+                              Directory holding one subdirectory per model
+          --default TEXT ...  Version a request without one resolves to, as name=version.
+                              Repeatable.

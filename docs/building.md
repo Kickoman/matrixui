@@ -57,7 +57,7 @@ by default, and they land in `build/lib/`:
 | `matrixgui_png` | `core/png/` | `matrix` | Image loading/writing over vendored stb |
 | `matrixgui_core_lib` | `core/lib/` | — | Framework-free utilities: text, stats, stream formatting, file IO, RNG, caches. Knows nothing about matrices or networks |
 | `matrixgui_nn` | `core/nn/` | `matrix`, `core_lib` | Layers, network, applier, loader, datasets |
-| `matrixgui_serving` | `core/serving/` | `nn`, `core_lib` | Reads a model directory — `manifest.json` plus a `.wgt` blob — into a validated, immutable `LoadedModel`. Links neither Qt, nor `classifier`, nor `png` |
+| `matrixgui_serving` | `core/serving/` | `nn`, `core_lib` | Model artifacts: one directory into a validated immutable `LoadedModel`, a tree of them into a `RegistrySnapshot`, and the registry that swaps snapshots. Links neither Qt, nor `classifier`, nor `png` |
 | `matrixgui_classifier` | `core/classifier/` | `nn` | Classifier training loop and its config |
 | `matrixgui_generator` | `core/generator/` | `nn`, `matrix` | Conditional-GAN training loop and its config |
 | `matrixgui_words` | `core/words/` | `core_lib` | The whole SGNS pipeline. Notably does **not** link `nn`, `matrix` or Eigen |
@@ -67,6 +67,7 @@ by default, and they land in `build/lib/`:
 | `matrixgui_cli_classifier` | `cli/classifier/` | `classifier`, `nn` | `MatrixGui_headless` subcommand bodies, minus `main()` |
 | `matrixgui_cli_generator` | `cli/generator/` | `generator` | `MatrixGui_gan` subcommand bodies, minus `main()` |
 | `matrixgui_cli_functions` | `cli/functions/` | `functions` | `MatrixGui_functions` subcommand bodies, minus `main()` |
+| `matrixgui_cli_serving` | `cli/serving/` | `serving` | `MatrixGui_models` subcommand bodies, minus `main()` |
 | `matrixgui_gui_common` | `gui_common/` | Qt | Reusable widgets; built only with `BUILD_GUI=ON` |
 
 Executables — these land in `build/` itself:
@@ -141,9 +142,33 @@ ctest --test-dir build --output-on-failure
 
 The suite is doctest-based and registered with CTest under the name `unit`; you
 can also run `./build/MatrixGui_tests` directly. It covers the words and
-functions modules, the network loader and the serving loader, plus the CLI
-command bodies. See [words.md](words.md#tests) for what it asserts and for the
-separate golden CLI snapshots (`tests/golden/README.md`).
+functions modules, the network loader, the serving loader and registry, plus the
+CLI command bodies.
+
+### Running the serving tests under a sanitizer
+
+`tests/serving/registry_test.cpp` has one case that spawns threads. It has
+detection power on its own — replacing the atomic slot with a plain
+`shared_ptr` crashes it ten runs out of ten — so there is no sanitizer job in
+CI, and deliberately no `add_test` for one: CI runs a bare `ctest`, so anything
+registered there is blocking.
+
+```bash
+tests/serving/run_sanitizers.sh asan     # prefer this
+tests/serving/run_sanitizers.sh tsan
+```
+
+The script builds a standalone binary out of tree rather than sanitizing
+`MatrixGui_tests`, for two reasons. `core/lib/rpn.h` has a `static_assert` that
+stops being a constant expression under `-fsanitize`, so the whole-suite build
+does not compile at all; and a sanitized whole-suite run costs 5-15x, with
+`words/trainer_test.cpp` — real SGNS training on two threads — as the long pole.
+
+Prefer ASan: use-after-free is the consequence that can actually happen here, if
+a lookup ever starts handing out a reference instead of a `shared_ptr`. TSan
+works too, but **does not start** on Ubuntu 24.04 kernels
+(`FATAL: ThreadSanitizer: unexpected memory mapping`, an ASLR entropy conflict);
+the script runs it under `setarch -R` for that reason.
 
 <details>
 <summary>What CI builds</summary>
