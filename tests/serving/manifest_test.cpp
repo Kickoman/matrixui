@@ -8,7 +8,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace {
 
@@ -244,4 +246,89 @@ TEST_CASE("ParseManifest refuses labels that do not count out to the output size
     auto kind = Valid();
     kind["output"]["kind"] = "prophecy";
     CHECK_THROWS_AS(fixture.parse(kind), ManifestError);
+}
+
+
+// --- Regressions for the defects found after step 1 shipped ------------------
+
+TEST_CASE("ParseManifest compares manifestVersion before narrowing it") {
+    const Fixture fixture;
+    auto document = Valid();
+
+    // get<int>() turned these into 1, so a future format version loaded as this
+    // one. The message must carry the value that was actually written.
+    document["manifestVersion"] = 4294967297ll;   // 2^32 + 1
+    CHECK(fixture.refusal(document)
+          == "manifest.json: unsupported manifestVersion 4294967297 (supported: 1)");
+
+    document["manifestVersion"] = 8589934593ll;   // 2^33 + 1
+    CHECK(fixture.refusal(document)
+          == "manifest.json: unsupported manifestVersion 8589934593 (supported: 1)");
+
+    document["manifestVersion"] = 18446744073709551615ull;   // above INT64_MAX
+    CHECK(fixture.refusal(document)
+          == "manifest.json: unsupported manifestVersion 18446744073709551615 (supported: 1)");
+
+    document["manifestVersion"] = 1;
+    CHECK(fixture.refusal(document) == "<parsed>");
+}
+
+TEST_CASE("ParseManifest refuses an input.shape whose product overflows") {
+    const Fixture fixture;
+
+    // 2^63+2 multiplied by 2 wraps to 4 in std::size_t, which is exactly the
+    // declared input.size, so the shape used to pass.
+    auto document = Tests::ManifestFor(4, 2);
+    document["input"]["shape"] = {9223372036854775810ull, 2};
+    CHECK(std::string(fixture.refusal(document)).find("overflows while multiplying out")
+          != std::string::npos);
+
+    // The ceiling is SIZE_MAX/product, never input.size/product: the latter
+    // refuses this ordinary case early and loses the message pinned above.
+    auto ordinary = Valid();
+    ordinary["input"]["shape"] = {28, 28, 3};
+    CHECK(std::string(fixture.refusal(ordinary)).find("multiplies out to 2352, but input.size is 784")
+          != std::string::npos);
+}
+
+TEST_CASE("ParseManifest reads a directory with a trailing separator") {
+    const Tests::TempDir dir;
+    const auto modelDirectory = Tests::MakeModelDirectory(dir, "trailing");
+
+    // weakly_canonical keeps a trailing separator as an empty final component
+    // when the directory does not exist, and the containment check then compared
+    // it against a real filename.
+    const auto withSlash = modelDirectory.string() + "/";
+    CHECK(ParseManifest(Tests::ManifestFor(4, 2), withSlash).weights.path
+          == ParseManifest(Tests::ManifestFor(4, 2), modelDirectory).weights.path);
+
+    const std::filesystem::path absent = "/no/such/place";
+    CHECK(ParseManifest(Tests::ManifestFor(4, 2), absent.string() + "/").weights.path
+          == ParseManifest(Tests::ManifestFor(4, 2), absent).weights.path);
+}
+
+TEST_CASE("ParseManifest turns an unresolvable weights path into a ManifestError") {
+    const Tests::TempDir dir;
+    const auto modelDirectory = Tests::MakeModelDirectory(dir, "loop");
+
+    std::error_code failed;
+    std::filesystem::create_symlink(modelDirectory / "b.wgt", modelDirectory / "a.wgt", failed);
+    if (!failed) {
+        std::filesystem::create_symlink(modelDirectory / "a.wgt", modelDirectory / "b.wgt", failed);
+    }
+    if (failed) {
+        WARN_MESSAGE(false, "symlinks unavailable here: " << failed.message());
+        return;
+    }
+
+    // weakly_canonical throws filesystem_error on a link loop, and that is not
+    // a Serving::Error.
+    auto document = Tests::ManifestFor(4, 2);
+    document["weights"]["path"] = "a.wgt";
+    try {
+        ParseManifest(document, modelDirectory);
+        FAIL("expected a throw");
+    } catch (const ManifestError& error) {
+        CHECK(std::string(error.what()).find("cannot be resolved") != std::string::npos);
+    }
 }

@@ -24,7 +24,7 @@ public:
     );
 
     const ModelManifest& manifest() const { return manifestData; }
-    const std::shared_ptr<const Neural::NeuralNetwork>& network() const { return networkData; }
+    std::shared_ptr<const Neural::NeuralNetwork> network() const { return networkData; }
     const std::filesystem::path& directory() const { return directoryPath; }
     IntegrityCheck integrity() const { return integrityState; }
 

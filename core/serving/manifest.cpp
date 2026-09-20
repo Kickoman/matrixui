@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <string_view>
 #include <utility>
 
@@ -93,6 +94,10 @@ std::string AsIdentifier(const nlohmann::json& value, const std::string& where) 
     return text;
 }
 
+std::filesystem::path WithoutTrailingSeparator(const std::filesystem::path& path) {
+    return path.filename().empty() ? path.parent_path() : path;
+}
+
 bool IsInside(const std::filesystem::path& directory, const std::filesystem::path& candidate) {
     auto expected = directory.begin();
     auto actual = candidate.begin();
@@ -114,8 +119,15 @@ WeightsReference ParseWeights(const nlohmann::json& object, const std::filesyste
         Refuse("weights.path \"" + declared + "\" must be relative to the model directory");
     }
 
-    const auto root = std::filesystem::weakly_canonical(modelDirectory);
-    const auto resolved = std::filesystem::weakly_canonical(modelDirectory / relative);
+    const auto directory = WithoutTrailingSeparator(modelDirectory);
+    std::filesystem::path root;
+    std::filesystem::path resolved;
+    try {
+        root = std::filesystem::weakly_canonical(directory);
+        resolved = std::filesystem::weakly_canonical(directory / relative);
+    } catch (const std::filesystem::filesystem_error& error) {
+        Refuse("weights.path \"" + declared + "\" cannot be resolved: " + error.code().message());
+    }
     if (!IsInside(root, resolved)) {
         Refuse("weights.path \"" + declared + "\" escapes the model directory");
     }
@@ -169,6 +181,9 @@ InputContract ParseInput(const nlohmann::json& object) {
         for (std::size_t i = 0; i < found->size(); ++i) {
             const auto dimension = AsPositiveSize((*found)[i], "input.shape[" + std::to_string(i) + "]");
             input.shape.push_back(dimension);
+            if (dimension > std::numeric_limits<std::size_t>::max() / product) {
+                Refuse("input.shape " + found->dump() + " overflows while multiplying out");
+            }
             product *= dimension;
         }
         if (product != input.size) {
@@ -266,11 +281,14 @@ ModelManifest ParseManifest(const nlohmann::json& document, const std::filesyste
     }
 
     ModelManifest manifest;
-    manifest.manifestVersion = declaredVersion.get<int>();
-    if (manifest.manifestVersion != kSupportedManifestVersion) {
-        Refuse("unsupported manifestVersion " + std::to_string(manifest.manifestVersion)
+    const bool supported = declaredVersion.is_number_unsigned()
+        ? declaredVersion.get<std::uint64_t>() == kSupportedManifestVersion
+        : declaredVersion.get<std::int64_t>() == kSupportedManifestVersion;
+    if (!supported) {
+        Refuse("unsupported manifestVersion " + declaredVersion.dump()
                + " (supported: " + std::to_string(kSupportedManifestVersion) + ")");
     }
+    manifest.manifestVersion = kSupportedManifestVersion;
 
     manifest.name = AsIdentifier(*Field(root, "root", "name"), "name");
     manifest.version = AsIdentifier(*Field(root, "root", "version"), "version");

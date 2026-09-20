@@ -13,6 +13,9 @@
 #include <fstream>
 #include <string>
 #include <system_error>
+#include <type_traits>
+#include <typeinfo>
+#include <vector>
 
 namespace {
 
@@ -232,5 +235,108 @@ TEST_CASE("LoadModel resolves the weights path relative to the manifest") {
 
         CHECK(RefusalOf<ManifestError>(modelDirectory).find("escapes the model directory")
               != std::string::npos);
+    }
+}
+
+
+// --- Regressions for the defects found after step 1 shipped ------------------
+
+// The registry hands models out of a snapshot, so a reference return would let
+// a caller bind into a temporary that dies with the full expression.
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const Serving::LoadedModel&>().network()),
+        std::shared_ptr<const Neural::NeuralNetwork>>,
+    "LoadedModel::network() must return by value");
+
+TEST_CASE("LoadModel reports an unreadable weights blob as an IntegrityError") {
+    const Tests::TempDir dir;
+    const auto modelDirectory = Tests::WriteModelDirectory(dir, {64, 16, 3});
+    const auto weights = modelDirectory / "weights.wgt";
+
+    // The digest has to be declared: without it the only reader is LoadNetwork,
+    // whose call is already wrapped, so the case passes even unfixed.
+    auto manifest = Tests::ManifestFor(64, 3);
+    manifest["weights"]["sha256"] = Digest(weights);
+    Tests::WriteManifest(modelDirectory, manifest);
+
+    std::error_code failed;
+    std::filesystem::permissions(weights, std::filesystem::perms::none, failed);
+    if (failed || std::ifstream(weights).good()) {
+        std::filesystem::permissions(weights, std::filesystem::perms::owner_all, failed);
+        WARN_MESSAGE(false, "cannot make a file unreadable here");
+        return;
+    }
+
+    CHECK_THROWS_AS(LoadModel(modelDirectory), IntegrityError);
+    std::filesystem::permissions(weights, std::filesystem::perms::owner_all, failed);
+}
+
+TEST_CASE("LoadModel refuses a manifest larger than the ceiling") {
+    const Tests::TempDir dir;
+    const auto modelDirectory = Tests::WriteModelDirectory(dir, {64, 16, 3});
+
+    // A registry turns one unbounded parse into one per directory.
+    auto manifest = Tests::ManifestFor(64, 3);
+    manifest["annotations"] = {{"filler", std::string(2u << 20, 'x')}};
+    Tests::WriteManifest(modelDirectory, manifest);
+
+    const auto refusal = RefusalOf<ManifestError>(modelDirectory);
+    CHECK(refusal.find("more than the 1048576 allowed") != std::string::npos);
+}
+
+TEST_CASE("LoadModel lets nothing but a Serving::Error out") {
+    const Tests::TempDir dir;
+
+    // Every shape of damage the loader can meet, swept in one place: the header
+    // promises this exception set, and a leak of Io::Error or filesystem_error
+    // would make it a lie for direct callers.
+    std::vector<std::filesystem::path> broken;
+
+    broken.push_back(dir.file("absent"));
+    broken.push_back(dir.write("plain.txt", "x"));
+    broken.push_back(Tests::MakeModelDirectory(dir, "no-manifest"));
+
+    const auto badJson = Tests::MakeModelDirectory(dir, "bad-json");
+    Io::WriteFile(badJson / "manifest.json", [](std::ostream& out) { out << "{nope"; });
+    broken.push_back(badJson);
+
+    const auto noWeights = Tests::MakeModelDirectory(dir, "no-weights");
+    Tests::WriteManifest(noWeights, Tests::ManifestFor(64, 3));
+    broken.push_back(noWeights);
+
+    const auto truncated = Tests::WriteModelDirectory(dir, {64, 16, 3}, "truncated");
+    Tests::Truncate(truncated / "weights.wgt", 20);
+    broken.push_back(truncated);
+
+    const auto mismatch = Tests::WriteModelDirectory(dir, {64, 16, 3}, "mismatch");
+    Tests::WriteManifest(mismatch, Tests::ManifestFor(100, 3));
+    broken.push_back(mismatch);
+
+    const auto badDigest = Tests::WriteModelDirectory(dir, {64, 16, 3}, "bad-digest");
+    auto withDigest = Tests::ManifestFor(64, 3);
+    withDigest["weights"]["sha256"] = std::string(64, '0');
+    Tests::WriteManifest(badDigest, withDigest);
+    broken.push_back(badDigest);
+
+    const auto loop = Tests::MakeModelDirectory(dir, "symlink-loop");
+    Tests::WriteManifest(loop, Tests::ManifestFor(64, 3));
+    std::error_code ignored;
+    std::filesystem::create_symlink(loop / "other.wgt", loop / "weights.wgt", ignored);
+    std::filesystem::create_symlink(loop / "weights.wgt", loop / "other.wgt", ignored);
+    if (!ignored) {
+        broken.push_back(loop);
+    }
+
+    for (const auto& directory : broken) {
+        try {
+            LoadModel(directory);
+            FAIL("expected a throw for " << directory.string());
+        } catch (const Serving::Error&) {
+            // as documented
+        } catch (const std::exception& error) {
+            FAIL(directory.string() << " escaped as " << typeid(error).name()
+                 << ": " << error.what());
+        }
     }
 }

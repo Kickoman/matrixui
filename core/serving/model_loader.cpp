@@ -19,7 +19,21 @@ namespace {
 
 constexpr const char* kManifestName = "manifest.json";
 
+// The largest legitimate manifest is dominated by output.labels, and a thousand
+// labels of thirty characters is about 30KB. Bounded because a registry turns
+// one unbounded parse into one per directory, and nlohmann's DOM costs roughly
+// sixteen bytes a node on top of the text.
+constexpr std::uintmax_t kMaxManifestBytes = 1u << 20;
+
 nlohmann::json ReadManifestDocument(const std::filesystem::path& path) {
+    std::error_code failed;
+    const auto size = std::filesystem::file_size(path, failed);
+    if (!failed && size > kMaxManifestBytes) {
+        throw ManifestError(
+            "manifest.json is " + std::to_string(size) + " bytes, more than the "
+            + std::to_string(kMaxManifestBytes) + " allowed: " + path.string());
+    }
+
     std::ifstream in(path);
     if (!in) {
         throw ManifestError("Can't open " + path.string());
@@ -32,10 +46,16 @@ nlohmann::json ReadManifestDocument(const std::filesystem::path& path) {
 }
 
 void VerifyDigest(const WeightsReference& weights) {
-    const auto actual = Hash::ToHex(Io::ReadFile(
-        weights.path,
-        [](std::istream& in) { return Hash::Sha256OfStream(in); },
-        std::ios::binary));
+    std::string actual;
+    try {
+        actual = Hash::ToHex(Io::ReadFile(
+            weights.path,
+            [](std::istream& in) { return Hash::Sha256OfStream(in); },
+            std::ios::binary));
+    } catch (const std::exception& error) {
+        // Io::Error is not a Serving::Error, and the header promises one.
+        throw IntegrityError(error.what());
+    }
     if (actual != weights.sha256) {
         throw IntegrityError(
             "weights sha256 mismatch for " + weights.path.string()
