@@ -21,7 +21,9 @@ add_executable(MatrixGui_tests
     nn/neural_network_test.cpp
     nn/neural_network_loader_test.cpp
 
+    serving/build_test.cpp
     serving/manifest_test.cpp
+    serving/registry_test.cpp
     serving/model_loader_test.cpp
 
     functions/applier_test.cpp

@@ -1,5 +1,8 @@
 add_library(matrixgui_serving ${MATRIXGUI_LIB_TYPE}
     manifest.cpp
+    snapshot.cpp
+    registry.cpp
+    build.cpp
     loaded_model.cpp
     model_loader.cpp
 )

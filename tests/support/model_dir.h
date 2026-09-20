@@ -23,12 +23,18 @@ inline std::filesystem::path MakeModelDirectory(const TempDir& dir, const std::s
     return path;
 }
 
-// Only the required fields, so a test can bend exactly one of them.
-inline nlohmann::json ManifestFor(const std::size_t inputSize, const std::size_t outputSize) {
+// Only the required fields, so a test can bend exactly one of them. Name and
+// version are parameters because a registry tree needs several of each.
+inline nlohmann::json ManifestFor(
+    const std::size_t inputSize,
+    const std::size_t outputSize,
+    const std::string& name = "mnist",
+    const std::string& version = "v3"
+) {
     return nlohmann::json{
         {"manifestVersion", 1},
-        {"name", "mnist"},
-        {"version", "v3"},
+        {"name", name},
+        {"version", version},
         {"weights", {{"path", "weights.wgt"}}},
         {"input", {{"size", inputSize}}},
         {"output", {{"size", outputSize}}},
@@ -64,6 +70,29 @@ inline std::filesystem::path WriteModelDirectory(
 
 inline void Truncate(const std::filesystem::path& path, const std::uintmax_t bytes) {
     std::filesystem::resize_file(path, bytes);
+}
+
+// One model directory inside a registry root, named after the pair it declares
+// so the directory name and the manifest stay easy to tell apart in a failure.
+struct ModelSpec {
+    std::string directory;
+    std::string name;
+    std::string version;
+    std::vector<std::size_t> layers{64, 16, 3};
+};
+
+inline std::filesystem::path WriteModelTree(const TempDir& dir, const std::vector<ModelSpec>& models,
+                                            const std::string& rootName = "models") {
+    const auto root = dir.file(rootName);
+    std::filesystem::create_directories(root);
+    for (const auto& model : models) {
+        const auto modelDirectory = root / model.directory;
+        std::filesystem::create_directories(modelDirectory);
+        WriteManifest(modelDirectory,
+                      ManifestFor(model.layers.front(), model.layers.back(), model.name, model.version));
+        WriteNetwork(modelDirectory / "weights.wgt", model.layers);
+    }
+    return root;
 }
 
 }  // namespace Tests
