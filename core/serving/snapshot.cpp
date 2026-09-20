@@ -55,16 +55,15 @@ Lookup Find(const RegistrySnapshot& snapshot, const std::string_view name, const
 }
 
 Lookup FindDefault(const RegistrySnapshot& snapshot, const std::string_view name) {
+    if (const auto chosen = snapshot.defaults.find(name); chosen != snapshot.defaults.end()) {
+        return Find(snapshot, name, chosen->second);
+    }
+
     auto versions = VersionsOf(snapshot, name);
     if (versions.empty()) {
         return Lookup{LookupStatus::UnknownModel, nullptr, {}};
     }
-
-    const auto chosen = snapshot.defaults.find(name);
-    if (chosen == snapshot.defaults.end()) {
-        return Lookup{LookupStatus::NoDefaultVersion, nullptr, std::move(versions)};
-    }
-    return Find(snapshot, name, chosen->second);
+    return Lookup{LookupStatus::NoDefaultVersion, nullptr, std::move(versions)};
 }
 
 std::string_view ToString(const FailureKind kind) {

@@ -19,10 +19,6 @@ namespace {
 
 constexpr const char* kManifestName = "manifest.json";
 
-// The largest legitimate manifest is dominated by output.labels, and a thousand
-// labels of thirty characters is about 30KB. Bounded because a registry turns
-// one unbounded parse into one per directory, and nlohmann's DOM costs roughly
-// sixteen bytes a node on top of the text.
 constexpr std::uintmax_t kMaxManifestBytes = 1u << 20;
 
 nlohmann::json ReadManifestDocument(const std::filesystem::path& path) {

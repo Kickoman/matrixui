@@ -26,31 +26,46 @@ void Record(
     failures.push_back(ModelFailure{std::move(directory), kind, std::move(reason), std::move(key)});
 }
 
+[[noreturn]] void RefuseRoot(const RegistryConfig& config, const std::string& reason) {
+    throw ManifestError("Can't read the model root " + config.root.string() + ": " + reason);
+}
+
 std::vector<std::filesystem::path> Candidates(const RegistryConfig& config, std::vector<ModelFailure>& failures) {
     std::error_code failed;
-    std::filesystem::directory_iterator entries(config.root, failed);
+    std::filesystem::directory_iterator entry(config.root, failed);
     if (failed) {
-        throw ManifestError("Can't read the model root " + config.root.string() + ": " + failed.message());
+        RefuseRoot(config, failed.message());
     }
 
+    const std::filesystem::directory_iterator end;
     std::vector<std::filesystem::path> candidates;
     std::size_t seen = 0;
-    for (const auto& entry : entries) {
+
+    while (entry != end) {
         if (++seen > config.maxRootEntries) {
             throw ManifestError(
                 "The model root " + config.root.string() + " holds more than the "
                 + std::to_string(config.maxRootEntries) + " entries allowed");
         }
 
-        if (entry.is_symlink()) {
-            Record(failures, entry.path(), FailureKind::Skipped,
-                   "symbolic links in the model root are not followed");
-            continue;
+        const auto path = entry->path();
+        const auto link = std::filesystem::symlink_status(path, failed);
+        if (failed) {
+            Record(failures, path, FailureKind::Skipped, "can't read this entry: " + failed.message());
+        } else if (std::filesystem::is_symlink(link)) {
+            std::error_code ignored;
+            if (std::filesystem::is_directory(path, ignored)) {
+                Record(failures, path, FailureKind::Skipped,
+                       "symbolic links in the model root are not followed");
+            }
+        } else if (std::filesystem::is_directory(link)) {
+            candidates.push_back(path);
         }
-        if (!std::filesystem::is_directory(entry.symlink_status())) {
-            continue;
+
+        entry.increment(failed);
+        if (failed) {
+            RefuseRoot(config, failed.message());
         }
-        candidates.push_back(entry.path());
     }
 
     std::sort(candidates.begin(), candidates.end());
@@ -78,28 +93,52 @@ std::uint64_t DeclaredWeightBytes(const Neural::NeuralNetwork& network) {
     return bytes;
 }
 
+std::string Join(const std::vector<std::string>& values) {
+    std::string text;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        text += (i == 0 ? "" : ", ") + values[i];
+    }
+    return text;
+}
+
+struct Claim {
+    std::filesystem::path directory;
+    std::uint64_t declaredBytes = 0;
+};
+
+void ResolveDefaults(RegistrySnapshot& snapshot, const RegistryConfig& config) {
+    for (const auto& [name, version] : config.defaults) {
+        if (snapshot.models.find(ModelKeyView{name, version}) != snapshot.models.end()) {
+            snapshot.defaults.emplace(name, version);
+            continue;
+        }
+        const auto available = VersionsOf(snapshot, name);
+        const std::string reason =
+            "default version \"" + version + "\" for model \"" + name + "\" is not loaded"
+            + (available.empty() ? " (no versions of that model are loaded)"
+                                 : " (loaded: " + Join(available) + ")");
+        Record(snapshot.failures, config.root, FailureKind::Manifest, reason, ModelKey{name, version});
+    }
+}
+
 }  // namespace
 
-std::shared_ptr<RegistrySnapshot> Build(const RegistryConfig& config) {
+RegistrySnapshot Build(const RegistryConfig& config) {
     std::error_code ignored;
     if (!std::filesystem::is_directory(config.root, ignored)) {
         throw ManifestError("Not a model root: " + config.root.string());
     }
 
-    auto snapshot = std::make_shared<RegistrySnapshot>();
-    const auto candidates = Candidates(config, snapshot->failures);
+    RegistrySnapshot snapshot;
+    const auto candidates = Candidates(config, snapshot.failures);
 
-    struct Claim {
-        std::filesystem::path directory;
-        std::uint64_t declaredBytes = 0;
-    };
     std::map<ModelKey, Claim, ModelKeyLess> claimedBy;
     std::map<ModelKey, bool, ModelKeyLess> collided;
     std::uint64_t declaredBytes = 0;
 
     for (const auto& directory : candidates) {
         if (!std::filesystem::is_regular_file(directory / kManifestName, ignored)) {
-            Record(snapshot->failures, directory, FailureKind::Skipped,
+            Record(snapshot.failures, directory, FailureKind::Skipped,
                    "no " + std::string(kManifestName));
             continue;
         }
@@ -108,7 +147,7 @@ std::shared_ptr<RegistrySnapshot> Build(const RegistryConfig& config) {
         try {
             loaded.emplace(LoadModel(directory));
         } catch (const Serving::Error& error) {
-            Record(snapshot->failures, directory, KindOf(error), error.what());
+            Record(snapshot.failures, directory, KindOf(error), error.what());
             continue;
         }
 
@@ -119,16 +158,16 @@ std::shared_ptr<RegistrySnapshot> Build(const RegistryConfig& config) {
                 "model \"" + key.name + "\" version \"" + key.version
                 + "\" is declared by two directories:\n  " + claimed->second.directory.string()
                 + "\n  " + directory.string();
-            Record(snapshot->failures, claimed->second.directory, FailureKind::Collision, reason, key);
+            Record(snapshot.failures, claimed->second.directory, FailureKind::Collision, reason, key);
             declaredBytes -= claimed->second.declaredBytes;
-            snapshot->models.erase(key);
+            snapshot.models.erase(key);
             claimedBy.erase(claimed);
             collided.emplace(key, true);
-            Record(snapshot->failures, directory, FailureKind::Collision, reason, key);
+            Record(snapshot.failures, directory, FailureKind::Collision, reason, key);
             continue;
         }
         if (collided.find(key) != collided.end()) {
-            Record(snapshot->failures, directory, FailureKind::Collision,
+            Record(snapshot.failures, directory, FailureKind::Collision,
                    "model \"" + key.name + "\" version \"" + key.version
                    + "\" is declared by more than one directory", key);
             continue;
@@ -136,7 +175,7 @@ std::shared_ptr<RegistrySnapshot> Build(const RegistryConfig& config) {
 
         const auto bytes = DeclaredWeightBytes(*loaded->network());
         if (declaredBytes + bytes > config.maxDeclaredWeightBytes) {
-            Record(snapshot->failures, directory, FailureKind::Budget,
+            Record(snapshot.failures, directory, FailureKind::Budget,
                    "loading this model would declare " + std::to_string(declaredBytes + bytes)
                    + " bytes of weights, more than the "
                    + std::to_string(config.maxDeclaredWeightBytes) + " allowed",
@@ -146,29 +185,12 @@ std::shared_ptr<RegistrySnapshot> Build(const RegistryConfig& config) {
         declaredBytes += bytes;
 
         claimedBy.emplace(key, Claim{directory, bytes});
-        snapshot->models.emplace(key, std::make_shared<const LoadedModel>(std::move(*loaded)));
+        snapshot.models.emplace(key, std::make_shared<const LoadedModel>(std::move(*loaded)));
     }
 
-    for (const auto& [name, version] : config.defaults) {
-        if (snapshot->models.find(ModelKeyView{name, version}) != snapshot->models.end()) {
-            snapshot->defaults.emplace(name, version);
-            continue;
-        }
-        auto available = VersionsOf(*snapshot, name);
-        std::string reason = "default version \"" + version + "\" for model \"" + name + "\" is not loaded";
-        if (available.empty()) {
-            reason += " (no versions of that model are loaded)";
-        } else {
-            reason += " (loaded: ";
-            for (std::size_t i = 0; i < available.size(); ++i) {
-                reason += (i == 0 ? "" : ", ") + available[i];
-            }
-            reason += ")";
-        }
-        Record(snapshot->failures, config.root, FailureKind::Manifest, reason, ModelKey{name, version});
-    }
+    ResolveDefaults(snapshot, config);
 
-    std::sort(snapshot->failures.begin(), snapshot->failures.end(),
+    std::sort(snapshot.failures.begin(), snapshot.failures.end(),
               [](const ModelFailure& left, const ModelFailure& right) {
                   return left.directory < right.directory;
               });

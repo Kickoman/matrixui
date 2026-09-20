@@ -28,14 +28,14 @@ public:
 
     std::shared_ptr<const RegistrySnapshot> snapshot() const;
 
-    void publish(std::shared_ptr<RegistrySnapshot> next);
+    void publish(RegistrySnapshot&& next);
 
     std::shared_ptr<const RegistrySnapshot> rebuild();
 
     const RegistryConfig& config() const { return configuration; }
 
 private:
-    void install(std::shared_ptr<RegistrySnapshot> next);   // publishMutex held
+    void install(RegistrySnapshot&& next);
 
     alignas(64) std::atomic<std::shared_ptr<const RegistrySnapshot>> slot;
     alignas(64) RegistryConfig configuration;

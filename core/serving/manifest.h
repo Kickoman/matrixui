@@ -10,9 +10,6 @@
 
 namespace Serving {
 
-// How a client's logical tensor flattens into the single row the network takes.
-// The network itself only ever sees `size` values, so this is description, not
-// instruction: nothing here is enforced on a request by the loader.
 enum class InputLayout {
     Flat,
     Hwc,
@@ -59,9 +56,6 @@ struct ModelManifest {
     nlohmann::json annotations = nlohmann::json::object();
 };
 
-// Parses and validates the document, resolving weights.path against
-// `modelDirectory`. Throws ManifestError naming the field and the value that
-// did not fit. Nothing here touches the weights file.
 ModelManifest ParseManifest(const nlohmann::json& document, const std::filesystem::path& modelDirectory);
 
 std::string_view ToString(InputLayout layout);

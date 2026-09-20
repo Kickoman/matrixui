@@ -52,18 +52,18 @@ struct Entry {
     std::size_t inputSize;
 };
 
-std::shared_ptr<RegistrySnapshot> MakeSnapshot(
+RegistrySnapshot MakeSnapshot(
     const std::vector<Entry>& entries,
     std::map<std::string, std::string> defaults = {}
 ) {
-    auto snapshot = std::make_shared<RegistrySnapshot>();
+    RegistrySnapshot snapshot;
     for (const auto& entry : entries) {
-        snapshot->models.emplace(
+        snapshot.models.emplace(
             Serving::ModelKey{entry.name, entry.version},
             MakeModel(entry.name, entry.version, entry.inputSize));
     }
     for (auto& [name, version] : defaults) {
-        snapshot->defaults.emplace(name, version);
+        snapshot.defaults.emplace(name, version);
     }
     return snapshot;
 }
@@ -93,6 +93,9 @@ static_assert(
                    std::shared_ptr<const Serving::LoadedModel>>,
     "Lookup must own the model it hands out");
 static_assert(
+    std::is_same_v<decltype(&ModelRegistry::publish), void (ModelRegistry::*)(RegistrySnapshot&&)>,
+    "publish must consume the composition; anything else leaves the caller a handle to a live snapshot");
+static_assert(
     !std::is_copy_constructible_v<ModelRegistry> && !std::is_move_constructible_v<ModelRegistry>,
     "the atomic member makes the registry neither; say so rather than discover it");
 
@@ -100,17 +103,17 @@ static_assert(
 TEST_CASE("Find tells the three kinds of miss apart") {
     const auto snapshot = MakeSnapshot({{"mnist", "v1", 64}, {"mnist", "v3", 64}, {"cifar", "v1", 32}});
 
-    const auto hit = Find(*snapshot, "mnist", "v3");
+    const auto hit = Find(snapshot, "mnist", "v3");
     CHECK(hit.status == LookupStatus::Found);
     REQUIRE(hit.model != nullptr);
     CHECK(hit.model->manifest().version == "v3");
 
-    const auto noModel = Find(*snapshot, "absent", "v1");
+    const auto noModel = Find(snapshot, "absent", "v1");
     CHECK(noModel.status == LookupStatus::UnknownModel);
     CHECK(noModel.model == nullptr);
     CHECK(noModel.availableVersions.empty());
 
-    const auto noVersion = Find(*snapshot, "mnist", "v9");
+    const auto noVersion = Find(snapshot, "mnist", "v9");
     CHECK(noVersion.status == LookupStatus::UnknownVersion);
     CHECK(noVersion.model == nullptr);
     CHECK(noVersion.availableVersions == std::vector<std::string>{"v1", "v3"});
@@ -118,22 +121,22 @@ TEST_CASE("Find tells the three kinds of miss apart") {
 
 TEST_CASE("FindDefault resolves only what the caller declared") {
     const auto withDefault = MakeSnapshot({{"mnist", "v1", 64}, {"mnist", "v3", 64}}, {{"mnist", "v3"}});
-    const auto chosen = FindDefault(*withDefault, "mnist");
+    const auto chosen = FindDefault(withDefault, "mnist");
     CHECK(chosen.status == LookupStatus::Found);
     CHECK(chosen.model->manifest().version == "v3");
 
     const auto withoutDefault = MakeSnapshot({{"mnist", "v1", 64}, {"mnist", "v3", 64}});
-    const auto undecided = FindDefault(*withoutDefault, "mnist");
+    const auto undecided = FindDefault(withoutDefault, "mnist");
     CHECK(undecided.status == LookupStatus::NoDefaultVersion);
     CHECK(undecided.availableVersions == std::vector<std::string>{"v1", "v3"});
 
     // A default naming a version that is not there: the default is broken, the
     // model is not, so explicit versions keep working.
     const auto dangling = MakeSnapshot({{"mnist", "v1", 64}}, {{"mnist", "v9"}});
-    CHECK(FindDefault(*dangling, "mnist").status == LookupStatus::UnknownVersion);
-    CHECK(Find(*dangling, "mnist", "v1").status == LookupStatus::Found);
+    CHECK(FindDefault(dangling, "mnist").status == LookupStatus::UnknownVersion);
+    CHECK(Find(dangling, "mnist", "v1").status == LookupStatus::Found);
 
-    CHECK(FindDefault(*withDefault, "absent").status == LookupStatus::UnknownModel);
+    CHECK(FindDefault(withDefault, "absent").status == LookupStatus::UnknownModel);
 }
 
 TEST_CASE("Lookup takes string_view without building a key") {
@@ -143,7 +146,7 @@ TEST_CASE("Lookup takes string_view without building a key") {
     const auto snapshot = MakeSnapshot({{"mnist", "v1", 64}});
     const std::string name = "mnist";
     const std::string_view view = name;
-    CHECK(Find(*snapshot, view, std::string_view{"v1"}).status == LookupStatus::Found);
+    CHECK(Find(snapshot, view, std::string_view{"v1"}).status == LookupStatus::Found);
 }
 
 TEST_CASE("A model taken from a snapshot outlives the swap") {
@@ -215,9 +218,9 @@ TEST_CASE("Lookups and swaps run together without tearing") {
     const auto first = MakeModel("mnist", "v1", 64);
     const auto third = MakeModel("mnist", "v3", 64);
     const auto compose = [&] {
-        auto snapshot = std::make_shared<RegistrySnapshot>();
-        snapshot->models.emplace(Serving::ModelKey{"mnist", "v1"}, first);
-        snapshot->models.emplace(Serving::ModelKey{"mnist", "v3"}, third);
+        RegistrySnapshot snapshot;
+        snapshot.models.emplace(Serving::ModelKey{"mnist", "v1"}, first);
+        snapshot.models.emplace(Serving::ModelKey{"mnist", "v3"}, third);
         return snapshot;
     };
 

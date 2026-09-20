@@ -15,10 +15,7 @@ std::shared_ptr<const RegistrySnapshot> ModelRegistry::snapshot() const {
     return slot.load();
 }
 
-void ModelRegistry::publish(std::shared_ptr<RegistrySnapshot> next) {
-    if (!next) {
-        return;
-    }
+void ModelRegistry::publish(RegistrySnapshot&& next) {
     const std::lock_guard<std::mutex> guard(publishMutex);
     install(std::move(next));
 }
@@ -29,9 +26,9 @@ std::shared_ptr<const RegistrySnapshot> ModelRegistry::rebuild() {
     return slot.load();
 }
 
-void ModelRegistry::install(std::shared_ptr<RegistrySnapshot> next) {
-    next->generation = ++published;
-    slot.store(std::move(next));
+void ModelRegistry::install(RegistrySnapshot&& next) {
+    next.generation = ++published;
+    slot.store(std::make_shared<const RegistrySnapshot>(std::move(next)));
 }
 
 }  // namespace Serving

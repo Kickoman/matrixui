@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <string>
 #include <system_error>
+#include <typeinfo>
 #include <vector>
 
 namespace {
@@ -65,9 +66,9 @@ TEST_CASE("Build loads every model directory under the root") {
     });
 
     const auto snapshot = Build(ConfigFor(root));
-    CHECK(KeysOf(*snapshot) == std::vector<std::string>{"cifar/v1", "mnist/v1", "mnist/v3"});
-    CHECK(snapshot->failures.empty());
-    CHECK(Find(*snapshot, "cifar", "v1").model->network()->inputSize() == 32);
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"cifar/v1", "mnist/v1", "mnist/v3"});
+    CHECK(snapshot.failures.empty());
+    CHECK(Find(snapshot, "cifar", "v1").model->network()->inputSize() == 32);
 }
 
 TEST_CASE("Build does not depend on the order the filesystem returns entries") {
@@ -80,7 +81,7 @@ TEST_CASE("Build does not depend on the order the filesystem returns entries") {
         {"mnist", "mnist", "v1", {64, 16, 3}},
     });
 
-    CHECK(KeysOf(*Build(ConfigFor(root)))
+    CHECK(KeysOf(Build(ConfigFor(root)))
           == std::vector<std::string>{"alpha/v1", "mnist/v1", "zebra/v1"});
 }
 
@@ -96,9 +97,9 @@ TEST_CASE("Build keeps the good models when one directory is bad") {
     Tests::Truncate(root / "broken" / "weights.wgt", 40);
 
     const auto snapshot = Build(ConfigFor(root));
-    CHECK(KeysOf(*snapshot) == std::vector<std::string>{"mnist/v1", "mnist/v3"});
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"mnist/v1", "mnist/v3"});
 
-    const auto* failure = FailureFor(*snapshot, "broken");
+    const auto* failure = FailureFor(snapshot, "broken");
     REQUIRE(failure != nullptr);
     CHECK(failure->kind == FailureKind::Integrity);
     // The loader already put the numbers in the message; they must survive.
@@ -117,15 +118,15 @@ TEST_CASE("Build sorts the reasons it could not use a directory") {
     Tests::WriteNetwork(root / "contract" / "weights.wgt", {64, 16, 3});
 
     const auto snapshot = Build(ConfigFor(root));
-    CHECK(KeysOf(*snapshot) == std::vector<std::string>{"mnist/v1"});
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"mnist/v1"});
 
-    REQUIRE(FailureFor(*snapshot, "empty") != nullptr);
-    CHECK(FailureFor(*snapshot, "empty")->kind == FailureKind::Skipped);
-    CHECK(FailureFor(*snapshot, "bad-json")->kind == FailureKind::Manifest);
-    CHECK(FailureFor(*snapshot, "contract")->kind == FailureKind::Contract);
-    CHECK(FailureFor(*snapshot, "contract")->reason.find("input.size 100") != std::string::npos);
+    REQUIRE(FailureFor(snapshot, "empty") != nullptr);
+    CHECK(FailureFor(snapshot, "empty")->kind == FailureKind::Skipped);
+    CHECK(FailureFor(snapshot, "bad-json")->kind == FailureKind::Manifest);
+    CHECK(FailureFor(snapshot, "contract")->kind == FailureKind::Contract);
+    CHECK(FailureFor(snapshot, "contract")->reason.find("input.size 100") != std::string::npos);
 
-    CHECK(std::is_sorted(snapshot->failures.begin(), snapshot->failures.end(),
+    CHECK(std::is_sorted(snapshot.failures.begin(), snapshot.failures.end(),
                          [](const ModelFailure& l, const ModelFailure& r) {
                              return l.directory < r.directory;
                          }));
@@ -142,10 +143,10 @@ TEST_CASE("Build rejects both sides of a name and version collision") {
     const auto snapshot = Build(ConfigFor(root));
     // Neither wins -- picking one would make the answer depend on the order the
     // filesystem happened to return.
-    CHECK(KeysOf(*snapshot) == std::vector<std::string>{"mnist/v1"});
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"mnist/v1"});
 
-    const auto* first = FailureFor(*snapshot, "a-copy");
-    const auto* second = FailureFor(*snapshot, "mnist-v3");
+    const auto* first = FailureFor(snapshot, "a-copy");
+    const auto* second = FailureFor(snapshot, "mnist-v3");
     REQUIRE(first != nullptr);
     REQUIRE(second != nullptr);
     CHECK(first->kind == FailureKind::Collision);
@@ -169,17 +170,17 @@ TEST_CASE("Build reports a default that names a version it did not load") {
     const auto snapshot = Build(config);
 
     // The default is broken, the model is not.
-    CHECK(Find(*snapshot, "mnist", "v1").status == LookupStatus::Found);
-    CHECK(Serving::FindDefault(*snapshot, "mnist").status == LookupStatus::NoDefaultVersion);
-    CHECK(snapshot->defaults.empty());
+    CHECK(Find(snapshot, "mnist", "v1").status == LookupStatus::Found);
+    CHECK(Serving::FindDefault(snapshot, "mnist").status == LookupStatus::NoDefaultVersion);
+    CHECK(snapshot.defaults.empty());
 
     const auto dangling = std::count_if(
-        snapshot->failures.begin(), snapshot->failures.end(),
+        snapshot.failures.begin(), snapshot.failures.end(),
         [](const ModelFailure& failure) {
             return failure.reason.find("default version") != std::string::npos;
         });
     CHECK(dangling == 2);
-    CHECK(std::any_of(snapshot->failures.begin(), snapshot->failures.end(),
+    CHECK(std::any_of(snapshot.failures.begin(), snapshot.failures.end(),
                       [](const ModelFailure& f) { return f.reason.find("loaded: v1, v3") != std::string::npos; }));
 }
 
@@ -195,8 +196,8 @@ TEST_CASE("Build carries a default it could resolve into the snapshot") {
     const auto snapshot = Build(config);
 
     // Copied into the snapshot, so composition and defaults swap as one unit.
-    CHECK(snapshot->defaults.at("mnist") == "v3");
-    CHECK(Serving::FindDefault(*snapshot, "mnist").model->manifest().version == "v3");
+    CHECK(snapshot.defaults.at("mnist") == "v3");
+    CHECK(Serving::FindDefault(snapshot, "mnist").model->manifest().version == "v3");
 }
 
 TEST_CASE("Build does not follow a symbolic link in the root") {
@@ -214,8 +215,8 @@ TEST_CASE("Build does not follow a symbolic link in the root") {
     // and models/current -> models/mnist-v3 is a common deployment habit, so the
     // operator has to be able to see why it did nothing.
     const auto snapshot = Build(ConfigFor(root));
-    CHECK(KeysOf(*snapshot) == std::vector<std::string>{"mnist/v3"});
-    const auto* skipped = FailureFor(*snapshot, "current");
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"mnist/v3"});
+    const auto* skipped = FailureFor(snapshot, "current");
     REQUIRE(skipped != nullptr);
     CHECK(skipped->kind == FailureKind::Skipped);
     CHECK(skipped->reason.find("not followed") != std::string::npos);
@@ -251,8 +252,8 @@ TEST_CASE("Build stops loading once the declared weight budget is spent") {
     config.maxDeclaredWeightBytes = 8856 * 2;
     const auto snapshot = Build(config);
 
-    CHECK(snapshot->models.size() == 2);
-    const auto* refused = FailureFor(*snapshot, "c");
+    CHECK(snapshot.models.size() == 2);
+    const auto* refused = FailureFor(snapshot, "c");
     REQUIRE(refused != nullptr);
     CHECK(refused->kind == FailureKind::Budget);
     CHECK(refused->reason.find("more than the 17712 allowed") != std::string::npos);
@@ -293,5 +294,57 @@ TEST_CASE("rebuild publishes what it could load and keeps the rest as reasons") 
 
     // Strictness stays available to the caller, one line before publish():
     const auto candidate = Build(ConfigFor(root));
-    CHECK_FALSE(candidate->failures.empty());
+    CHECK_FALSE(candidate.failures.empty());
+}
+
+
+TEST_CASE("Build lets nothing but a Serving::Error out") {
+    const Tests::TempDir dir;
+
+    std::vector<std::filesystem::path> roots;
+    roots.push_back(dir.file("absent"));
+    roots.push_back(dir.write("plain.txt", "x"));
+    roots.push_back(Tests::WriteModelTree(dir, {{"a", "mnist", "v1", {64, 16, 3}}}, "fine"));
+
+    // Readable but not searchable: readdir succeeds, every lstat on a child
+    // fails, and directory_entry::symlink_status() is the throwing overload.
+    const auto unsearchable = Tests::WriteModelTree(dir, {{"a", "mnist", "v1", {64, 16, 3}}}, "unsearchable");
+    std::error_code failed;
+    std::filesystem::permissions(unsearchable, std::filesystem::perms::owner_read, failed);
+    const bool locked = !failed && !std::filesystem::is_directory(unsearchable / "a", failed);
+    if (locked) {
+        roots.push_back(unsearchable);
+    }
+
+    for (const auto& root : roots) {
+        try {
+            Build(ConfigFor(root));
+        } catch (const Serving::Error&) {
+            continue;
+        } catch (const std::exception& error) {
+            std::filesystem::permissions(unsearchable, std::filesystem::perms::owner_all, failed);
+            FAIL(root.string() << " escaped as " << typeid(error).name() << ": " << error.what());
+        }
+    }
+
+    std::filesystem::permissions(unsearchable, std::filesystem::perms::owner_all, failed);
+    if (!locked) {
+        WARN_MESSAGE(false, "cannot make a directory unsearchable here");
+    }
+}
+
+TEST_CASE("Build ignores a symbolic link that is not a directory") {
+    const Tests::TempDir dir;
+    const auto root = Tests::WriteModelTree(dir, {{"mnist-v3", "mnist", "v3", {64, 16, 3}}});
+
+    std::error_code failed;
+    std::filesystem::create_symlink(root / "mnist-v3" / "manifest.json", root / "notes.json", failed);
+    if (failed) {
+        WARN_MESSAGE(false, "symlinks unavailable here: " << failed.message());
+        return;
+    }
+
+    const auto snapshot = Build(ConfigFor(root));
+    CHECK(KeysOf(snapshot) == std::vector<std::string>{"mnist/v3"});
+    CHECK(snapshot.failures.empty());
 }

@@ -1,4 +1,4 @@
-# `core/serving` — loading a model artifact
+# `core/serving` — loading and holding model artifacts
 
 Turns a directory on disk into a validated, immutable model in memory, or
 refuses saying which number did not match. This is the first piece of an
@@ -9,7 +9,10 @@ inference service; nothing here serves anything yet.
 | `error.h` | `Error` and its three children — `ManifestError`, `IntegrityError`, `ContractError` |
 | `manifest.h/.cpp` | `ModelManifest` and the parts it is made of, plus `ParseManifest` |
 | `loaded_model.h/.cpp` | `class LoadedModel`, `enum class IntegrityCheck` |
-| `model_loader.h/.cpp` | `LoadModel` — the only entry point |
+| `model_loader.h/.cpp` | `LoadModel` — one directory into one model |
+| `snapshot.h/.cpp` | `RegistrySnapshot`, `ModelKey`, `ModelFailure`, `Find`, `FindDefault` |
+| `build.h/.cpp` | `Build` — a directory of directories into one snapshot |
+| `registry.h/.cpp` | `RegistryConfig`, `class ModelRegistry` — holds the snapshot and swaps it |
 
 This library links `matrixgui_nn` for `NeuralNetwork` and `LoadNetwork`, and
 `matrixgui_core_lib` privately for `Io::ReadFile` and `Hash::Sha256OfStream`.
@@ -115,6 +118,14 @@ under a running client.
    rather than holding it next to the matrices it is about to become.
 5. `Neural::LoadNetwork` parses it, which is where a truncated or oversized
    header is refused.
+
+`manifest.json` is refused above `kMaxManifestBytes = 1MiB`, checked with
+`file_size` before the parse. The largest legitimate manifest is dominated by
+`output.labels`, and a thousand labels of thirty characters is about 30KB, so
+that is thirty times the headroom. It is bounded at all because a registry turns
+one unbounded parse into one per directory, and nlohmann materialises roughly
+sixteen bytes a node on top of the text — 1MiB of JSON can be 10–20MB resident,
+which is the reason not to raise it casually.
 6. `input.size` against `network.inputSize()`, `output.size` against
    `network.outputSize()`. Label count is already tied to `output.size` by
    step 2, so it reaches the network transitively.
@@ -159,8 +170,235 @@ the one thing holding this up.
 independent models with two networks — deciding what to keep is the registry's
 job, not this one's.
 
+## The registry
+
+`ModelRegistry` holds one published `RegistrySnapshot` and replaces it whole.
+Building a composition and installing it are separate operations:
+
+```cpp
+RegistrySnapshot Build(const RegistryConfig& config);   // never publishes
+void ModelRegistry::publish(RegistrySnapshot&& next);   // stamps, installs
+std::shared_ptr<const RegistrySnapshot> ModelRegistry::rebuild();   // both, under one lock
+```
+
+`publish` takes the composition by rvalue and turns it into a
+`shared_ptr<const>` itself. That is deliberate: if it took a
+`shared_ptr<RegistrySnapshot>`, the caller would keep a mutable handle to a
+snapshot that is already serving readers, and could empty it from the outside
+with an ordinary `clear()`.
+
+### What the swap guarantees
+
+The slot is a `std::atomic<std::shared_ptr<const RegistrySnapshot>>`.
+`snapshot()` is one `load()` returning a pointer that *owns* the composition, so
+a later `publish()` cannot destroy what a reader is holding. A request that
+started on one composition keeps it — models, networks, strings, diagnostics —
+until it drops the pointer, and whichever thread drops the last reference pays
+for freeing the old tree.
+
+Three things about it are easy to get wrong:
+
+- **`snapshot()` is not free and readers do not run in parallel.** libstdc++
+  implements `atomic<shared_ptr>` as `_Sp_atomic`, a spinlock in the low bit of
+  the control-block pointer, and `_Atomic_count::lock()` is *exclusive* — readers
+  take it too. Two concurrent `snapshot()` calls serialise. The spin is
+  `__builtin_ia32_pause()` with no `sched_yield`. Measured here, nanoseconds per
+  acquisition: 21.5 at one reader, 53.2 at two, 132 at four, 292 at eight, while
+  a `shared_mutex` flattens at ~108. It is still the right primitive, because one
+  `Predict` costs 33µs–3.7ms and a worker touches the slot once per request — but
+  do not write "readers never block" anywhere.
+- **Atomicity is per acquisition.** One `snapshot()` per request and every lookup
+  through that pointer; two loads can land on different compositions. This is why
+  there is deliberately no `registry.find(name, version)` shortcut hiding the
+  load inside itself.
+- **Default `seq_cst`, and not because ordering is moot.** `_Sp_atomic` clamps
+  anything weaker — `load` up to acquire, `store` up to release — so a `relaxed`
+  annotation in the source would be a lie rather than an optimisation.
+
+`Build` on one thread and `publish` on another is safe only when the hand-off is
+itself synchronised (a return value, a join, a queue under a mutex). Stashing a
+raw pointer is not.
+
+`slot` carries `alignas(64)`, and so does the member after it. `alignas` sets a
+member's alignment, not the padding after it, so aligning only `slot` leaves the
+next member on the same line: measured here, `configuration` lands at offset 16
+of the line readers are CAS-ing. With `alignas` on both it starts at 64.
+
+### The snapshot
+
+```cpp
+struct RegistrySnapshot {
+    std::map<ModelKey, std::shared_ptr<const LoadedModel>, ModelKeyLess> models;
+    std::map<std::string, std::string, std::less<>> defaults;
+    std::vector<ModelFailure> failures;
+    std::uint64_t generation = 0;
+};
+```
+
+`std::map` rather than `unordered_map`: a composition is tens of models, so the
+`log N` is irrelevant, and a deterministic order is what makes diagnostics,
+collision messages and the CLI snapshot reproducible. The same scar is recorded
+in [`core/words/data/README.md`](../words/data/README.md).
+
+`ModelKeyLess` is transparent, so resolving a request does not have to build a
+`ModelKey` out of two `std::string`s — two allocations on the path a request
+takes. There is no `versionsByName` index: the map is keyed by `(name, version)`,
+so every version of one name is already contiguous and `VersionsOf` walks that
+range. A second index would only be a second thing to keep in step.
+
+`generation` is stamped by `publish`, not by whoever built the composition: the
+number is about publication order, which only the registry knows.
+
+### Lookup
+
+A miss is data, not an exception. Not finding a model is an ordinary outcome of a
+request; `Serving::Error` stays for a build that went wrong.
+
+| `LookupStatus` | Means | The HTTP layer will want |
+|---|---|---|
+| `Found` | | 200 |
+| `UnknownModel` | no such name at all | 404 |
+| `UnknownVersion` | the name is served, that version is not | 404, different text |
+| `NoDefaultVersion` | the name is served, none asked for, none is default | 400 |
+
+The two "which one?" misses carry `availableVersions`, so the HTTP layer never
+re-asks the snapshot just to write the error text.
+
+`FindDefault` resolves the default *first* and only builds a version list on a
+miss. The route without a version is the common one, and the list is needed only
+for the message.
+
+### One bad directory does not sink the rest
+
+`Build` loads what loads and records the rest in `failures`. It throws only when
+the root itself cannot be walked.
+
+The unit of failure is a directory; the unit of value is a model; they are
+independent, so coupling them would be a choice rather than a consequence. The
+usual objection to degrading — that the failure is displaced in time and space,
+a log line at 03:14 becoming a customer's 404 at 11:40 — holds only when the
+reason burns in a log. Here it does not: `failures` is a field of the snapshot,
+`MatrixGui_models list` prints it, and a future `/readyz` reads the same field.
+
+Strictness stays available to the caller, one line before publishing:
+
+```cpp
+auto next = Build(config);
+if (!next.failures.empty()) { throw ...; }
+registry.publish(std::move(next));
+```
+
+The reverse is not available: a library that throws cannot hand back a partial
+composition. And because publication is the last statement, a failed rebuild is
+non-destructive — the previous composition keeps serving.
+
+`FailureKind` is an enum rather than a string so the HTTP layer never matches on
+message text; `reason` is the exception's own `what()`, because the loader
+already put the numbers in it.
+
+### Walking the root
+
+Depth is exactly one: `<root>/<directory>/manifest.json`.
+
+| Found in the root | Result |
+|---|---|
+| a directory with a `manifest.json` | a candidate |
+| a directory without one | recorded as `Skipped` |
+| a plain file | ignored silently |
+| a symlink to a directory | recorded as `Skipped`, not followed |
+| a symlink to anything else | ignored silently, like a plain file |
+| an entry whose status cannot be read | recorded as `Skipped` |
+
+Entries are sorted before they are loaded. `directory_iterator` hands them back
+in filesystem order — creation order here — and letting that decide anything
+would make the result depend on how the tree was built.
+
+Symlinks are not followed. Step 1 already refuses a symlink that leaves a model
+directory, and following them in the root invites loops and registering one model
+twice under two directory names. `models/current -> models/mnist-v3` is a common
+deployment habit, so it is recorded rather than ignored: the operator has to be
+able to see why it did nothing.
+
+Every status query uses the `error_code` overload and the walk increments with
+`increment(ec)`. `directory_entry::symlink_status()` is the throwing form and
+does not consult the cached `d_type`, so on a root that is readable but not
+searchable — or when an entry vanishes between `readdir` and `lstat`, which is an
+ordinary `rsync` race — the throwing form would emit a `filesystem_error`, and
+that is not a `Serving::Error`.
+
+### Collisions
+
+Two directories declaring the same `name` + `version` are **both** rejected.
+Picking a winner would make the answer depend on the traversal order, and that
+order is the filesystem's. The message names both directories; a third claimant
+names only itself, because the first two already named each other.
+
+### Defaults
+
+Which version answers a request that does not name one comes from
+`RegistryConfig::defaults`, supplied by the caller — a repeated `--default
+mnist=v3` on the CLI today, a service configuration later. It is never derived
+from disk: the manifest format defines no ordering over versions, and a
+`defaults.json` in the root would be a second file format with its own version,
+parser and messages for a map the caller already has.
+
+The resolved map is copied *into* the snapshot, so composition and defaults swap
+as one unit; otherwise a rebuild could publish new models with stale defaults.
+
+A default naming a version that is not loaded is recorded in `failures` and the
+model stays: the default is broken, the model is not, so explicit versions keep
+working and a request without one gets `NoDefaultVersion`.
+
+### Rebuilding
+
+`rebuild()` is called by the owner — a CLI invocation, a SIGHUP handler, a future
+admin endpoint. There is no watcher, no timer and no background thread: `inotify`
+fires in the middle of an `rsync` and would publish a composition built from a
+half-written tree, and nothing in `core/` owns a daemon thread.
+
+**Everything is re-read. Nothing is reused.** Two independent reasons:
+
+- Filesystem metadata lies, and not exotically. `tar --mtime='@0' --clamp-mtime`
+  and `SOURCE_DATE_EPOCH` pin mtime to a constant as a matter of reproducible-build
+  practice, `cp -p` and `git checkout` do weaker versions of the same, and
+  `SaveNetwork` writes a fixed layout, so retraining the same topology yields a
+  file of exactly the same length. `(size, mtime)` would call that the same model.
+- Hashing to decide costs more than reloading. Measured: for a 5.2MB blob the
+  digest is 173ms against 62.9ms for the whole load — 2.8x worse, because the
+  SHA-256 here runs at about 30MB/s.
+
+The price is measured and is not hidden: 10ms for a 795KB model, 63ms for 5.2MB,
+roughly 3.5x that when a digest is declared. Twenty MNIST-sized models rebuild in
+about 0.2s.
+
+### Ceilings
+
+```cpp
+std::size_t maxRootEntries = 4096;
+std::uint64_t maxDeclaredWeightBytes = 2ull << 30;
+```
+
+`maxRootEntries` is counted *while* iterating and bails before pushing, so a root
+with millions of entries does not cost a vector of paths before being refused.
+
+The weight budget is in *declared* bytes — `(rows*cols + cols) * 8` summed across
+the tree — not in bytes on disk. 2GiB rather than 4: `LoadNetwork` already refuses
+a single network above `kMaxWeightBytes = 4GiB`, so a registry-wide 4GiB ceiling
+would be weaker than the existing per-model cap as soon as there are two models.
+
+**What the budget does and does not bound.** It bounds the total a composition
+*retains*. It does not bound the peak during the walk: the declared size is known
+only after `LoadModel` has already built the matrices, so one model up to the
+per-model 4GiB cap can materialise before the budget refuses it. Nor is resident
+size the same as declared: `LoadNetwork` allocates `gradientWeights` and
+`gradientBiases` for every dense layer even though inference never reads them, so
+a model is **2x its declared bytes** resident, and a rebuild holds two
+compositions at once, so the peak is about **4x**. For scale: twenty
+784/256/128/10 models are 36MB declared, 72MB resident, 144MB at the swap. The
+default exists for a corrupt or hostile tree, not for capacity planning.
+
 ## Not here
 
-HTTP, request serialisation, the model registry, lookup by name and version,
-snapshots, hot reload, worker pools — and inference itself beyond the single
-`Predict` call above. Also no PNG decoding and no preprocessing of any kind.
+HTTP, request serialisation, JSON for any of these structures, worker pools,
+batching, hot-reload triggers — and inference itself beyond the single `Predict`
+call above. Also no PNG decoding and no preprocessing of any kind.
