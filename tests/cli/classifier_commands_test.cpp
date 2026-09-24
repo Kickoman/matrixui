@@ -67,15 +67,33 @@ TEST_CASE("Predict classifies a PNG with a saved network") {
     CHECK(digit < 3);
 }
 
-TEST_CASE("Predict reports a missing network file with the size-mismatch code") {
+TEST_CASE("Predict maps a network it cannot open to the bad-config code") {
     Tests::TempDir dir;
     ClassifierCli::PredictOptions options;
     options.networkPath = dir.file("absent.wgt").string();
     options.imagePath = dir.file("any.png").string();
 
     std::ostringstream out, err;
-    CHECK(ClassifierCli::Predict(out, err, options) == ClassifierCli::kSizeMismatch);
+    CHECK(ClassifierCli::Predict(out, err, options) == ClassifierCli::kBadConfig);
     CHECK(err.str() == "Failed to load network: " + options.networkPath + "\n");
+    CHECK(out.str().empty());
+}
+
+TEST_CASE("Predict refuses an image the network's input layer cannot take") {
+    Tests::TempDir dir;
+    const auto network = WriteNetwork(dir, "net.wgt", {64, 16, 3});
+    const auto image = dir.file("digit.png");
+    PngUtils::toImage(Matrix(8, 8, 0.5), image.string());
+
+    ClassifierCli::PredictOptions options;
+    options.networkPath = network.string();
+    options.imagePath = image.string();
+    options.imageWidth = 28;
+    options.imageHeight = 28;
+
+    std::ostringstream out, err;
+    CHECK(ClassifierCli::Predict(out, err, options) == ClassifierCli::kSizeMismatch);
+    CHECK(err.str() == "Invalid image sizes: 28x28 = 784, while network input layer is 64\n");
     CHECK(out.str().empty());
 }
 

@@ -145,7 +145,7 @@ outcomes, and a CLI to different exit codes.
 
 ```cpp
 const ModelManifest& manifest() const;
-const std::shared_ptr<const Neural::NeuralNetwork>& network() const;
+std::shared_ptr<const Neural::NeuralNetwork> network() const;
 const std::filesystem::path& directory() const;
 IntegrityCheck integrity() const;   // NotDeclared | Verified
 ```
@@ -161,10 +161,16 @@ Running it is `Neural::Predict(*model.network(), input)`
 `NeuralNetworkApplier` holds a `NeuralNetwork` by value and would copy every
 weight per executor.
 
+`network()` returns the pointer **by value**, not by const reference: every call
+is a reference-count increment, so a request calls it once and keeps the result
+for the whole forward pass rather than reaching through `model` per layer.
+
 That sharing is safe because the only mutable state on the forward path,
 `DropoutLayer::mask`, is written only when `ForwardContext::training` is set,
-which `Predict` never sets. There is a comment on the member saying so; it is
-the one thing holding this up.
+which `Predict` never sets. That invariant is not this module's to keep:
+[`core/nn/README.md`](../nn/README.md) states it, names the `static std::mt19937`
+next to it, and spells out the edit that loses it without any compiler
+diagnostic. This module only depends on it.
 
 `LoadModel` does not cache. Loading the same directory twice gives two
 independent models with two networks — deciding what to keep is the registry's
@@ -204,9 +210,22 @@ Three things about it are easy to get wrong:
   take it too. Two concurrent `snapshot()` calls serialise. The spin is
   `__builtin_ia32_pause()` with no `sched_yield`. Measured here, nanoseconds per
   acquisition: 21.5 at one reader, 53.2 at two, 132 at four, 292 at eight, while
-  a `shared_mutex` flattens at ~108. It is still the right primitive, because one
-  `Predict` costs 33µs–3.7ms and a worker touches the slot once per request — but
-  do not write "readers never block" anywhere.
+  a `shared_mutex` flattens at ~108. Those are tight-loop numbers — threads doing
+  nothing but acquiring — so they are an upper bound on contention, not what a
+  worker that touches the slot once and then spends microseconds in `Predict`
+  will see; a rerun on different hardware moves them and should not be pasted
+  over these. It is still the right primitive, for that once-per-request reason
+  — but the margin is far thinner than the first draft of this paragraph
+  claimed, and "readers never block" must not be written anywhere.
+
+  That draft said one `Predict` costs 33µs–3.7ms. Those are `-O0` numbers. `build/`
+  is configured `Debug` — it is the tree CLAUDE.md tells you to create for the
+  tests, and it is the tree the benchmark was run in. Rebuilt with the flags the
+  project actually ships, `-O3 -march=native`, the same three topologies cost
+  0.8µs (64-16-10), 34µs (784-128-10) and 87µs (784-256-128-10): forty to fifty
+  times less. An acquisition under contention is therefore comparable to a whole
+  small prediction, not to a thousandth of one. Measure the forward pass against
+  the tree the service ships, never against `build/`.
 - **Atomicity is per acquisition.** One `snapshot()` per request and every lookup
   through that pointer; two loads can land on different compositions. This is why
   there is deliberately no `registry.find(name, version)` shortcut hiding the
@@ -363,13 +382,17 @@ half-written tree, and nothing in `core/` owns a daemon thread.
   practice, `cp -p` and `git checkout` do weaker versions of the same, and
   `SaveNetwork` writes a fixed layout, so retraining the same topology yields a
   file of exactly the same length. `(size, mtime)` would call that the same model.
-- Hashing to decide costs more than reloading. Measured: for a 5.2MB blob the
-  digest is 173ms against 62.9ms for the whole load — 2.8x worse, because the
-  SHA-256 here runs at about 30MB/s.
+- Hashing to decide costs more than reloading. Measured with the Release flags on
+  a 5.1MB blob: the digest is 23.8ms against 11.8ms for the whole load — 2.0x
+  worse, because SHA-256 here runs at about 240MB/s. The 173ms against 62.9ms
+  this bullet used to quote came from the same `-O0` tree as the `Predict`
+  numbers above; there the two are 205ms against 70ms. The ratio survives the
+  rebuild, the magnitudes do not.
 
-The price is measured and is not hidden: 10ms for a 795KB model, 63ms for 5.2MB,
-roughly 3.5x that when a digest is declared. Twenty MNIST-sized models rebuild in
-about 0.2s.
+The price is measured and is not hidden: with the Release flags, 1.3ms for a
+795KB model and 11.8ms for 5.2MB, roughly 3.5x that when a digest is declared.
+Twenty MNIST-sized models rebuild in about 0.03s. In `build/` all of these are
+eight times slower, which is where the 10ms and 63ms of earlier drafts came from.
 
 ### Ceilings
 

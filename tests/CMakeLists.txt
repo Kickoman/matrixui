@@ -18,8 +18,11 @@ add_executable(MatrixGui_tests
     words/inspect_test.cpp
     words/queries_test.cpp
 
+    matrix/matrix_test.cpp
+
     nn/neural_network_test.cpp
     nn/neural_network_loader_test.cpp
+    nn/neural_network_applier_test.cpp
 
     serving/build_test.cpp
     serving/manifest_test.cpp

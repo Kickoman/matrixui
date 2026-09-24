@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 Matrix::Matrix() : data(0, 0) {}
 
@@ -133,9 +134,23 @@ Matrix& Matrix::addTransposeMultiply(const Matrix& a, const Matrix& b) {
 }
 
 Matrix Matrix::multiplyAdd(const Matrix& multiplier, const Matrix& addition) const {
+    if (data.cols() != multiplier.data.rows()) {
+        throw std::invalid_argument(
+            "multiplyAdd: left side has " + std::to_string(data.cols()) +
+            " columns, multiplier has " + std::to_string(multiplier.data.rows()) + " rows"
+        );
+    }
+    if (addition.data.rows() != 1 || addition.data.cols() != multiplier.data.cols()) {
+        throw std::invalid_argument(
+            "multiplyAdd: addition must be 1x" + std::to_string(multiplier.data.cols()) +
+            ", got " + std::to_string(addition.data.rows()) + "x"
+            + std::to_string(addition.data.cols())
+        );
+    }
+
     Matrix result;
     result.data.noalias() = data * multiplier.data;
-    result.data += addition.data;
+    result.data.rowwise() += addition.data.row(0);
     return result;
 }
 

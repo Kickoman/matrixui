@@ -124,6 +124,13 @@ int RunPredict(std::ostream& out, std::ostream& err, const PredictOptions& optio
     auto loaded = Io::TryReadFile(options.networkPath, [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!loaded) {
         err << "Failed to load network: " << options.networkPath << "\n";
+        return kBadConfig;
+    }
+
+    if (loaded->inputSize() != options.imageWidth * options.imageHeight) {
+        err << "Invalid image sizes: " << options.imageWidth << "x" << options.imageHeight
+            << " = " << options.imageWidth * options.imageHeight
+            << ", while network input layer is " << loaded->inputSize() << "\n";
         return kSizeMismatch;
     }
 

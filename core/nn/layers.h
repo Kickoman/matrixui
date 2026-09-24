@@ -65,8 +65,6 @@ struct ActivationLayer {
 };
 
 struct DropoutLayer {
-    // Written only when ForwardContext::training is set, which is why forward()
-    // on a network shared const between threads is safe to call concurrently.
     mutable Matrix mask;
 
     Matrix forward(const Matrix& input) const;

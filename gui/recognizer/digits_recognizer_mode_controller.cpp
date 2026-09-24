@@ -6,6 +6,9 @@
 
 #include <QImage>
 
+#include <stdexcept>
+#include <string>
+
 
 DigitsRecognizerModeController::DigitsRecognizerModeController(QObject* parent) : ModeController(parent)
 {}
@@ -33,7 +36,15 @@ void DigitsRecognizerModeController::processUpdates(const QImage& image) {
     }
 
     matrix = matrix.transform(1, reader::kMnistPixels);
-    const Matrix prediction = network.predict(matrix);
+
+    // processUpdates runs from a slot on every stroke, so an escaping exception
+    // would terminate the application rather than surface anywhere.
+    Matrix prediction;
+    try {
+        prediction = network.predict(matrix);
+    } catch (const std::exception&) {
+        return;
+    }
 
     const std::size_t n = prediction.getCols();
     QVector<double> qtPredictions(static_cast<int>(n));
@@ -61,6 +72,12 @@ bool DigitsRecognizerModeController::loadNetwork(const QString& networkName) {
     auto loaded = Io::TryReadFile(networkName.toStdString(), [](std::istream& in) { return Neural::LoadNetwork(in); }, std::ios::binary);
     if (!loaded.has_value())
         return false;
+    if (loaded->inputSize() != static_cast<std::size_t>(reader::kMnistPixels)) {
+        throw std::invalid_argument(
+            "This mode feeds " + std::to_string(reader::kMnistPixels) +
+            " values per digit, but the network takes " + std::to_string(loaded->inputSize())
+        );
+    }
     network.initializeNetwork(std::move(*loaded));
     this->networkName = networkName;
     return true;

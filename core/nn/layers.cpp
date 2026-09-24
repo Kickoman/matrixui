@@ -18,9 +18,6 @@ double applyActivation(const double x, const ActivationType type) {
     }
 }
 
-// x is the cached output value (post-activation).
-// For ReLU/LeakyReLU, output and input have the same sign so the derivative
-// is derivable from the output alone.
 double applyActivationDerivative(const double x, const ActivationType type) {
     assert(type != ActivationType::Softmax);
     switch(type) {

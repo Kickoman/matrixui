@@ -1,6 +1,7 @@
 #include "core/nn/neural_network_applier.h"
 #include "core/nn/layers.h"
 #include <stdexcept>
+#include <string>
 
 namespace Neural {
 
@@ -35,6 +36,13 @@ NeuralNetworkApplier::NeuralNetworkApplier(NeuralNetwork&& network) {
 }
 
 Matrix Predict(const NeuralNetwork& network, const Matrix& input) {
+    if (!network.config.layersSizes.empty() && input.getCols() != network.inputSize()) {
+        throw std::invalid_argument(
+            "Network takes " + std::to_string(network.inputSize()) +
+            " values per row, input carries " + std::to_string(input.getCols())
+        );
+    }
+
     const ForwardContext ctx{false, 0.0};
     Matrix current = input;
     for (const auto& layer : network.layerStack) {

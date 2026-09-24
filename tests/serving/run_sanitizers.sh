@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and run the serving tests under a sanitizer, out of tree.
+# Build and run the serving, matrix and nn tests under a sanitizer, out of tree.
 #
 # Usage: tests/serving/run_sanitizers.sh [asan|tsan]
 #
@@ -21,6 +21,8 @@ esac
 
 SOURCES=(
     tests/main.cpp
+    tests/matrix/matrix_test.cpp
+    tests/nn/neural_network_applier_test.cpp
     tests/serving/registry_test.cpp
     tests/serving/build_test.cpp
     tests/serving/manifest_test.cpp
