@@ -1,5 +1,6 @@
 add_library(matrixgui_cli_serving ${MATRIXGUI_LIB_TYPE}
     commands.cpp
+    handlers.cpp
     server.cpp
 )
 

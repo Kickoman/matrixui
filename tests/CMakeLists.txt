@@ -50,6 +50,7 @@ add_executable(MatrixGui_tests
     cli/classifier_commands_test.cpp
     cli/generator_commands_test.cpp
     cli/serving_commands_test.cpp
+    cli/serving_handlers_test.cpp
     cli/words_commands_test.cpp
     cli/functions_commands_test.cpp
 )
