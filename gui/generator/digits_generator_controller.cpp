@@ -431,6 +431,26 @@ bool DigitsGeneratorController::loadProject() {
         out() << "Generator is not loaded. Stopping." << std::endl;
         return false;
     }
+
+    // Checked here rather than inside the runner: training runs on
+    // internalRunner, and an exception escaping that lambda terminates the
+    // process instead of reaching the log.
+    const std::size_t pixels = imageHeight * imageWidth;
+    if (classifierNet->inputSize() != pixels) {
+        out() << "Classifier takes " << classifierNet->inputSize() << " values, but images are "
+              << imageHeight << "x" << imageWidth << " = " << pixels << ". Stopping." << std::endl;
+        return false;
+    }
+    if (generatorNet.has_value() && generatorNet->outputSize() != pixels) {
+        out() << "Generator produces " << generatorNet->outputSize() << " values, but images are "
+              << imageHeight << "x" << imageWidth << " = " << pixels << ". Stopping." << std::endl;
+        return false;
+    }
+    if (discriminatorNet.has_value() && discriminatorNet->inputSize() != pixels) {
+        out() << "Discriminator takes " << discriminatorNet->inputSize() << " values, but images are "
+              << imageHeight << "x" << imageWidth << " = " << pixels << ". Stopping." << std::endl;
+        return false;
+    }
     return true;
 }
 

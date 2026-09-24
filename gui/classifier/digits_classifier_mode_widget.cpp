@@ -111,8 +111,12 @@ void DigitsClassifierModeWidget::setController(DigitsClassifierController* contr
     connect(toggleLearningButton, &QPushButton::clicked, [this, controller]{
         if (controller->getInfo().running) {
             controller->requestStop();
-        } else {
+            return;
+        }
+        try {
             controller->run(learningConfigWidget->getConfig());
+        } catch (const std::exception& e) {
+            QMessageBox::critical(this, tr("Can't start training"), QString::fromUtf8(e.what()));
         }
     });
 

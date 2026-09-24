@@ -7,3 +7,4 @@ OPTIONS:
 
 SUBCOMMANDS:
   list                        Load every model under a root and print what came up
+  serve                       Serve the models under a root over HTTP

@@ -1,5 +1,7 @@
 #include "cli/serving/commands.h"
 
+#include "cli/serving/server.h"
+
 #include "core/serving/build.h"
 #include "core/serving/error.h"
 #include "core/serving/registry.h"
@@ -77,6 +79,19 @@ void PrintTable(std::ostream& out, const std::vector<Row>& rows) {
     }
 }
 
+void ReportFailures(std::ostream& err, const std::vector<Serving::ModelFailure>& failures) {
+    err << "\n" << failures.size()
+        << (failures.size() == 1 ? " problem:\n" : " problems:\n");
+    for (const auto& failure : failures) {
+        std::string reason = failure.reason;
+        for (auto at = reason.find('\n'); at != std::string::npos; at = reason.find('\n', at + 5)) {
+            reason.replace(at, 1, "\n    ");
+        }
+        err << "\n  " << failure.directory.string()
+            << "\n    " << Serving::ToString(failure.kind) << ": " << reason << "\n";
+    }
+}
+
 int RunList(std::ostream& out, std::ostream& err, const ListOptions& options) {
     Serving::RegistryConfig config;
     config.root = options.root;
@@ -108,18 +123,29 @@ int RunList(std::ostream& out, std::ostream& err, const ListOptions& options) {
     if (described.failures.empty()) {
         return kSuccess;
     }
-
-    err << "\n" << described.failures.size()
-        << (described.failures.size() == 1 ? " problem:\n" : " problems:\n");
-    for (const auto& failure : described.failures) {
-        std::string reason = failure.reason;
-        for (auto at = reason.find('\n'); at != std::string::npos; at = reason.find('\n', at + 5)) {
-            reason.replace(at, 1, "\n    ");
-        }
-        err << "\n  " << failure.directory.string()
-            << "\n    " << Serving::ToString(failure.kind) << ": " << reason << "\n";
-    }
+    ReportFailures(err, described.failures);
     return kIncomplete;
+}
+
+int RunServe(std::ostream& out, std::ostream& err, const ServeOptions& options) {
+    Serving::RegistryConfig config;
+    config.root = options.root;
+    config.defaults = options.defaults;
+
+    Serving::ModelRegistry registry(config);
+    const auto snapshot = registry.rebuild();
+
+    out << snapshot->models.size() << (snapshot->models.size() == 1 ? " model" : " models")
+        << " loaded, generation " << snapshot->generation << "\n";
+
+    if (!snapshot->failures.empty()) {
+        ReportFailures(err, snapshot->failures);
+        if (options.strictReady) {
+            return kIncomplete;
+        }
+    }
+
+    return RunServer(out, err, options);
 }
 
 }  // namespace
@@ -127,6 +153,18 @@ int RunList(std::ostream& out, std::ostream& err, const ListOptions& options) {
 int List(std::ostream& out, std::ostream& err, const ListOptions& options) {
     try {
         return RunList(out, err, options);
+    } catch (const Serving::Error& error) {
+        err << error.what() << "\n";
+        return kUnusableRoot;
+    } catch (const std::exception& error) {
+        err << error.what() << "\n";
+        return kUnusableRoot;
+    }
+}
+
+int Serve(std::ostream& out, std::ostream& err, const ServeOptions& options) {
+    try {
+        return RunServe(out, err, options);
     } catch (const Serving::Error& error) {
         err << error.what() << "\n";
         return kUnusableRoot;

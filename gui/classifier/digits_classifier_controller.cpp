@@ -16,6 +16,7 @@
 #include <QDir>
 #include <QSettings>
 #include <filesystem>
+#include <string>
 
 
 namespace {
@@ -88,6 +89,22 @@ void DigitsClassifierController::run(const Neural::Classifier::LearningConfig& c
     if (recognizer.isRunning()) {
         throw std::runtime_error("Can't start learning while learning in progress");
     }
+
+    // Checked before the thread exists: training runs on internalRunner, and an
+    // exception escaping that lambda terminates the process instead of reaching
+    // anyone.
+    const auto& layers = recognizer.getNetwork().config.layersSizes;
+    if (layers.empty()) {
+        throw std::runtime_error("Load or create a network before training");
+    }
+    if (layers.front() != imageWidth * imageHeight) {
+        throw std::runtime_error(
+            "Invalid image sizes: " + std::to_string(imageWidth) + "x" + std::to_string(imageHeight)
+            + " = " + std::to_string(imageWidth * imageHeight)
+            + ", while network input layer is " + std::to_string(layers.front())
+        );
+    }
+
     internalRunner = new QThread(this);
     connect(internalRunner, &QThread::started, [this, config]{
         QMetaObject::invokeMethod(this, &DigitsClassifierController::infoUpdated);
