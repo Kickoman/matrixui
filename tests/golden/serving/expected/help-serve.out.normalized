@@ -1,0 +1,26 @@
+Serve the models under a root over HTTP
+
+<BIN> serve [OPTIONS]
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --root TEXT:DIR REQUIRED 
+                              Directory holding one subdirectory per model
+          --default TEXT ...  Version a request without one resolves to, as name=version.
+                              Repeatable.
+          --host TEXT [127.0.0.1]  
+                              Address the public listener binds
+          --port INT:INT in [1 - 65535] [8080]  
+                              Port the public listener binds
+          --admin-host TEXT [127.0.0.1]  
+                              Address the admin listener binds
+          --admin-port INT:INT in [1 - 65535] [8081]  
+                              Port the admin listener binds
+          --threads UINT:UINT in [1 - 1024] [32]  
+                              Concurrent connections the public listener serves
+          --max-batch-rows UINT:UINT in [1 - 4096] [32]  
+                              Rows one request may carry
+          --max-body-bytes UINT [8388608]  
+                              Largest request body accepted
+          --strict-ready      Refuse to start, and report not ready, while any model failed to
+                              load

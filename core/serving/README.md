@@ -1,8 +1,11 @@
 # `core/serving` — loading and holding model artifacts
 
 Turns a directory on disk into a validated, immutable model in memory, or
-refuses saying which number did not match. This is the first piece of an
-inference service; nothing here serves anything yet.
+refuses saying which number did not match, and holds the result in a snapshot that
+can be swapped under live readers. This folder is the whole model side of the
+inference service; the HTTP side that sits on it is
+[`cli/serving/`](../../cli/serving/), which owns the listeners, the request layer
+and every socket. Nothing here opens one.
 
 | File | Contains |
 |---|---|
@@ -31,9 +34,9 @@ any-directory-name/
 **The directory name is decorative.** `name` and `version` live in the manifest
 and are not checked against it: `models/mnist-v3/` holding a manifest that says
 `"name": "digits"` loads without complaint. The manifest is the only truth. A
-consequence that lands on the future registry rather than here: two directories
-can declare the same `name` + `version`, and catching that collision is the
-registry's job when it walks the tree.
+consequence that lands on the registry rather than here: two directories can
+declare the same `name` + `version`, and catching that collision is the registry's
+job when it walks the tree.
 
 `weights.wgt` is the format `Neural::SaveNetwork` writes — see
 [`core/nn/`](../nn/). Nothing about it changed for serving; the manifest is the
@@ -138,8 +141,11 @@ Failures throw, never return a sentinel:
 | `IntegrityError` | The blob: truncated, unparseable, or not the one the digest names |
 | `ContractError` | The two disagreeing about what the model takes or returns |
 
-The three are separate because the HTTP layer will map them to different
-outcomes, and a CLI to different exit codes.
+The three are separate because they are answered differently. The CLI turns them
+into exit codes; the HTTP layer never sees them on a request path, because nothing
+a request does calls `LoadModel` — they reach it only through `POST /admin/reload`
+and through the failure list `/readyz` renders, where `FailureKind` has already
+told them apart. See [`cli/serving/README.md`](../../cli/serving/README.md).
 
 ## `LoadedModel`
 
@@ -151,7 +157,7 @@ IntegrityCheck integrity() const;   // NotDeclared | Verified
 ```
 
 Immutable through having no mutators, not through `const` members — those would
-kill move, and the registry will want these in a container.
+kill move, and the registry holds these in a container.
 
 The network is a `shared_ptr<const>` rather than a value for two reasons: several
 executors can run it at once without copying the weights, and a request that
@@ -273,7 +279,7 @@ number is about publication order, which only the registry knows.
 A miss is data, not an exception. Not finding a model is an ordinary outcome of a
 request; `Serving::Error` stays for a build that went wrong.
 
-| `LookupStatus` | Means | The HTTP layer will want |
+| `LookupStatus` | Means | What the HTTP layer answers |
 |---|---|---|
 | `Found` | | 200 |
 | `UnknownModel` | no such name at all | 404 |
@@ -297,7 +303,8 @@ independent, so coupling them would be a choice rather than a consequence. The
 usual objection to degrading — that the failure is displaced in time and space,
 a log line at 03:14 becoming a customer's 404 at 11:40 — holds only when the
 reason burns in a log. Here it does not: `failures` is a field of the snapshot,
-`MatrixGui_models list` prints it, and a future `/readyz` reads the same field.
+`MatrixGui_models list` prints it, and `/readyz` reads the same field — bounded,
+because a reason carries whatever the operator wrote in the file.
 
 Strictness stays available to the caller, one line before publishing:
 
@@ -370,8 +377,10 @@ working and a request without one gets `NoDefaultVersion`.
 
 ### Rebuilding
 
-`rebuild()` is called by the owner — a CLI invocation, a SIGHUP handler, a future
-admin endpoint. There is no watcher, no timer and no background thread: `inotify`
+`rebuild()` is called by the owner. Today that is `MatrixGui_models serve`, from
+either `POST /admin/reload` or a `SIGHUP`, both funnelled through one call guarded
+against overlapping with itself. There is no watcher, no timer and no background
+thread here: `inotify`
 fires in the middle of an `rsync` and would publish a composition built from a
 half-written tree, and nothing in `core/` owns a daemon thread.
 
@@ -438,6 +447,13 @@ still see the problems, and `1` is what a deployment check would gate on.
 
 ## Not here
 
-HTTP, request serialisation, JSON for any of these structures, worker pools,
-batching, hot-reload triggers — and inference itself beyond the single `Predict`
-call above. Also no PNG decoding and no preprocessing of any kind.
+No sockets, no HTTP, no request or response format, no worker pool, no thread that
+outlives a call, and no trigger that fires on its own. All of that is
+[`cli/serving/`](../../cli/serving/): it owns both listeners, the request layer,
+the batch ceiling, the reload route and the signal plumbing, and it reaches in here
+only through `snapshot()`, `rebuild()` and the free lookups above.
+
+Also still absent, and not planned here: PNG decoding and preprocessing of any
+kind. The manifest's `input` block describes how a caller's data is meant to become
+a row; nothing in this folder acts on it, and the HTTP layer enforces only
+`input.size`, because that is the only field with a mechanical meaning.

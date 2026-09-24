@@ -18,9 +18,12 @@ a framework for models, training and inference from nothing.
 | Words | `MatrixGui_words` | Train SGNS word embeddings and explore them (neighbours, analogies, evaluation) |
 | Functions | `MatrixGui_functions` | Genetic symbolic regression: evolve an arithmetic expression fitting a table of data points |
 
-Plus one tool that is not a mode: `MatrixGui_models list --root <dir>` walks a
-directory of model artifacts and prints what a serving process would load, and
-why it would refuse the rest — see [`core/serving/`](core/serving/).
+Plus one tool that is not a mode. `MatrixGui_models list --root <dir>` walks a
+directory of model artifacts and prints what loads, and why the rest is refused;
+`MatrixGui_models serve --root <dir>` holds the same composition in a registry and
+answers predictions over HTTP, reloadable without dropping a request. The model
+side is [`core/serving/`](core/serving/), the HTTP side
+[`cli/serving/`](cli/serving/).
 
 All five are also available as modes in the GUI.
 

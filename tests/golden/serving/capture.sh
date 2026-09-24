@@ -76,14 +76,27 @@ run() {
 
 echo "capturing to $OUT using $BIN"
 
-run help      --help
-run help-list list --help
+run help       --help
+run help-list  list --help
+run help-serve serve --help
 
 run list-clean        list --root "$CLEAN"
 run list-default      list --root "$CLEAN" --default mnist=v3
 run list-empty-root   list --root "$WORK/nothing"
 run list-with-failures list --root "$ROOT"
 run list-dangling-default list --root "$CLEAN" --default mnist=v9
+
+# Every serve case here has to finish before it binds a socket, or this script
+# hangs. Nothing below reaches listen(): CLI11 rejects the first five, --default is
+# parsed by hand before the registry is built, and --strict-ready exits on an
+# incomplete composition while still holding the bind in front of it.
+run err-serve-no-root      serve
+run err-serve-missing-root serve --root "$WORK/absent"
+run err-serve-port-zero    serve --root "$CLEAN" --port 0
+run err-serve-port-high    serve --root "$CLEAN" --port 70000
+run err-serve-no-threads   serve --root "$CLEAN" --threads 0
+run err-serve-bad-default  serve --root "$CLEAN" --default mnist
+run err-serve-strict       serve --root "$ROOT" --strict-ready
 
 run err-no-subcommand
 run err-no-root          list

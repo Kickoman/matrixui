@@ -4,7 +4,7 @@ One subdirectory per tool — `words/`, `classifier/`, `generator/`, `functions/
 `serving/` —
 each with its own `capture.sh` (records a snapshot), `compare.sh` (re-captures and
 diffs against `expected/`) and `expected/` (the committed snapshot). The top-level
-[`compare.sh`](compare.sh) runs all four, or just the ones named:
+[`compare.sh`](compare.sh) runs all five, or just the ones named:
 
 ```bash
 tests/golden/compare.sh                 # everything
@@ -55,6 +55,14 @@ mismatch, a symlink in the root, a dangling default) are the whole point of the
 set: they are the messages an operator reads. Refusals carry paths that come
 back from `weakly_canonical`, so they are absolute and the normalizer strips the
 checkout prefix as well as the work directory.
+
+Its `serve` cases pin the flag surface and the start-up exit codes only. **Every
+one of them has to finish before the listeners bind, or `capture.sh` hangs with no
+timeout around it**: CLI11 rejects the malformed flags, `--default` is parsed by
+hand before the registry is built, and `--strict-ready` exits on an incomplete
+composition while the bind is still ahead of it. Anything that would actually serve
+belongs in `tests/cli/serving_server_test.cpp`, which binds port 0 and stops
+deterministically.
 
 **functions** is deterministic whenever `--seed` is passed: it seeds both
 sources of randomness — the genetizer's tournament draw and the thread-local

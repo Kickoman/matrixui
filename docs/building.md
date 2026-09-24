@@ -1,6 +1,6 @@
 # Building MatrixGui
 
-One CMake project builds everything: a Qt desktop application, four command-line
+One CMake project builds everything: a Qt desktop application, five command-line
 tools and a test binary. They share a set of small libraries under `core/`, each
 built once and linked by whichever front end needs it.
 
@@ -42,7 +42,7 @@ sudo apt-get install -y --no-install-recommends \
 | Option | Default | Description |
 |--------|---------|-------------|
 | `BUILD_GUI` | `ON` | Qt-based graphical application (`MatrixGui`) |
-| `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`, `MatrixGui_functions`) |
+| `BUILD_CLI` | `ON` | Command-line tools (`MatrixGui_headless`, `MatrixGui_gan`, `MatrixGui_words`, `MatrixGui_functions`, `MatrixGui_models`) |
 | `BUILD_TESTS` | `ON` | Unit-test binary (`MatrixGui_tests`) and the `unit` CTest entry |
 | `BUILD_SHARED_LIBS` | `OFF` | Build the `matrixgui_*` libraries as `.so` instead of `.a` |
 
@@ -79,6 +79,7 @@ Executables — these land in `build/` itself:
 | `MatrixGui_gan` | CLI | GAN training and image generation |
 | `MatrixGui_words` | CLI | Word-embedding (SGNS) pipeline and queries |
 | `MatrixGui_functions` | CLI | Genetic symbolic regression over a CSV of expected values |
+| `MatrixGui_models` | CLI | `list` inspects a directory of model artifacts; `serve` holds them in a registry and answers over HTTP |
 | `MatrixGui_tests` | test binary | doctest suite, built when `BUILD_TESTS=ON` |
 
 ## Common build configurations
@@ -132,6 +133,33 @@ and are not portable to a different CPU. That is also why the golden CLI
 snapshot only runs locally: it pins the float output of a trained model, and a
 different instruction set accumulates floats in a different order.
 
+**`MatrixGui_models serve` is the first artifact here meant to run somewhere other
+than the machine that built it. Rebuild it on the target rather than copying it.**
+On a host older than the builder it dies with an illegal instruction; on a host
+newer than the builder it runs, which is the more interesting case below.
+
+**`-march=native` also has to be kept in step with the vendored Eigen.** `eigen/`
+is 3.3.90, a snapshot between 3.3 and 3.4, and on a `-march` that has AVX-512 it
+enables the AVX-512 kernels while still computing an alignment of 32. The kernel
+then issues a 64-byte-aligned store into a 32-byte-aligned buffer and the process
+dies inside the first product large enough for Eigen to take its blocked path —
+which for a service means dying on a request, and for training means dying on a
+batch. The root `CMakeLists.txt` therefore sets `EIGEN_MAX_ALIGN_BYTES=64` on the
+`matrixgui_eigen` interface target, which is what carries the include path, so
+every translation unit that can reach Eigen sees the same value. Do not move it
+into the flags: the Debug tree and the hand-written sanitizer build would then
+disagree with Release. `core/matrix/README.md` has the measurements and the table
+of which `-march` values are consistent on their own.
+
+`tests/matrix/matrix_test.cpp` runs a 256x784 product for no reason other than to
+be above that threshold. Every other matrix in the suite is smaller, which is how
+the problem went unnoticed until a batch request found it.
+
+CI configures without `CMAKE_BUILD_TYPE`, so it builds Release and therefore with
+`-march=native` on whatever runner it gets. That is fine as long as the runner
+also executes the result, which it does — and the test above is what fails loudly
+if the alignment ever stops matching the kernels.
+
 ## Tests
 
 ```bash
@@ -183,7 +211,7 @@ into it, as two jobs:
 
 Both check out with `submodules: true`, since Eigen is required to configure.
 
-The golden CLI snapshots (`tests/golden/compare.sh`, covering all four
+The golden CLI snapshots (`tests/golden/compare.sh`, covering all five
 command-line tools) deliberately do not run in CI, for the `-march=native`
 reason given above. They stay a local pre-commit tool; the unit tests carry the
 same invariants with tolerances. See `tests/golden/README.md`.
