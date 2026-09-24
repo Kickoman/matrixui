@@ -1,19 +1,27 @@
 # `cli/serving` — the `MatrixGui_models` subcommands
 
-The operator-facing front end over [`core/serving`](../../core/serving/). One
-subcommand today: `list`, which walks a directory of model artifacts and prints
-what loaded and why the rest did not.
+The front end over [`core/serving`](../../core/serving/). Two subcommands:
+`list`, which walks a directory of model artifacts and prints what loaded and why
+the rest did not, and `serve`, which holds the same composition in a registry and
+answers over HTTP.
 
 `core/serving/README.md` is the reference for the manifest format, the loader's
 checks, the registry and the snapshot; nothing here repeats it. This file is
-about how the two pieces fit and about the exit codes, which are this tool's own.
+about how the pieces fit, about the exit codes, which are this tool's own, and
+about what the `serve` limits cost.
 
 | File | Contains |
 |---|---|
-| `options.h` | `struct ListOptions` — plain fields, no accessors |
-| `commands.h` | `int List(std::ostream&, std::ostream&, const ListOptions&)` and the exit-code constants |
-| `commands.cpp` | The body, plus the table formatting it uses |
+| `options.h` | `struct ListOptions`, `struct ServeOptions` — plain fields, no accessors |
+| `commands.h` | One `int Name(std::ostream&, std::ostream&, const NameOptions&)` per subcommand, and the exit-code constants |
+| `commands.cpp` | The bodies, the table formatting and the failure report they share |
+| `handlers.h/.cpp` | The request layer as pure functions: no httplib, no sockets, `(snapshot, request) -> reply` |
+| `server.h/.cpp` | The only translation unit that includes httplib: both listeners, routes, settings |
 | `main.cpp` | The CLI11 app: flag definitions, `--default` parsing, dispatch |
+
+`handlers` and `server` are split so that every status code is reachable from a
+doctest without a socket, and so that the fourteen seconds httplib costs to
+compile are paid by one file.
 
 ## Its own library
 
@@ -51,6 +59,35 @@ result — `Build` throws rather than returning half a composition.
 The CLI11 codes are not ours but they are **pinned** by
 `tests/golden/serving/expected/*.code`, so a new exit code must not collide with
 them.
+
+## What the `serve` limits cost
+
+`--max-body-bytes` defaults to 8 MiB against httplib's own
+`CPPHTTPLIB_PAYLOAD_MAX_LENGTH` of 100 MB, and the reason is not tidiness. The
+cap bounds what a hostile `Content-Length` makes the process buffer *before* a
+handler runs, and for the JSON representation the buffer is the cheap part.
+
+Measured, Release flags, one core, a body of empty rows at the cap:
+
+| Body | Peak resident | CPU | Answer |
+|---|---|---|---|
+| 7.98 MiB, 2 790 000 rows | 236 MiB | ~0.5 s | 413 `batch_too_large` |
+| 5.72 MiB, 2 000 000 rows | 164 MiB | ~0.3 s | 413 `batch_too_large` |
+
+That is nlohmann's document tree, and it is **not avoidable by checking things
+sooner**: the row count only exists once the body has been parsed. At
+`--threads 32` the worst case is about thirty times the first row, so a public
+port and a large `--max-body-bytes` are a memory budget, not a formality. 8 MiB
+is chosen so that the row ceiling binds first for any plausible model — 64 rows
+of 784 values is 401 KB — and so that thirty-two concurrent worst cases stay in
+the same order as the model set the registry already holds.
+
+**The two representations do not cost the same for the same byte cap.** A binary
+body allocates in proportion to itself, because the row count is
+`body.size() / (input.size * 8)`; a JSON body of the same length can declare
+millions of rows. What the cap can do is refuse the count before anything is
+sized from it, which is where the 413 above comes from. What it cannot do is make
+the parse cheaper.
 
 ## What will bite you
 

@@ -376,14 +376,45 @@ TEST_CASE("Predict refuses a request carrying no rows") {
 TEST_CASE("Predict refuses a batch over the ceiling") {
     Tests::TempDir dir;
     const auto snapshot = Snapshot(dir);
-    const std::vector<std::vector<double>> rows(5, Row(64));
 
-    const auto reply = PredictJson(snapshot, "mnist", "v3", JsonBody(rows), HandlerLimits{4});
-    CHECK(reply.status == 413);
-    CHECK(Code(reply) == "batch_too_large");
-    const auto message = Parsed(reply).at("error").at("message").get<std::string>();
-    CHECK(message.find("5 rows") != std::string::npos);
-    CHECK(message.find("4 allowed") != std::string::npos);
+    SUBCASE("naming both numbers") {
+        const std::vector<std::vector<double>> rows(5, Row(64));
+        const auto reply = PredictJson(snapshot, "mnist", "v3", JsonBody(rows), HandlerLimits{4});
+        CHECK(reply.status == 413);
+        CHECK(Code(reply) == "batch_too_large");
+        const auto message = Parsed(reply).at("error").at("message").get<std::string>();
+        CHECK(message.find("5 rows") != std::string::npos);
+        CHECK(message.find("4 allowed") != std::string::npos);
+    }
+
+    SUBCASE("on the declared count, before any row is measured") {
+        // inputs.size() is the client's number and is not bounded by the body's
+        // length, so it has to be refused before anything is sized from it. These
+        // rows are all the wrong width; a decoder that looked at widths first
+        // would answer bad_input_size, and would already have reserved for
+        // a hundred thousand rows to do it.
+        std::string body = "{\"inputs\":[";
+        for (std::size_t i = 0; i < 100000; ++i) {
+            body += (i == 0 ? "[]" : ",[]");
+        }
+        body += "]}";
+
+        const auto reply = PredictJson(snapshot, "mnist", "v3", body, HandlerLimits{64});
+        CHECK(reply.status == 413);
+        CHECK(Code(reply) == "batch_too_large");
+        CHECK(Parsed(reply).at("error").at("message").get<std::string>().find("100000 rows")
+              != std::string::npos);
+    }
+
+    SUBCASE("a binary body cannot declare more rows than it carries") {
+        const std::vector<double> values(65 * 64, 0.5);
+        const auto reply = ServingCli::Predict(
+            snapshot,
+            PredictRequest{"mnist", "v3", "application/octet-stream", BinaryBody(values)},
+            HandlerLimits{64});
+        CHECK(reply.status == 413);
+        CHECK(Code(reply) == "batch_too_large");
+    }
 }
 
 TEST_CASE("Predict refuses a value that is not finite") {

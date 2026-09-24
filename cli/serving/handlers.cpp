@@ -154,6 +154,14 @@ HttpReply BadInputSize(const std::string& message) {
     return Reply(400, {{"error", {{"code", "bad_input_size"}, {"message", message}}}});
 }
 
+HttpReply BatchTooLarge(const std::size_t rows, const std::size_t allowed) {
+    return Reply(413, {{"error", {
+        {"code", "batch_too_large"},
+        {"message", std::to_string(rows) + " rows, more than the "
+                    + std::to_string(allowed) + " allowed"},
+    }}});
+}
+
 HttpReply MalformedBody(const std::string& message) {
     return Reply(400, {{"error", {{"code", "malformed_body"}, {"message", message}}}});
 }
@@ -170,6 +178,9 @@ bool DecodeBinary(
     Decoded& into,
     HttpReply& failure
 ) {
+    // No ceiling needed before allocating here: rows is derived from body.size(),
+    // which httplib has already bounded by maxBodyBytes.
+
     const std::size_t rowBytes = manifest.input.size * sizeof(double);
     if (body.size() % rowBytes != 0) {
         failure = BadInputSize(
@@ -190,6 +201,7 @@ bool DecodeBinary(
 bool DecodeJson(
     std::string_view body,
     const Serving::ModelManifest& manifest,
+    const HandlerLimits& limits,
     Decoded& into,
     HttpReply& failure
 ) {
@@ -212,6 +224,13 @@ bool DecodeJson(
     }
 
     into.rows = inputs.size();
+    // Before the reserve, not after: inputs.size() is the client's number and is
+    // not bounded by the body's length. A 5 MiB body of empty rows otherwise
+    // reserves a gigabyte on the way to its refusal.
+    if (into.rows > limits.maxBatchRows) {
+        failure = BatchTooLarge(into.rows, limits.maxBatchRows);
+        return false;
+    }
     into.values.reserve(into.rows * manifest.input.size);
     for (std::size_t row = 0; row < inputs.size(); ++row) {
         const auto& values = inputs[row];
@@ -311,7 +330,7 @@ HttpReply Predict(
     HttpReply failure;
     const bool ok = format == BodyFormat::Binary
         ? DecodeBinary(request.body, manifest, decoded, failure)
-        : DecodeJson(request.body, manifest, decoded, failure);
+        : DecodeJson(request.body, manifest, limits, decoded, failure);
     if (!ok) {
         return failure;
     }
@@ -320,11 +339,7 @@ HttpReply Predict(
         return BadInputSize("at least one row is required");
     }
     if (decoded.rows > limits.maxBatchRows) {
-        return Reply(413, {{"error", {
-            {"code", "batch_too_large"},
-            {"message", std::to_string(decoded.rows) + " rows, more than the "
-                        + std::to_string(limits.maxBatchRows) + " allowed"},
-        }}});
+        return BatchTooLarge(decoded.rows, limits.maxBatchRows);
     }
     for (const double value : decoded.values) {
         if (!std::isfinite(value)) {
@@ -333,6 +348,14 @@ HttpReply Predict(
                 {"message", "every value must be finite"},
             }}});
         }
+    }
+
+    // Both decoders establish values.size() == rows * input.size, each in its own
+    // way. The fill loop below trusts it, and it runs before Neural::Predict, so
+    // the guard there cannot catch a decoder that broke it. One comparison makes
+    // the property local instead of an argument about two distant functions.
+    if (decoded.values.size() != decoded.rows * manifest.input.size) {
+        return ErrorReply(500, "internal", "internal error");
     }
 
     Matrix input(decoded.rows, manifest.input.size);
