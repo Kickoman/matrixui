@@ -8,6 +8,10 @@
 
 #include <httplib/httplib.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <csignal>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -162,10 +166,46 @@ void InstallPublicRoutes(
     });
 }
 
-void InstallAdminRoutes(httplib::Server& server) {
+void InstallAdminRoutes(
+    httplib::Server& server,
+    Serving::ModelRegistry& registry,
+    ReloadGate& gate,
+    const bool strictReady
+) {
     server.Get("/healthz", [](const httplib::Request&, httplib::Response& response) {
+        // Liveness never reads the registry: a probe that can fail for a reason a
+        // restart will not fix is a probe that gets the process killed.
         response.set_content("{\"status\":\"ok\"}\n", "application/json");
     });
+
+    server.Get("/readyz", [&registry, strictReady](const httplib::Request&, httplib::Response& response) {
+        Apply(Readyz(*registry.snapshot(), strictReady), response);
+    });
+
+    server.Post("/admin/reload", [&registry, &gate](const httplib::Request&, httplib::Response& response) {
+        Apply(Reload(registry, gate), response);
+    });
+}
+
+// The write end of the self-pipe. A signal handler may touch nothing else: no
+// mutex, no allocation, no atomic<shared_ptr>, no stream. write() is on the
+// async-signal-safe list, and one byte through a pipe is the whole mechanism.
+volatile sig_atomic_t gSignalWriteEnd = -1;
+
+extern "C" void OnSignal(const int number) {
+    const unsigned char byte = number == SIGHUP ? 1 : 0;
+    const ssize_t wrote = ::write(static_cast<int>(gSignalWriteEnd), &byte, 1);
+    (void)wrote;
+}
+
+bool InstallSignalHandlers() {
+    struct sigaction action{};
+    action.sa_handler = &OnSignal;
+    action.sa_flags = SA_RESTART;
+    sigemptyset(&action.sa_mask);
+    return ::sigaction(SIGHUP, &action, nullptr) == 0
+        && ::sigaction(SIGINT, &action, nullptr) == 0
+        && ::sigaction(SIGTERM, &action, nullptr) == 0;
 }
 
 HandlerLimits LimitsOf(const ServeOptions& options) {
@@ -189,6 +229,9 @@ ServerSettings AdminSettings(const ServeOptions& options) {
     // admin request must never wait behind a public one.
     settings.threads = 1;
     settings.maxThreads = 1;
+    // A reload re-reads the whole tree, so the admin side gets room to answer
+    // where the public side keeps its five-second stall detector.
+    settings.writeTimeoutSeconds = 60;
     return settings;
 }
 
@@ -200,6 +243,7 @@ struct ServerHandle::State {
     int publicPort = 0;
     int adminPort = 0;
     bool running = false;
+    ReloadGate gate;
 };
 
 ServerHandle::ServerHandle(
@@ -213,7 +257,7 @@ ServerHandle::ServerHandle(
     InstallHooks(state->publicListener, err);
     InstallHooks(state->adminListener, err);
     InstallPublicRoutes(state->publicListener, registry, LimitsOf(options));
-    InstallAdminRoutes(state->adminListener);
+    InstallAdminRoutes(state->adminListener, registry, state->gate, options.strictReady);
     state->publicPort = options.port;
     state->adminPort = options.adminPort;
 }
@@ -273,13 +317,14 @@ int RunServer(
 ) {
     httplib::Server publicListener;
     httplib::Server adminListener;
+    ReloadGate gate;
 
     ApplySettings(publicListener, PublicSettings(options));
     ApplySettings(adminListener, AdminSettings(options));
     InstallHooks(publicListener, err);
     InstallHooks(adminListener, err);
     InstallPublicRoutes(publicListener, registry, LimitsOf(options));
-    InstallAdminRoutes(adminListener);
+    InstallAdminRoutes(adminListener, registry, gate, options.strictReady);
 
     if (!publicListener.bind_to_port(options.host, options.port)) {
         err << "Can't bind " << options.host << ":" << options.port << "\n";
@@ -290,15 +335,58 @@ int RunServer(
         return kCannotBind;
     }
 
+    int signalPipe[2] = {-1, -1};
+    if (::pipe2(signalPipe, O_CLOEXEC) != 0) {
+        err << "Can't open the signal pipe\n";
+        return kCannotBind;
+    }
+    gSignalWriteEnd = signalPipe[1];
+    if (!InstallSignalHandlers()) {
+        err << "Can't install the signal handlers\n";
+        ::close(signalPipe[0]);
+        ::close(signalPipe[1]);
+        return kCannotBind;
+    }
+
     out << "Serving on " << options.host << ":" << options.port
         << ", admin on " << options.adminHost << ":" << options.adminPort << "\n";
     out.flush();
 
+    // The rebuild runs here, on a thread of its own, never in the handler: the
+    // handler is a signal handler and may do nothing but write a byte.
+    std::thread signals([&] {
+        for (;;) {
+            unsigned char byte = 0;
+            const auto got = ::read(signalPipe[0], &byte, 1);
+            if (got <= 0) {
+                return;
+            }
+            if (byte == 0) {
+                publicListener.stop();
+                adminListener.stop();
+                return;
+            }
+            const auto reply = Reload(registry, gate);
+            err << "SIGHUP: " << reply.body;
+            err.flush();
+        }
+    });
+
     std::thread admin([&adminListener] { adminListener.listen_after_bind(); });
     publicListener.listen_after_bind();
-
     adminListener.stop();
+
+    // Unblocks the reader if the listeners stopped for any other reason. Harmless
+    // when it has already returned: the byte sits in a pipe we are about to close.
+    const unsigned char stop = 0;
+    const ssize_t wrote = ::write(signalPipe[1], &stop, 1);
+    (void)wrote;
+
+    signals.join();
     admin.join();
+    ::close(signalPipe[0]);
+    ::close(signalPipe[1]);
+    gSignalWriteEnd = -1;
     return kSuccess;
 }
 

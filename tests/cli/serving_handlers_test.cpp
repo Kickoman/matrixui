@@ -2,7 +2,9 @@
 
 #include "cli/serving/handlers.h"
 
+#include "core/lib/file_stream.h"
 #include "core/serving/build.h"
+#include "core/serving/error.h"
 #include "core/serving/registry.h"
 
 #include "tests/support/model_dir.h"
@@ -469,4 +471,166 @@ TEST_CASE("ErrorReply carries the same envelope as every handler") {
     CHECK(reply.contentType == "application/json");
     CHECK(Code(reply) == "not_found");
     CHECK(Parsed(reply).at("error").at("message") == "no such route");
+}
+
+TEST_CASE("Readyz answers on the composition, not on the failures alone") {
+    Tests::TempDir dir;
+
+    SUBCASE("a composition with models is ready, failures and all") {
+        const auto root = Tests::WriteModelTree(dir, {{"mnist-v3", "mnist", "v3", {64, 16, 3}}});
+        std::filesystem::create_directories(root / "broken");
+        Io::WriteFile(root / "broken" / "manifest.json", [](std::ostream& out) { out << "{nope"; });
+
+        Serving::RegistryConfig config;
+        config.root = root;
+        Serving::ModelRegistry registry(config);
+        registry.rebuild();
+        const auto snapshot = registry.snapshot();
+
+        const auto lenient = ServingCli::Readyz(*snapshot, false);
+        CHECK(lenient.status == 200);
+        CHECK(Parsed(lenient).at("ready") == true);
+        CHECK(Parsed(lenient).at("failures") == 1);
+        CHECK(Parsed(lenient).at("models") == 1);
+
+        // --strict-ready re-couples what step 2 decoupled, on purpose and on request.
+        const auto strict = ServingCli::Readyz(*snapshot, true);
+        CHECK(strict.status == 503);
+        CHECK(Parsed(strict).at("ready") == false);
+        CHECK(Parsed(strict).at("strict") == true);
+    }
+
+    SUBCASE("a composition with no models is never ready") {
+        const auto root = dir.file("empty");
+        std::filesystem::create_directories(root);
+        Serving::RegistryConfig config;
+        config.root = root;
+        Serving::ModelRegistry registry(config);
+        registry.rebuild();
+
+        for (const bool strict : {false, true}) {
+            const auto reply = ServingCli::Readyz(*registry.snapshot(), strict);
+            CHECK(reply.status == 503);
+            CHECK(Parsed(reply).at("models") == 0);
+        }
+    }
+
+    SUBCASE("a snapshot that was never published is not ready") {
+        // generation 0 is the only thing separating this from an empty root.
+        Serving::RegistrySnapshot fresh;
+        const auto reply = ServingCli::Readyz(fresh, false);
+        CHECK(reply.status == 503);
+        CHECK(Parsed(reply).at("generation") == 0);
+    }
+
+    SUBCASE("a default naming a version that did not load keeps the model serving") {
+        const auto root = Tests::WriteModelTree(dir, {{"mnist-v3", "mnist", "v3", {64, 16, 3}}});
+        Serving::RegistryConfig config;
+        config.root = root;
+        config.defaults = {{"mnist", "v9"}};
+        Serving::ModelRegistry registry(config);
+        registry.rebuild();
+        const auto snapshot = registry.snapshot();
+
+        CHECK(ServingCli::Readyz(*snapshot, false).status == 200);
+        CHECK(ServingCli::Readyz(*snapshot, true).status == 503);
+
+        // The name is known here because the typo is in the configuration, not in
+        // an artifact -- unlike a manifest that failed to parse.
+        const auto detail = Parsed(ServingCli::Readyz(*snapshot, false)).at("detail");
+        REQUIRE(detail.size() == 1);
+        CHECK(detail[0].at("name") == "mnist");
+        CHECK(detail[0].at("version") == "v9");
+    }
+}
+
+TEST_CASE("Readyz bounds a body the operator does not control") {
+    Tests::TempDir dir;
+
+    SUBCASE("a reason is elided") {
+        const auto root = dir.file("models");
+        std::filesystem::create_directories(root / "huge");
+        nlohmann::json manifest{
+            {"manifestVersion", 1}, {"name", "x"}, {"version", "v1"},
+            {"weights", {{"path", "weights.wgt"}}},
+            {"input", std::vector<int>(900, 7)},
+            {"output", {{"size", 1}}},
+        };
+        Tests::WriteManifest(root / "huge", manifest);
+
+        Serving::RegistryConfig config;
+        config.root = root;
+        Serving::ModelRegistry registry(config);
+        registry.rebuild();
+
+        const auto detail = Parsed(ServingCli::Readyz(*registry.snapshot(), false)).at("detail");
+        REQUIRE(detail.size() == 1);
+        const auto reason = detail[0].at("reason").get<std::string>();
+        CHECK(reason.size() == 512 + 3);
+        CHECK(reason.substr(reason.size() - 3) == "...");
+    }
+
+    SUBCASE("failures past the thirty-second are counted, not printed") {
+        const auto root = dir.file("many");
+        std::filesystem::create_directories(root);
+        for (int i = 0; i < 40; ++i) {
+            const auto one = root / ("broken" + std::to_string(i));
+            std::filesystem::create_directories(one);
+            Io::WriteFile(one / "manifest.json", [](std::ostream& out) { out << "{nope"; });
+        }
+
+        Serving::RegistryConfig config;
+        config.root = root;
+        Serving::ModelRegistry registry(config);
+        registry.rebuild();
+
+        const auto body = Parsed(ServingCli::Readyz(*registry.snapshot(), false));
+        CHECK(body.at("failures") == 40);
+        CHECK(body.at("detail").size() == 32);
+        CHECK(body.at("detailTruncated") == 8);
+    }
+}
+
+TEST_CASE("Reload rebuilds once at a time and never destroys what serves") {
+    Tests::TempDir dir;
+    const auto root = Tests::WriteModelTree(dir, {{"mnist-v3", "mnist", "v3", {64, 16, 3}}});
+    Serving::RegistryConfig config;
+    config.root = root;
+    Serving::ModelRegistry registry(config);
+    registry.rebuild();
+    REQUIRE(registry.snapshot()->generation == 1);
+
+    SUBCASE("a rebuild publishes the next generation") {
+        ServingCli::ReloadGate gate;
+        const auto reply = ServingCli::Reload(registry, gate);
+        CHECK(reply.status == 200);
+        CHECK(Parsed(reply).at("generation") == 2);
+        CHECK(Parsed(reply).at("models") == 1);
+        CHECK(Parsed(reply).at("failures") == 0);
+        CHECK(Parsed(reply).contains("durationMs"));
+        CHECK(registry.snapshot()->generation == 2);
+        CHECK_FALSE(gate.inFlight.load());
+    }
+
+    SUBCASE("a second rebuild while one runs is refused, not queued") {
+        ServingCli::ReloadGate gate;
+        gate.inFlight.store(true);
+        const auto reply = ServingCli::Reload(registry, gate);
+        CHECK(reply.status == 409);
+        CHECK(Code(reply) == "reload_in_flight");
+        CHECK(registry.snapshot()->generation == 1);   // nothing was rebuilt
+    }
+
+    SUBCASE("a rebuild that throws leaves the old composition serving") {
+        std::filesystem::remove_all(root);
+        ServingCli::ReloadGate gate;
+        const auto reply = ServingCli::Reload(registry, gate);
+        CHECK(reply.status == 500);
+        CHECK(Code(reply) == "reload_failed");
+        // The unchanged generation is the proof: publication is the last statement.
+        CHECK(Parsed(reply).at("error").at("generation") == 1);
+        CHECK(registry.snapshot()->generation == 1);
+        CHECK(registry.snapshot()->models.size() == 1);
+        CHECK_FALSE(gate.inFlight.load());
+    }
 }

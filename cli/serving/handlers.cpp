@@ -5,9 +5,11 @@
 #include "core/nn/neural_network_applier.h"
 #include "core/serving/loaded_model.h"
 #include "core/serving/manifest.h"
+#include "core/serving/registry.h"
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -21,6 +23,12 @@ namespace {
 constexpr char kJson[] = "application/json";
 constexpr char kBinary[] = "application/octet-stream";
 constexpr std::size_t kMaxParseMessageBytes = 512;
+
+// A failure's reason is an exception's what(), and a manifest message embeds
+// value.dump() of whatever the operator put in the file -- bounded only by the
+// 1MiB the loader allows a manifest. Unbounded, /readyz would echo megabytes.
+constexpr std::size_t kMaxReasonBytes = 512;
+constexpr std::size_t kMaxReportedFailures = 32;
 
 // The wire is little-endian whatever the host is, the same rule the on-disk
 // formats follow. IsLittleEndian() is constexpr, so the swap disappears on x86.
@@ -69,11 +77,15 @@ HttpReply Reply(const int status, nlohmann::json body) {
     return HttpReply{status, kJson, body.dump() + "\n", {}};
 }
 
-std::string Truncated(const std::string& text) {
-    if (text.size() <= kMaxParseMessageBytes) {
+std::string Elided(const std::string& text, const std::size_t allowed) {
+    if (text.size() <= allowed) {
         return text;
     }
-    return text.substr(0, kMaxParseMessageBytes) + "...";
+    return text.substr(0, allowed) + "...";
+}
+
+std::string Truncated(const std::string& text) {
+    return Elided(text, kMaxParseMessageBytes);
 }
 
 nlohmann::json ManifestJson(const Serving::LoadedModel& model, const bool isDefault) {
@@ -260,6 +272,80 @@ bool DecodeJson(
 }
 
 }  // namespace
+
+HttpReply Readyz(const Serving::RegistrySnapshot& snapshot, const bool strict) {
+    // generation is the only thing that tells "never published" from "published
+    // an empty composition": the registry's constructor installs an empty
+    // snapshot at generation 0, and install() stamps ++published.
+    const bool ready = snapshot.generation > 0
+        && !snapshot.models.empty()
+        && (!strict || snapshot.failures.empty());
+
+    nlohmann::json detail = nlohmann::json::array();
+    std::size_t truncated = 0;
+    for (const auto& failure : snapshot.failures) {
+        if (detail.size() >= kMaxReportedFailures) {
+            ++truncated;
+            continue;
+        }
+        nlohmann::json one{
+            {"directory", failure.directory.string()},
+            {"kind", Serving::ToString(failure.kind)},
+            {"reason", Elided(failure.reason, kMaxReasonBytes)},
+        };
+        // Set for a broken default, a collision and a budget refusal; absent when
+        // parsing itself failed, because then the name is not known.
+        if (failure.key.has_value()) {
+            one["name"] = failure.key->name;
+            one["version"] = failure.key->version;
+        }
+        detail.push_back(std::move(one));
+    }
+
+    return Reply(ready ? 200 : 503, nlohmann::json{
+        {"ready", ready},
+        {"strict", strict},
+        {"generation", snapshot.generation},
+        {"models", snapshot.models.size()},
+        {"failures", snapshot.failures.size()},
+        {"detail", std::move(detail)},
+        {"detailTruncated", truncated},
+    });
+}
+
+HttpReply Reload(Serving::ModelRegistry& registry, ReloadGate& gate) {
+    bool expected = false;
+    if (!gate.inFlight.compare_exchange_strong(expected, true)) {
+        return ErrorReply(409, "reload_in_flight", "a rebuild is already running");
+    }
+    struct Release {
+        ReloadGate& gate;
+        ~Release() { gate.inFlight.store(false); }
+    } release{gate};
+
+    const auto started = std::chrono::steady_clock::now();
+    try {
+        const auto snapshot = registry.rebuild();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - started).count();
+        return Reply(200, nlohmann::json{
+            {"generation", snapshot->generation},
+            {"models", snapshot->models.size()},
+            {"failures", snapshot->failures.size()},
+            {"durationMs", elapsed},
+        });
+    } catch (const std::exception& error) {
+        // Build throws only Serving::Error, but a bad_alloc or an uncovered
+        // filesystem_error escapes it, so this catches std::exception. The old
+        // composition is still serving because publication is the last statement,
+        // and the unchanged generation is what proves it.
+        return Reply(500, {{"error", {
+            {"code", "reload_failed"},
+            {"message", Elided(error.what(), kMaxReasonBytes)},
+            {"generation", registry.snapshot()->generation},
+        }}});
+    }
+}
 
 HttpReply ErrorReply(const int status, std::string_view code, std::string_view message) {
     return Reply(status, {{"error", {

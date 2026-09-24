@@ -206,6 +206,31 @@ TEST_CASE("The listeners answer on ephemeral ports and stop when told") {
         CHECK(Fetch(port, "GET", "/v1/models/-leading-dash").status == 404);
     }
 
+    SUBCASE("readiness and reload live on the admin listener only") {
+        const auto ready = Fetch(server.adminPort(), "GET", "/readyz");
+        CHECK(ready.status == 200);
+        const auto body = nlohmann::json::parse(ready.body);
+        CHECK(body.at("ready") == true);
+        CHECK(body.at("models") == 2);
+        CHECK(body.at("generation") == 1);
+
+        // Absolute server paths and manifest text go out here, and an
+        // unauthenticated rebuild is triggerable here, so neither is on the
+        // public socket. With no auth in this step the bind address is the only
+        // access control there is.
+        CHECK(Fetch(port, "GET", "/readyz").status == 404);
+        CHECK(Fetch(port, "POST", "/admin/reload").status == 404);
+    }
+
+    SUBCASE("a reload over the admin socket publishes the next generation") {
+        const auto reload = Fetch(server.adminPort(), "POST", "/admin/reload");
+        CHECK(reload.status == 200);
+        CHECK(nlohmann::json::parse(reload.body).at("generation") == 2);
+
+        const auto after = Fetch(server.adminPort(), "GET", "/readyz");
+        CHECK(nlohmann::json::parse(after.body).at("generation") == 2);
+    }
+
     server.stop();
     server.stop();   // idempotent, so a handle can be stopped and then destroyed
     CHECK(err.str().empty());

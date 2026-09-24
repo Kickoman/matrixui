@@ -94,6 +94,83 @@ no special socket handling, and `ServerSettings::tcpNoDelay` is asserted by a
 test rather than trusted, because losing it leaves a service that answers
 correctly and ninety times slower.
 
+## Two listeners, and why
+
+`--port` carries `/healthz`, `/v1/models` and the predict routes. `--admin-port`,
+on loopback by default, carries `/healthz`, `/readyz` and `POST /admin/reload`.
+
+Authentication and TLS are out of scope for this step, which makes the bind
+address the only access control there is. `/readyz` publishes absolute server
+paths and the text of manifests — which is operator input, echoed through an
+exception message — and `/admin/reload` triggers an unauthenticated re-read of the
+whole tree. Neither belongs on a public socket, and a test asserts that neither
+answers there.
+
+## Readiness
+
+`/healthz` is liveness and never reads the registry: a probe that can fail for a
+reason a restart will not fix is a probe that gets the process killed. It answers
+one question, whether the listener accepted and routed.
+
+`/readyz` is readiness, and its predicate is:
+
+```
+default:         generation > 0 && !models.empty()
+--strict-ready:  generation > 0 && !models.empty() && failures.empty()
+```
+
+`generation > 0` is the only thing that separates *never published* from
+*published an empty composition*: the registry's constructor installs an empty
+snapshot at generation 0 and `install` stamps `++published`.
+
+`failures.empty()` is deliberately **not** the default gate. Step 2 decided that
+the unit of failure is a directory and the unit of value is a model, and that they
+are independent; gating readiness on the failure list re-couples exactly that, so
+one unparsable directory would pull a healthy nineteen-model service out of
+rotation. `--strict-ready` is for operators who want them coupled, and the same
+flag also makes `serve` exit `kIncomplete` before binding rather than start
+degraded — one flag, both meanings.
+
+The body has the same shape at 200 and at 503, so a probe never branches on the
+status to read it, and it is bounded: a reason is elided at 512 bytes and at most
+32 failures are printed, the rest counted in `detailTruncated`. Without that, a
+manifest whose `input` is a 900 KB array would put 900 KB into a readiness probe.
+
+**A broken `--default` is reported with `directory` set to the root**, not to a
+model directory, because the mistake is in the configuration rather than in any
+artifact. It does carry `name` and `version`, which a parse failure cannot. A
+reader that renders every failure as "this directory did not load" will misreport
+a typo as a corrupt tree.
+
+## Reload
+
+Both triggers, one path: `POST /admin/reload` and `SIGHUP` call the same function.
+
+It is synchronous. `rebuild()` re-reads everything — measured in
+`core/serving/README.md` at 1.3 ms for a 795 KB model and about 0.03 s for twenty
+MNIST-sized ones — the admin listener has one thread of its own, and its write
+timeout is raised to 60 s so even a pathological tree answers rather than dropping
+the connection.
+
+One rebuild at a time. `rebuild()` holds the registry's mutex for the whole walk,
+so a second concurrent request is refused with 409 rather than queued: it would
+park a connection slot for the length of a re-read the first one is already doing.
+
+A failed rebuild is non-destructive, because publication is the last statement,
+and the **unchanged `generation` in the 500 body is the proof**. The handler
+catches `std::exception`, not only `Serving::Error`: `Build` catches only the
+latter, so a `bad_alloc` or an uncovered `filesystem_error` escapes it.
+
+`SIGHUP` goes through a self-pipe. The handler writes one byte and touches nothing
+else — no mutex, no allocation, no stream, all of which are undefined there — and
+a dedicated thread does the rebuild. `SIGINT` and `SIGTERM` write a different byte
+through the same pipe, which is how the process stops cleanly.
+
+**Rapid `SIGHUP`s coalesce.** Standard signals are not queued, so two arriving
+before the handler runs produce one rebuild. That is the desirable outcome — one
+re-read instead of two identical ones — but it means `SIGHUP` is a request to
+reconverge, not a counter.
+
 ## What the `serve` limits cost
 
 `--max-body-bytes` defaults to 8 MiB against httplib's own

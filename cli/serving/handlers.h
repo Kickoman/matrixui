@@ -2,9 +2,14 @@
 
 #include "core/serving/snapshot.h"
 
+#include <atomic>
 #include <cstddef>
 #include <string>
 #include <string_view>
+
+namespace Serving {
+class ModelRegistry;
+}
 
 namespace ServingCli {
 
@@ -38,6 +43,19 @@ HttpReply Predict(
     const PredictRequest& request,
     const HandlerLimits& limits
 );
+
+// Readiness, admin side only. The body has the same shape whether ready or not,
+// so a probe never has to branch on the status to read it.
+HttpReply Readyz(const Serving::RegistrySnapshot& snapshot, bool strict);
+
+// One rebuild at a time. rebuild() holds the registry's mutex for the whole walk,
+// so a second concurrent request would park a connection slot for seconds to pay
+// for a re-read the first one is already doing.
+struct ReloadGate {
+    std::atomic<bool> inFlight{false};
+};
+
+HttpReply Reload(Serving::ModelRegistry& registry, ReloadGate& gate);
 
 // For the statuses httplib raises on its own, so every body carries one envelope.
 HttpReply ErrorReply(int status, std::string_view code, std::string_view message);
