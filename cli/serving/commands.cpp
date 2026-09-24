@@ -145,7 +145,7 @@ int RunServe(std::ostream& out, std::ostream& err, const ServeOptions& options) 
         }
     }
 
-    return RunServer(out, err, options);
+    return RunServer(out, err, options, registry);
 }
 
 }  // namespace

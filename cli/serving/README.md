@@ -60,6 +60,40 @@ The CLI11 codes are not ours but they are **pinned** by
 `tests/golden/serving/expected/*.code`, so a new exit code must not collide with
 them.
 
+## What the wire costs
+
+Measured against a Release build, one model 784-128-10, `--threads 2`, one
+keep-alive client, median of three thousand requests:
+
+| Representation | Body | Median | Throughput |
+|---|---|---|---|
+| `application/octet-stream` | 6272 B | 151 us | 6600 req/s |
+| `application/json` | 15043 B | 561 us | 1800 req/s |
+
+The binary path is 3.7x quicker for the same prediction, and the gap is the
+decode: nlohmann has to build a document tree, the raw path is a loop of
+`memcpy`. That is why `octet-stream` exists at all, and why JSON stays — it is
+the only representation a human can send by hand, and nothing in this step ships
+a tool that builds a frame.
+
+**`TCP_NODELAY` is the server's job and only the server's.** httplib defaults
+`CPPHTTPLIB_TCP_NODELAY` to false. Measured over all four combinations of the
+flag on a keep-alive binary round trip:
+
+| Server | Client | Median |
+|---|---|---|
+| on | on | 91.9 us |
+| on | off | 84.1 us |
+| off | on | 41162 us |
+| off | off | 41324 us |
+
+With the server setting it, what the client does is noise. With the server not
+setting it, nothing the client does helps: it is Nagle against a delayed ACK on
+the response, and forty milliseconds is the delayed-ACK timer. So a client needs
+no special socket handling, and `ServerSettings::tcpNoDelay` is asserted by a
+test rather than trusted, because losing it leaves a service that answers
+correctly and ninety times slower.
+
 ## What the `serve` limits cost
 
 `--max-body-bytes` defaults to 8 MiB against httplib's own
