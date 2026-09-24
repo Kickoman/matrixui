@@ -284,6 +284,15 @@ TEST_CASE("The listeners are configured with TCP_NODELAY") {
     CHECK(publicSide.keepAliveMaxCount == 100);
     CHECK(publicSide.maxBodyBytes == 4096);
 
+    // The serve default the handler layer inherits, pinned next to the rest.
+    CHECK(ServingCli::ServeOptions{}.maxBatchRows == 32);
+    CHECK(ServingCli::ServeOptions{}.maxBodyBytes == 8u << 20);
+    // Loopback, not 0.0.0.0: with no auth and no TLS in this step the bind address
+    // is the only access control, and a service that listens to the world by
+    // default is one that gets deployed "just to try" and stays.
+    CHECK(ServingCli::ServeOptions{}.host == "127.0.0.1");
+    CHECK(ServingCli::ServeOptions{}.adminHost == "127.0.0.1");
+
     const auto adminSide = ServingCli::AdminSettings(options);
     CHECK(adminSide.tcpNoDelay);
     // Two, and this is load-bearing rather than a round number. A pool task is a

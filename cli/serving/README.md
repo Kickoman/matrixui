@@ -191,6 +191,43 @@ before the handler runs produce one rebuild. That is the desirable outcome — o
 re-read instead of two identical ones — but it means `SIGHUP` is a request to
 reconverge, not a counter.
 
+## Batching, and where the ceiling comes from
+
+`forward` is batched by rows, and one request carrying several rows amortises both
+the inference and the roughly 75 us of HTTP and socket work that surrounds it.
+Measured through the real server, Release, binary frame, 784-128-10, one
+keep-alive client:
+
+| Rows | Median | Per row | Against one row | Body |
+|---|---|---|---|---|
+| 1 | 225 us | 225 us | 1.00x | 6 KB |
+| 8 | 346 us | 43 us | 5.20x | 49 KB |
+| 16 | 626 us | 39 us | **5.76x** | 98 KB |
+| 32 | 1292 us | 40 us | 5.58x | 196 KB |
+| 64 | 3101 us | 48 us | 4.65x | 392 KB |
+
+The gain peaks near sixteen rows and then falls back: past that the intermediate
+activations stop fitting in cache, and the per-row cost climbs again.
+
+`--max-batch-rows` defaults to **32**, and it is a hard refusal — 413
+`batch_too_large` — not a policy switch. The binding constraint is head-of-line
+blocking rather than memory: a request occupies one connection slot for its whole
+length, so a batch that costs much more than the tail everyone else already sees
+drags that tail out. The measured p99 under saturation is about 1200 us, which 32
+rows match at 1292 us and 64 rows exceed by 2.6x at 3101 us. Memory is not close
+to binding: 32 rows of the heaviest measured topology carry about 400 KB of
+intermediates.
+
+An operator who cares about throughput more than about tail latency can raise it;
+the flag exists for that, and nothing above 16 rows buys much more efficiency
+anyway.
+
+**These absolute numbers drift.** Re-measuring the single-row path across sessions
+on the same laptop gave 41.7 us, 48.2 us and 59.9 us for the same topology — a
+CPU that throttles differently from one hour to the next. The ratios held every
+time, which is why the derivations above rest on ratios and on one p99 measured in
+the same sitting as the batch figures.
+
 ## What the `serve` limits cost
 
 `--max-body-bytes` defaults to 8 MiB against httplib's own

@@ -21,7 +21,7 @@ struct ServeOptions {
     int adminPort = 8081;
 
     std::size_t threads = 32;
-    std::size_t maxBatchRows = 64;
+    std::size_t maxBatchRows = 32;
     std::size_t maxBodyBytes = 8u << 20;
 
     bool strictReady = false;

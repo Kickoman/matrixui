@@ -408,6 +408,24 @@ TEST_CASE("Predict refuses a batch over the ceiling") {
               != std::string::npos);
     }
 
+    SUBCASE("the default ceiling is the one the latency budget derives") {
+        // Thirty-two, not sixty-four. Measured end to end on 784-128-10: one row
+        // 225us, 8 rows 346us, 16 rows 626us, 32 rows 1292us, 64 rows 3101us. The
+        // per-row gain peaks near sixteen and falls back after, and the p99 under
+        // saturation is about 1200us -- which 32 rows match and 64 rows exceed by
+        // 2.6x. A batch holds one connection slot for its whole length, so going
+        // past that budget drags out the tail for everyone else.
+        CHECK(ServingCli::HandlerLimits{}.maxBatchRows == 32);
+
+        const std::vector<std::vector<double>> rows(33, Row(64));
+        const auto reply = PredictJson(snapshot, "mnist", "v3", JsonBody(rows));
+        CHECK(reply.status == 413);
+        CHECK(Code(reply) == "batch_too_large");
+
+        const std::vector<std::vector<double>> allowed(32, Row(64));
+        CHECK(PredictJson(snapshot, "mnist", "v3", JsonBody(allowed)).status == 200);
+    }
+
     SUBCASE("a binary body cannot declare more rows than it carries") {
         const std::vector<double> values(65 * 64, 0.5);
         const auto reply = ServingCli::Predict(

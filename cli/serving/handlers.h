@@ -14,7 +14,7 @@ class ModelRegistry;
 namespace ServingCli {
 
 struct HandlerLimits {
-    std::size_t maxBatchRows = 64;
+    std::size_t maxBatchRows = 32;
 };
 
 struct PredictRequest {
