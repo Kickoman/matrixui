@@ -148,13 +148,33 @@ Both triggers, one path: `POST /admin/reload` and `SIGHUP` call the same functio
 
 It is synchronous. `rebuild()` re-reads everything — measured in
 `core/serving/README.md` at 1.3 ms for a 795 KB model and about 0.03 s for twenty
-MNIST-sized ones — the admin listener has one thread of its own, and its write
-timeout is raised to 60 s so even a pathological tree answers rather than dropping
-the connection.
+MNIST-sized ones — the admin listener has its own small pool so a reload never
+waits behind public traffic, and its write timeout is raised to 60 s so even a
+pathological tree answers rather than dropping the connection.
 
-One rebuild at a time. `rebuild()` holds the registry's mutex for the whole walk,
-so a second concurrent request is refused with 409 rather than queued: it would
-park a connection slot for the length of a re-read the first one is already doing.
+One rebuild at a time, refused with 409 rather than queued: a second rebuild would
+re-read a tree the first one is reading right now.
+
+**That guarantee needs the admin listener to have two threads, and the reason is
+not obvious.** A pool task is a whole connection, not a request, so a
+single-threaded admin listener cannot hold two reload requests at once: the second
+waits in the kernel backlog until the first has finished and released the gate,
+then gets a thread, finds the gate free, and pays for a full second re-read.
+Measured on twelve 5 MB models, one rebuild costing 141 ms, two simultaneous
+`curl`s:
+
+| Admin threads | Wall clock | First | Second |
+|---|---|---|---|
+| 1 | 280 ms | 200, generation 2 | 200, generation 3 |
+| 2 | 171 ms | 200, generation 3 | **409** |
+
+At one thread the 409 in this document did not exist over HTTP, and the
+documentation was describing something the code could not do.
+
+The other way in is genuinely concurrent whatever the pool looks like: the signal
+thread is not part of it. Ten rounds of a `SIGHUP` racing an HTTP reload published
+exactly ten generations for twenty requests — every HTTP request answered 409 while
+the signal thread held the gate.
 
 A failed rebuild is non-destructive, because publication is the last statement,
 and the **unchanged `generation` in the 500 body is the proof**. The handler

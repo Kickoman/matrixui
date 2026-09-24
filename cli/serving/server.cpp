@@ -208,6 +208,18 @@ bool InstallSignalHandlers() {
         && ::sigaction(SIGTERM, &action, nullptr) == 0;
 }
 
+// Ignored rather than restored to the default: shutdown is already under way, and
+// SIG_DFL for SIGHUP would turn a stray signal into termination by signal instead
+// of a clean exit status.
+void SilenceSignalHandlers() {
+    struct sigaction action{};
+    action.sa_handler = SIG_IGN;
+    sigemptyset(&action.sa_mask);
+    ::sigaction(SIGHUP, &action, nullptr);
+    ::sigaction(SIGINT, &action, nullptr);
+    ::sigaction(SIGTERM, &action, nullptr);
+}
+
 HandlerLimits LimitsOf(const ServeOptions& options) {
     return HandlerLimits{options.maxBatchRows};
 }
@@ -227,8 +239,14 @@ ServerSettings AdminSettings(const ServeOptions& options) {
     ServerSettings settings = PublicSettings(options);
     // One thread: rebuild() serialises on the registry's own mutex anyway, and an
     // admin request must never wait behind a public one.
-    settings.threads = 1;
-    settings.maxThreads = 1;
+    // Two, not one, and the reason is the pool's shape: a task is a whole
+    // connection, so a single-threaded listener cannot have two admin requests in
+    // flight. The second would wait in the backlog until the first rebuild had
+    // finished and released the gate, get a thread, see the gate free, and pay for
+    // a second full re-read of the tree the first one just read. Two threads make
+    // the 409 reachable, which is what turns it from a claim into a guarantee.
+    settings.threads = 2;
+    settings.maxThreads = 2;
     // A reload re-reads the whole tree, so the admin side gets room to answer
     // where the public side keeps its five-second stall detector.
     settings.writeTimeoutSeconds = 60;
@@ -384,9 +402,14 @@ int RunServer(
 
     signals.join();
     admin.join();
+
+    // Order matters: stop the handlers and drop the descriptor before closing it.
+    // The other way round, a signal arriving in the window writes into a closed
+    // fd -- or into whatever else has since been handed that number.
+    SilenceSignalHandlers();
+    gSignalWriteEnd = -1;
     ::close(signalPipe[0]);
     ::close(signalPipe[1]);
-    gSignalWriteEnd = -1;
     return kSuccess;
 }
 

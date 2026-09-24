@@ -286,6 +286,16 @@ TEST_CASE("The listeners are configured with TCP_NODELAY") {
 
     const auto adminSide = ServingCli::AdminSettings(options);
     CHECK(adminSide.tcpNoDelay);
-    CHECK(adminSide.threads == 1);
-    CHECK(adminSide.maxThreads == 1);
+    // Two, and this is load-bearing rather than a round number. A pool task is a
+    // whole connection, so at one thread two admin reloads cannot overlap: the
+    // second waits in the backlog, finds the gate free, and re-reads the tree the
+    // first one just read. Measured on twelve 5MB models, rebuild 126ms: at one
+    // thread both requests answered 200 and the pair took 280ms; at two, the
+    // second answered 409 and the pair took 136ms. Drop this to one and the 409
+    // documented in the README stops existing over HTTP.
+    CHECK(adminSide.threads == 2);
+    CHECK(adminSide.maxThreads == 2);
+    // The public side keeps its stall detector; a reload needs room to answer.
+    CHECK(adminSide.writeTimeoutSeconds == 60);
+    CHECK(publicSide.writeTimeoutSeconds == 5);
 }
