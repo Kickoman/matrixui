@@ -43,6 +43,12 @@ target_include_directories(matrixgui_contrib SYSTEM INTERFACE ${PROJECT_SOURCE_D
 
 add_library(matrixgui_eigen INTERFACE)
 target_include_directories(matrixgui_eigen SYSTEM INTERFACE ${PROJECT_SOURCE_DIR}/eigen)
+# The vendored Eigen is 3.3.90, which enables AVX-512 kernels on a -march that has
+# them while still promising only 32-byte alignment. The kernel then issues a
+# 64-byte-aligned store into a 32-byte-aligned buffer and the process dies inside a
+# large enough product. See core/matrix/README.md; carried on this target so that
+# every translation unit that can reach Eigen agrees on the value.
+target_compile_definitions(matrixgui_eigen INTERFACE EIGEN_MAX_ALIGN_BYTES=64)
 
 if(BUILD_TESTS)
     enable_testing()

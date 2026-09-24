@@ -194,39 +194,48 @@ reconverge, not a counter.
 ## Batching, and where the ceiling comes from
 
 `forward` is batched by rows, and one request carrying several rows amortises both
-the inference and the roughly 75 us of HTTP and socket work that surrounds it.
-Measured through the real server, Release, binary frame, 784-128-10, one
-keep-alive client:
+the inference and the HTTP work around it. Measured end to end, Release, binary
+frame, 784-128-10, server pinned to two CPUs and the client to two others, median
+of three runs:
 
 | Rows | Median | Per row | Against one row | Body |
 |---|---|---|---|---|
-| 1 | 225 us | 225 us | 1.00x | 6 KB |
-| 8 | 346 us | 43 us | 5.20x | 49 KB |
-| 16 | 626 us | 39 us | **5.76x** | 98 KB |
-| 32 | 1292 us | 40 us | 5.58x | 196 KB |
-| 64 | 3101 us | 48 us | 4.65x | 392 KB |
-
-The gain peaks near sixteen rows and then falls back: past that the intermediate
-activations stop fitting in cache, and the per-row cost climbs again.
+| 1 | 172 us | 172 us | 1.00x | 6 KB |
+| 8 | 287 us | 36 us | 4.8x | 49 KB |
+| 16 | 515 us | 32 us | 5.4x | 98 KB |
+| 32 | 875 us | 27 us | **6.9x** | 196 KB |
+| 64 | 2620 us | 41 us | 4.2x | 392 KB |
 
 `--max-batch-rows` defaults to **32**, and it is a hard refusal — 413
-`batch_too_large` — not a policy switch. The binding constraint is head-of-line
-blocking rather than memory: a request occupies one connection slot for its whole
-length, so a batch that costs much more than the tail everyone else already sees
-drags that tail out. The measured p99 under saturation is about 1200 us, which 32
-rows match at 1292 us and 64 rows exceed by 2.6x at 3101 us. Memory is not close
-to binding: 32 rows of the heaviest measured topology carry about 400 KB of
-intermediates.
+`batch_too_large` — not a policy switch. Thirty-two is where both arguments land:
+it is the best per-row cost measured, and it is the largest batch that still fits
+the tail. A request holds one connection slot for its whole length, the measured
+p99 under saturation is about 1200 us, and 32 rows come in at 875 us where 64 rows
+take 2620 us. Memory is nowhere near binding: 32 rows of the heaviest measured
+topology carry about 400 KB of intermediates.
 
-An operator who cares about throughput more than about tail latency can raise it;
-the flag exists for that, and nothing above 16 rows buys much more efficiency
-anyway.
+**Where the rise past 32 rows is, and where it is not.** It is not the inference:
+`Neural::Predict` per row improves monotonically all the way out — 48 us at one
+row, 8.6 us at 64 — and it is not the handler either, whose decode, fill, predict
+and encode together hold flat at about 10.7 us per row from 8 rows to 64. What is
+left is the transport of the body itself, which doubles from 196 KB to 392 KB
+across that step. The cost is measured; its mechanism is not, and this file will
+not guess at one.
 
-**These absolute numbers drift.** Re-measuring the single-row path across sessions
-on the same laptop gave 41.7 us, 48.2 us and 59.9 us for the same topology — a
-CPU that throttles differently from one hour to the next. The ratios held every
-time, which is why the derivations above rest on ratios and on one p99 measured in
-the same sitting as the batch figures.
+That distinction was worth the measurement: the first explanation written here
+blamed cache pressure on the activations, which the split above refutes.
+
+**The fill and encode loops walk columns, not rows, and that is not cosmetic.**
+`Matrix` wraps a column-major Eigen matrix, so a row-major walk strides by the row
+count and gets worse the taller the batch. Measured on a 784-column fill: about
+2.2 us per row either way at 8 rows, but 7.1 against 2.2 at 128. Written the
+row-major way the handler's own overhead grew from 3.1 to 6.9 us per row between 8
+and 64 rows; written this way it stays near 3.
+
+**These absolute numbers drift.** The single-row path measured 41.7 us, 48.2 us and
+59.9 us for the same topology across three sittings on the same laptop, a CPU that
+throttles differently from hour to hour. Ratios held every time, which is why the
+derivations here rest on ratios and on a p99 measured in the same sitting.
 
 ## What the `serve` limits cost
 

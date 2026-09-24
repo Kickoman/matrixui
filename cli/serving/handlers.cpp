@@ -444,9 +444,13 @@ HttpReply Predict(
         return ErrorReply(500, "internal", "internal error");
     }
 
+    // Column outside, row inside: Matrix wraps a column-major Eigen matrix, so a
+    // row-major walk strides by the row count and gets worse the taller the batch.
+    // Measured at 784 columns: 2.2us per row either way at 8 rows, but 7.1 against
+    // 2.2 at 128.
     Matrix input(decoded.rows, manifest.input.size);
-    for (std::size_t row = 0; row < decoded.rows; ++row) {
-        for (std::size_t col = 0; col < manifest.input.size; ++col) {
+    for (std::size_t col = 0; col < manifest.input.size; ++col) {
+        for (std::size_t row = 0; row < decoded.rows; ++row) {
             input(row, col) = decoded.values[row * manifest.input.size + col];
         }
     }
@@ -459,8 +463,8 @@ HttpReply Predict(
     if (format == BodyFormat::Binary) {
         reply.contentType = kBinary;
         reply.body.resize(decoded.rows * width * sizeof(double));
-        for (std::size_t row = 0; row < decoded.rows; ++row) {
-            for (std::size_t col = 0; col < width; ++col) {
+        for (std::size_t col = 0; col < width; ++col) {
+            for (std::size_t row = 0; row < decoded.rows; ++row) {
                 WriteLittleEndianDouble(
                     reply.body.data() + (row * width + col) * sizeof(double),
                     output(row, col)

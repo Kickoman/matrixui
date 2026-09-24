@@ -63,6 +63,45 @@ cannot be mistaken for a shape-matching add. Before this was fixed, four
 identical input rows produced four different answers, each summing to one and
 each looking like a reasonable distribution.
 
+**The vendored Eigen needs `EIGEN_MAX_ALIGN_BYTES` pinned, or a big enough product
+kills the process.** `eigen/` is 3.3.90, a snapshot between 3.3 and 3.4. On a
+`-march` that has AVX-512 it enables the AVX-512 kernels while still computing an
+alignment of 32, and the kernel then issues a `_mm512_store_pd`, which needs 64,
+into a buffer aligned to 32. The result is a SIGSEGV inside `gemm_pack_lhs` on the
+first product large enough for Eigen to take its blocked path — reachable over the
+network in a service, and reachable from training, where the matrices are bigger.
+
+Verified by compiling an assertion against the vendored headers, which needs no
+AVX-512 hardware to show:
+
+| `-march` | `EIGEN_MAX_ALIGN_BYTES` | AVX-512 kernels | |
+|---|---|---|---|
+| `skylake` | 32 | off | consistent |
+| `sapphirerapids` | 32 | **on** | **inconsistent** |
+| `skylake-avx512` | 32 | **on** | **inconsistent** |
+| `sapphirerapids` + `EIGEN_MAX_ALIGN_BYTES=64` | 64 | on | consistent |
+| `x86-64-v3` | 32 | off | consistent |
+
+The root `CMakeLists.txt` therefore sets `EIGEN_MAX_ALIGN_BYTES=64` on the
+`matrixgui_eigen` interface target rather than in the compiler flags. That target
+is what carries the include path, and `core/matrix/matrix.h` is the only file in
+the tree that includes Eigen, so every translation unit able to see Eigen also sees
+the definition — 108 of them, with none missed. Putting it in
+`CMAKE_CXX_FLAGS_RELEASE` next to `-march=native` would have left the Debug tree
+and the hand-written sanitizer build on a different value, which is the same class
+of mismatch one step removed.
+
+The threshold where it starts crashing is a property of Eigen's blocking
+heuristics, not of any number here: for 784x128 it sits between 64 and 96 rows on
+one machine, and it moves with the shape of the matrices and with the host.
+`tests/matrix/matrix_test.cpp` runs a 256x784 product for no reason other than to
+be above it, because every other matrix in the suite is below — which is exactly
+how this survived undetected until a batch request went looking for it.
+
+Updating to Eigen 3.4, where the alignment and the kernels agree, is the real fix
+and a separate piece of work: it re-measures everything that rests on the current
+numbers.
+
 **`Eigen::MatrixXd` is column-major.** `transform(rows, cols)` is a *row-major*
 reshape and therefore a strided copy, not a view: it walks the source in
 row-major order and writes in row-major order, which is what callers flattening

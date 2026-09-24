@@ -46,6 +46,7 @@ SOURCES=(
 
 echo "building with $FLAGS"
 g++ -std=c++20 -O1 -g $FLAGS \
+    -DEIGEN_MAX_ALIGN_BYTES=64 \
     -I. -Ieigen -Icontrib \
     "${SOURCES[@]}" -o "$OUT/serving_tests" -pthread
 
